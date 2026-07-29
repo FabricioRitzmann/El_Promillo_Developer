@@ -22,7 +22,13 @@ function assertIncludes(label, source, needles) {
 }
 
 const indexHtml = read('public/index.html');
+const dashboardHtml = read('public/dashboard.html');
+const scannerHtml = read('public/scanner.html');
+const editorHtml = read('public/editor.html');
 const authJs = read('public/js/auth.js');
+const dashboardJs = read('public/js/dashboard.js');
+const scannerJs = read('public/js/scanner.js');
+const editorJs = read('public/js/editor.js');
 const supabaseClientJs = read('public/js/supabaseClient.js');
 const i18nJs = read('public/js/i18n.js');
 
@@ -66,6 +72,33 @@ assertIncludes('Auth Sprache', i18nJs, [
   "{ code: 'it', short: 'IT', label: 'Italiano' }",
   'export function setupLanguageSelectors'
 ]);
+
+assertIncludes('Dashboard Sprache', dashboardHtml, [
+  'data-i18n="dashboard.heading"',
+  'data-i18n="dashboard.statsTitle"',
+  'data-i18n="nav.scanner"'
+]);
+
+assertIncludes('Scanner Sprache', scannerHtml, [
+  'data-i18n="scanner.heading"',
+  'data-i18n="scanner.loadCard"',
+  'data-i18n="dashboard.privacyNote"'
+]);
+
+assertIncludes('Editor Sprache', editorHtml, [
+  'data-i18n="editor.newTitle"',
+  'data-i18n="editor.saveTemplate"',
+  'data-i18n="editor.walletNotifications"'
+]);
+
+[
+  ['Dashboard JS Sprache', dashboardJs],
+  ['Scanner JS Sprache', scannerJs],
+  ['Editor JS Sprache', editorJs]
+].forEach(([label, source]) => assertIncludes(label, source, [
+  "import { setupLanguageSelectors",
+  'setupLanguageSelectors(document);'
+]));
 
 assertIncludes('Auth Session-Speicher', supabaseClientJs, [
   'const persistentSessionFlagKey',

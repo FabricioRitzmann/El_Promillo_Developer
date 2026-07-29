@@ -395,7 +395,7 @@ Wichtig für Free-Tier: Password Recovery ist mit Supabase Auth nutzbar. Wenn da
 
 ## Sprache und Login-Sitzung
 
-Login- und Kontoseite enthalten eine moderne Sprachwahl. Deutsch (`DE`) ist immer die Standardsprache; Betreiber können zusätzlich Englisch (`EN`), Französisch (`FR`) und Italienisch (`IT`) wählen. Die Auswahl wird lokal im Browser gespeichert und betrifft nur die angezeigten UI-Texte, nicht Supabase-Daten oder Wallet-Inhalte.
+Login- und Kontoseite enthalten eine moderne Sprachwahl. Deutsch (`DE`) ist immer die Standardsprache; Betreiber können zusätzlich Englisch (`EN`), Französisch (`FR`) und Italienisch (`IT`) wählen. Die Auswahl wird lokal im Browser gespeichert und von Login, Konto, Dashboard, Scanner und Karteneditor beim Laden übernommen. Sie betrifft nur die angezeigten UI-Texte, nicht Supabase-Daten oder Wallet-Inhalte.
 
 Aus Sicherheitsgründen bleibt ein Login standardmässig nur für die aktuelle Browser-Sitzung aktiv. Erst wenn beim Login `Eingeloggt bleiben` angewählt wird, speichert die App die Supabase-Session dauerhaft im Browser. Beim Logout werden beide Session-Speicher geleert.
 

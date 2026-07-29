@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>El Promillo - Dashboard</title>
+    <title data-i18n="dashboard.title">El Promillo - Dashboard</title>
     <link rel="stylesheet" href="styles.css">
   </head>
   <body>
@@ -19,9 +19,9 @@
     </header>
 
     <nav class="app-tabbar" aria-label="Hauptbereiche">
-      <a class="app-tab is-active" href="dashboard.html#dashboardOverview" data-dashboard-tab="dashboard" aria-current="page">Dashboard</a>
-      <a class="app-tab" href="dashboard.html#visitorStatistics" data-dashboard-tab="statistics">Besucherstatistik</a>
-      <a class="app-tab" href="scanner.html">Scanner</a>
+      <a class="app-tab is-active" href="dashboard.html#dashboardOverview" data-dashboard-tab="dashboard" aria-current="page" data-i18n="nav.dashboard">Dashboard</a>
+      <a class="app-tab" href="dashboard.html#visitorStatistics" data-dashboard-tab="statistics" data-i18n="nav.visitors">Besucherstatistik</a>
+      <a class="app-tab" href="scanner.html" data-i18n="nav.scanner">Scanner</a>
       <a class="app-tab app-tab-account" href="account.html" aria-label="Konto">
         <svg class="account-tab-icon" viewBox="0 0 24 24" aria-hidden="true">
           <circle cx="12" cy="8" r="4"></circle>
@@ -33,10 +33,10 @@
     <main class="page-shell">
       <section id="dashboardOverview" class="page-heading" data-dashboard-page="dashboard">
         <div>
-          <h1>Dashboard</h1>
-          <p class="view-subtitle">Karten, QR-Codes und Kundenkarten zentral verwalten.</p>
+          <h1 data-i18n="dashboard.heading">Dashboard</h1>
+          <p class="view-subtitle" data-i18n="dashboard.subtitle">Karten, QR-Codes und Kundenkarten zentral verwalten.</p>
         </div>
-        <a class="button primary" href="scanner.html">Kundenkarte scannen</a>
+        <a class="button primary" href="scanner.html" data-i18n="dashboard.scanCard">Kundenkarte scannen</a>
       </section>
 
       <div id="dashboardMessage" class="message" hidden></div>
@@ -44,33 +44,33 @@
       <section id="visitorStatistics" class="section-block stats-section" data-dashboard-page="statistics">
         <div class="section-title">
           <div>
-            <h2>Besucherstatistik</h2>
-            <p class="muted">Scans nach Zeitraum, Kartentyp, Clubkarten-Modul, Geschlecht, Altersgruppe, Uhrzeit und Aktion auswerten.</p>
+            <h2 data-i18n="dashboard.statsTitle">Besucherstatistik</h2>
+            <p class="muted" data-i18n="dashboard.statsSubtitle">Scans nach Zeitraum, Kartentyp, Clubkarten-Modul, Geschlecht, Altersgruppe, Uhrzeit und Aktion auswerten.</p>
           </div>
-          <button id="refreshStatsButton" class="secondary" type="button">Aktualisieren</button>
+          <button id="refreshStatsButton" class="secondary" type="button" data-i18n="dashboard.refresh">Aktualisieren</button>
         </div>
         <form id="statsFilterForm" class="panel stats-filter-panel">
           <div class="stats-filter-grid">
-            <label>Zeitraum
+            <label><span data-i18n="dashboard.period">Zeitraum</span>
               <select name="period" id="statsPeriod">
-                <option value="today">Heute</option>
-                <option value="yesterday">Gestern</option>
-                <option value="last_7_days" selected>Letzte 7 Tage</option>
-                <option value="last_30_days">Letzte 30 Tage</option>
-                <option value="this_month">Dieser Monat</option>
-                <option value="last_month">Letzter Monat</option>
-                <option value="custom">Benutzerdefiniert</option>
+                <option value="today" data-i18n="dashboard.today">Heute</option>
+                <option value="yesterday" data-i18n="dashboard.yesterday">Gestern</option>
+                <option value="last_7_days" selected data-i18n="dashboard.last7">Letzte 7 Tage</option>
+                <option value="last_30_days" data-i18n="dashboard.last30">Letzte 30 Tage</option>
+                <option value="this_month" data-i18n="dashboard.thisMonth">Dieser Monat</option>
+                <option value="last_month" data-i18n="dashboard.lastMonth">Letzter Monat</option>
+                <option value="custom" data-i18n="dashboard.custom">Benutzerdefiniert</option>
               </select>
             </label>
-            <label data-stats-custom-date hidden>Von
+            <label data-stats-custom-date hidden><span data-i18n="dashboard.from">Von</span>
               <input name="date_from" type="date">
             </label>
-            <label data-stats-custom-date hidden>Bis
+            <label data-stats-custom-date hidden><span data-i18n="dashboard.to">Bis</span>
               <input name="date_to" type="date">
             </label>
-            <label>Kartentyp
+            <label><span data-i18n="dashboard.cardType">Kartentyp</span>
               <select name="template_type" id="statsTemplateType">
-                <option value="all">Alle Karten</option>
+                <option value="all" data-i18n="dashboard.allCards">Alle Karten</option>
                 <option value="club_card">Clubkarte</option>
                 <option value="stamp_card">Stempelkarte</option>
                 <option value="streak_card">Streakkarte</option>
@@ -83,7 +83,7 @@
                 <option value="generic_card">Generische Karte</option>
               </select>
             </label>
-            <label id="statsClubFeatureField">Clubkarten-Modul
+            <label id="statsClubFeatureField"><span data-i18n="dashboard.clubFeature">Clubkarten-Modul</span>
               <select name="club_feature">
                 <option value="all">Alle Clubkarten</option>
                 <option value="vip">Clubkarten mit VIP</option>
@@ -94,47 +94,47 @@
                 <option value="multiple">Mehrere aktive Module</option>
               </select>
             </label>
-            <label>Geschlecht
+            <label><span data-i18n="dashboard.gender">Geschlecht</span>
               <select name="gender">
-                <option value="all">Alle</option>
-                <option value="male">Männlich</option>
-                <option value="female">Weiblich</option>
+                <option value="all" data-i18n="dashboard.all">Alle</option>
+                <option value="male" data-i18n="dashboard.male">Männlich</option>
+                <option value="female" data-i18n="dashboard.female">Weiblich</option>
               </select>
             </label>
-            <label>Altersgruppe
+            <label><span data-i18n="dashboard.ageGroup">Altersgruppe</span>
               <select name="age_group">
-                <option value="all">Alle</option>
+                <option value="all" data-i18n="dashboard.all">Alle</option>
                 <option value="18_plus">18+</option>
                 <option value="25_plus">25+</option>
                 <option value="30_plus">30+</option>
               </select>
             </label>
-            <label>Scan-Typ
+            <label><span data-i18n="dashboard.scanType">Scan-Typ</span>
               <select name="scan_type">
-                <option value="all">Alle Scans</option>
-                <option value="first_scan">Nur Erstscans</option>
-                <option value="repeat_scan">Nur Wiederholungsscans</option>
+                <option value="all" data-i18n="dashboard.allScans">Alle Scans</option>
+                <option value="first_scan" data-i18n="dashboard.firstScans">Nur Erstscans</option>
+                <option value="repeat_scan" data-i18n="dashboard.repeatScans">Nur Wiederholungsscans</option>
               </select>
             </label>
-            <label>Uhrzeit
+            <label><span data-i18n="dashboard.timeOfDay">Uhrzeit</span>
               <select name="hour_range" id="statsHourRange">
-                <option value="all">Ganzer Tag</option>
+                <option value="all" data-i18n="dashboard.fullDay">Ganzer Tag</option>
                 <option value="0-6">00:00-06:00</option>
                 <option value="6-12">06:00-12:00</option>
                 <option value="12-18">12:00-18:00</option>
                 <option value="18-24">18:00-24:00</option>
-                <option value="custom">Benutzerdefiniert</option>
+                <option value="custom" data-i18n="dashboard.custom">Benutzerdefiniert</option>
               </select>
             </label>
-            <label data-stats-custom-hour hidden>Von Stunde
+            <label data-stats-custom-hour hidden><span data-i18n="dashboard.fromHour">Von Stunde</span>
               <input name="hour_from" type="number" min="0" max="23">
             </label>
-            <label data-stats-custom-hour hidden>Bis Stunde
+            <label data-stats-custom-hour hidden><span data-i18n="dashboard.toHour">Bis Stunde</span>
               <input name="hour_to" type="number" min="1" max="24">
             </label>
-            <label>Aktion
+            <label><span data-i18n="dashboard.action">Aktion</span>
               <select name="action_type">
-                <option value="all">Alle Aktionen</option>
+                <option value="all" data-i18n="dashboard.allActions">Alle Aktionen</option>
                 <option value="visit">Besuch erfasst</option>
                 <option value="vip-update">VIP-Aktion</option>
                 <option value="balance-redeem">Guthaben-Aktion</option>
@@ -147,7 +147,7 @@
               </select>
             </label>
           </div>
-          <p class="privacy-note">Hinweis: Diese Erfassung dient der anonymisierten Besucherstatistik. Bitte stelle sicher, dass die Nutzung den geltenden Datenschutzregeln und deinen lokalen Informationspflichten entspricht.</p>
+          <p class="privacy-note" data-i18n="dashboard.privacyNote">Hinweis: Diese Erfassung dient der anonymisierten Besucherstatistik. Bitte stelle sicher, dass die Nutzung den geltenden Datenschutzregeln und deinen lokalen Informationspflichten entspricht.</p>
         </form>
         <div id="statsMessage" class="message" hidden></div>
         <div id="statsKpiGrid" class="stats-kpi-grid"></div>
@@ -158,10 +158,10 @@
       <section class="section-block" data-dashboard-page="dashboard">
         <div class="section-title">
           <div>
-            <h2>Kartenübersicht</h2>
-            <p class="muted">Alle Karten-Templates mit eigenem QR-Code. Eine Zeile anklicken, um die Karte im Editor zu bearbeiten.</p>
+            <h2 data-i18n="dashboard.templateOverview">Kartenübersicht</h2>
+            <p class="muted" data-i18n="dashboard.templateOverviewText">Alle Karten-Templates mit eigenem QR-Code. Eine Zeile anklicken, um die Karte im Editor zu bearbeiten.</p>
           </div>
-          <a id="newTemplateButton" class="button primary" href="editor.html">Neue Karte erstellen</a>
+          <a id="newTemplateButton" class="button primary" href="editor.html" data-i18n="dashboard.newCard">Neue Karte erstellen</a>
         </div>
         <div id="templateList" class="template-list"></div>
       </section>
@@ -169,10 +169,10 @@
       <section class="section-block" data-dashboard-page="dashboard">
         <div class="section-title">
           <div>
-            <h2>Ausgestellte Kundenkarten</h2>
-            <p class="muted">Karteninstanzen mit aktuellem Status und matrixbasierten Werten wie Guthaben, Stempel oder VIP.</p>
+            <h2 data-i18n="dashboard.issuedCards">Ausgestellte Kundenkarten</h2>
+            <p class="muted" data-i18n="dashboard.issuedCardsText">Karteninstanzen mit aktuellem Status und matrixbasierten Werten wie Guthaben, Stempel oder VIP.</p>
           </div>
-          <a class="button secondary" href="scanner.html">Scanner öffnen</a>
+          <a class="button secondary" href="scanner.html" data-i18n="dashboard.openScanner">Scanner öffnen</a>
         </div>
         <div id="customerCardList" class="template-list"></div>
       </section>

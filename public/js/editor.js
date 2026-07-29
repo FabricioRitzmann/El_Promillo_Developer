@@ -1,5 +1,6 @@
 import { requireLogin } from './guards.js';
 import { appUrl, apiUrl } from './config.js';
+import { setupLanguageSelectors, t } from './i18n.js';
 import { pagePath } from './path.js';
 import { imageFileToPngUnderLimit } from './imageUploadOptimizer.js';
 import { byId, escapeHtml, renderBusinessHeader, showMessage, walletPreviewHtml } from './ui.js';
@@ -319,7 +320,7 @@ function templateSupportsReward(templateOrType) {
 
 function updateEditorModeUi() {
   const isEditing = Boolean(state.templateId);
-  const title = isEditing ? 'Karte bearbeiten' : 'Neue Karte erstellen';
+  const title = isEditing ? t('editor.editTitle') : t('editor.newTitle');
 
   if (editorPageTitle) {
     editorPageTitle.textContent = title;
@@ -331,12 +332,12 @@ function updateEditorModeUi() {
 
   if (editorModeText) {
     editorModeText.textContent = isEditing
-      ? 'Aenderungen werden am bestehenden Template gespeichert. Der QR-Code bleibt gleich.'
-      : 'Erstelle hier ein neues Karten-Template. Danach erscheint es in der Dashboard-Übersicht.';
+      ? t('editor.modeTextEdit')
+      : t('editor.modeTextNew');
   }
 
   if (templateSubmitButton) {
-    templateSubmitButton.textContent = isEditing ? 'Aenderungen speichern' : 'Template speichern';
+    templateSubmitButton.textContent = isEditing ? t('editor.saveChanges') : t('editor.saveTemplate');
   }
 }
 
@@ -1863,17 +1864,17 @@ async function loadNotificationTemplates() {
 
 async function saveTemplate(event) {
   event.preventDefault();
-  showMessage(editorMessage, state.templateId ? 'Karte wird aktualisiert ...' : 'Template wird gespeichert ...');
+  showMessage(editorMessage, state.templateId ? t('editor.updating', 'Karte wird aktualisiert ...') : t('editor.saving', 'Template wird gespeichert ...'));
 
   const draft = templateDraftFromForm();
 
   if (!draft.business_name || !draft.card_name) {
-    showMessage(editorMessage, 'Geschäftsname und Kartenname sind Pflichtfelder.', 'error');
+    showMessage(editorMessage, t('editor.requiredNames', 'Geschäftsname und Kartenname sind Pflichtfelder.'), 'error');
     return;
   }
 
   if (!state.business?.id) {
-    showMessage(editorMessage, 'Bitte zuerst auf der Konto-Seite deine Firmendaten speichern, damit diese Karte einem Business zugeordnet werden kann.', 'error');
+    showMessage(editorMessage, t('editor.businessRequired', 'Bitte zuerst auf der Konto-Seite deine Firmendaten speichern, damit diese Karte einem Business zugeordnet werden kann.'), 'error');
     return;
   }
 
@@ -1896,7 +1897,7 @@ async function saveTemplate(event) {
     loadTemplateIntoForm(state.template);
     updateConditionalTemplateFields();
     renderWalletNotificationsPanel().catch(() => {});
-    showMessage(editorMessage, 'Karte aktualisiert. Der QR-Code bleibt gleich.', 'success');
+    showMessage(editorMessage, t('editor.updated', 'Karte aktualisiert. Der QR-Code bleibt gleich.'), 'success');
     return;
   }
 
@@ -1920,10 +1921,12 @@ async function saveTemplate(event) {
     renderWalletNotificationsPanel().catch(() => {});
   }
 
-  showMessage(editorMessage, 'Template erstellt. Es erscheint jetzt in der Dashboard-Übersicht.', 'success');
+  showMessage(editorMessage, t('editor.created', 'Template erstellt. Es erscheint jetzt in der Dashboard-Übersicht.'), 'success');
 }
 
 async function initEditor() {
+  setupLanguageSelectors(document);
+
   const context = await requireLogin({ requireUnlock: true });
 
   if (!context) {

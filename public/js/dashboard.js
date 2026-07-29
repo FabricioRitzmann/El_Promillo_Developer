@@ -1,5 +1,6 @@
 import { requireLogin } from './guards.js';
 import { appUrl, apiUrl } from './config.js';
+import { setupLanguageSelectors, t } from './i18n.js';
 import { pagePath } from './path.js';
 import { businessLogoUrl, byId, cardTypeLabel, escapeHtml, renderBusinessHeader, showMessage } from './ui.js';
 import { cardFeatureRows, featureEnabled, templateFeatureSummary } from './templateFeatures.js';
@@ -309,7 +310,7 @@ function renderTemplates() {
   }
 
   if (!state.templates.length) {
-    templateList.innerHTML = '<div class="empty-state">Noch keine Karten vorhanden. Erstelle die erste Karte im Editor.</div>';
+    templateList.innerHTML = `<div class="empty-state">${escapeHtml(t('dashboard.noTemplates'))}</div>`;
     return;
   }
 
@@ -329,14 +330,14 @@ function renderTemplates() {
             ${logoUrl ? `<img class="card-table-icon" src="${escapeHtml(logoUrl)}" alt="">` : '<span class="card-table-icon card-table-icon-empty"></span>'}
             <div>
               <strong>${escapeHtml(template.card_name)}</strong>
-              <span>${escapeHtml(template.business_name || 'Ohne Geschäftsname')}</span>
+              <span>${escapeHtml(template.business_name || t('dashboard.withoutBusiness'))}</span>
             </div>
           </div>
         </td>
         <td><span class="pill">${escapeHtml(cardTypeLabel(template))}</span></td>
         <td>${escapeHtml(templateFeatureSummary(template))}</td>
         <td>${escapeHtml(template.reward_text || '-')}</td>
-        <td>${template.is_active ? 'Aktiv' : 'Inaktiv'}</td>
+        <td>${template.is_active ? t('dashboard.active') : t('dashboard.inactive')}</td>
         <td>
           <img class="table-qr" src="${qrUrl}" alt="QR-Code für ${escapeHtml(template.card_name)}">
         </td>
@@ -350,14 +351,14 @@ function renderTemplates() {
             data-qr-filename="qr-${escapeHtml(template.card_name)}.svg"
             data-pdf-a4-url="${escapeHtml(pdfA4Url)}"
             data-pdf-a5-url="${escapeHtml(pdfA5Url)}"
-            aria-label="Aktionen für ${escapeHtml(template.card_name)}"
+            aria-label="${escapeHtml(t('dashboard.actions'))} ${escapeHtml(template.card_name)}"
           >
-            <option value="">Aktionen</option>
-            <option value="edit">Bearbeiten</option>
-            <option value="copy-link">Claim-Link kopieren</option>
-            <option value="qr-download">QR herunterladen</option>
-            <option value="pdf-a4">PDF A4 öffnen</option>
-            <option value="pdf-a5">PDF A5 öffnen</option>
+            <option value="">${escapeHtml(t('dashboard.actions'))}</option>
+            <option value="edit">${escapeHtml(t('dashboard.edit'))}</option>
+            <option value="copy-link">${escapeHtml(t('dashboard.copyClaimLink'))}</option>
+            <option value="qr-download">${escapeHtml(t('dashboard.downloadQr'))}</option>
+            <option value="pdf-a4">${escapeHtml(t('dashboard.openPdfA4'))}</option>
+            <option value="pdf-a5">${escapeHtml(t('dashboard.openPdfA5'))}</option>
           </select>
         </td>
       </tr>
@@ -369,13 +370,13 @@ function renderTemplates() {
       <table class="cards-table">
         <thead>
           <tr>
-            <th>Karte</th>
-            <th>Typ</th>
-            <th>Funktion</th>
-            <th>Belohnung</th>
-            <th>Status</th>
+            <th>${escapeHtml(t('dashboard.card'))}</th>
+            <th>${escapeHtml(t('dashboard.type'))}</th>
+            <th>${escapeHtml(t('dashboard.function'))}</th>
+            <th>${escapeHtml(t('dashboard.reward'))}</th>
+            <th>${escapeHtml(t('dashboard.status'))}</th>
             <th>QR</th>
-            <th>Aktionen</th>
+            <th>${escapeHtml(t('dashboard.actions'))}</th>
           </tr>
         </thead>
         <tbody>
@@ -403,7 +404,7 @@ function renderCustomerCards() {
   }
 
   if (!state.customerCards.length) {
-    customerCardList.innerHTML = '<div class="empty-state">Noch keine Kundenkarten ausgegeben. Kunden entstehen über die Claim-Seite eines Templates.</div>';
+    customerCardList.innerHTML = `<div class="empty-state">${escapeHtml(t('dashboard.noCustomers'))}</div>`;
     return;
   }
 
@@ -427,7 +428,7 @@ function renderCustomerCards() {
             </div>
           </div>
         </td>
-        <td>${escapeHtml(template.card_name || 'Template fehlt')}</td>
+        <td>${escapeHtml(template.card_name || t('dashboard.templateMissing'))}</td>
         <td><span class="pill">${escapeHtml(cardTypeLabel(template))}</span></td>
         <td>${escapeHtml(card.status || 'active')}</td>
         <td>${escapeHtml(formatBalance(card, template))}</td>
@@ -438,11 +439,11 @@ function renderCustomerCards() {
             data-card-action
             data-scanner-url="${escapeHtml(scannerUrl)}"
             data-card-code="${escapeHtml(cardNumber)}"
-            aria-label="Aktionen für Kundenkarte ${escapeHtml(cardNumber)}"
+            aria-label="${escapeHtml(t('dashboard.actions'))} ${escapeHtml(cardNumber)}"
           >
-            <option value="">Aktionen</option>
-            <option value="scanner">Im Scanner öffnen</option>
-            <option value="copy-code">Code kopieren</option>
+            <option value="">${escapeHtml(t('dashboard.actions'))}</option>
+            <option value="scanner">${escapeHtml(t('dashboard.openInScanner'))}</option>
+            <option value="copy-code">${escapeHtml(t('dashboard.copyCode'))}</option>
           </select>
         </td>
       </tr>
@@ -454,13 +455,13 @@ function renderCustomerCards() {
       <table class="cards-table">
         <thead>
           <tr>
-            <th>Karten-ID</th>
-            <th>Template</th>
-            <th>Typ</th>
-            <th>Status</th>
-            <th>Guthaben</th>
-            <th>Aktueller Stand</th>
-            <th>Aktionen</th>
+            <th>${escapeHtml(t('dashboard.cardId'))}</th>
+            <th>${escapeHtml(t('dashboard.template'))}</th>
+            <th>${escapeHtml(t('dashboard.type'))}</th>
+            <th>${escapeHtml(t('dashboard.status'))}</th>
+            <th>${escapeHtml(t('dashboard.balance'))}</th>
+            <th>${escapeHtml(t('dashboard.currentState'))}</th>
+            <th>${escapeHtml(t('dashboard.actions'))}</th>
           </tr>
         </thead>
         <tbody>
@@ -499,7 +500,7 @@ async function handleTemplateAction(select) {
 
   if (action === 'copy-link') {
     await navigator.clipboard.writeText(select.dataset.claimUrl);
-    showMessage(dashboardMessage, 'Claim-Link kopiert.', 'success');
+    showMessage(dashboardMessage, t('dashboard.claimCopied'), 'success');
     return;
   }
 
@@ -533,7 +534,7 @@ async function handleCardAction(select) {
 
   if (action === 'copy-code') {
     await navigator.clipboard.writeText(select.dataset.cardCode);
-    showMessage(dashboardMessage, 'Kundencode kopiert.', 'success');
+    showMessage(dashboardMessage, t('dashboard.codeCopied'), 'success');
   }
 }
 
@@ -1313,6 +1314,8 @@ async function loadVisitorStatistics() {
 }
 
 async function initDashboard() {
+  setupLanguageSelectors(document);
+
   const context = await requireLogin({ requireUnlock: true });
 
   if (!context) {
@@ -1352,7 +1355,7 @@ async function initDashboard() {
     }
 
     handleTemplateAction(actionSelect).catch((error) => {
-      showMessage(dashboardMessage, error.message || 'Aktion konnte nicht ausgeführt werden.', 'error');
+      showMessage(dashboardMessage, error.message || t('dashboard.actionFailed'), 'error');
     });
   });
 
@@ -1361,7 +1364,7 @@ async function initDashboard() {
 
     if (copyButton) {
       await navigator.clipboard.writeText(copyButton.dataset.copyUrl);
-      showMessage(dashboardMessage, 'Claim-Link kopiert.', 'success');
+      showMessage(dashboardMessage, t('dashboard.claimCopied'), 'success');
       return;
     }
 
@@ -1384,7 +1387,7 @@ async function initDashboard() {
     }
 
     handleCardAction(actionSelect).catch((error) => {
-      showMessage(dashboardMessage, error.message || 'Aktion konnte nicht ausgeführt werden.', 'error');
+      showMessage(dashboardMessage, error.message || t('dashboard.actionFailed'), 'error');
     });
   });
 
@@ -1393,7 +1396,7 @@ async function initDashboard() {
 
     if (copyButton) {
       await navigator.clipboard.writeText(copyButton.dataset.copyCode);
-      showMessage(dashboardMessage, 'Kundencode kopiert.', 'success');
+      showMessage(dashboardMessage, t('dashboard.codeCopied'), 'success');
       return;
     }
 
@@ -1412,6 +1415,15 @@ async function initDashboard() {
   await loadTemplates();
   await loadCustomerCards();
   await showDashboardTab(dashboardTabFromHash());
+
+  window.addEventListener('el-promillo-language-change', () => {
+    renderTemplates();
+    renderCustomerCards();
+
+    if (state.currentStatistics) {
+      renderVisitorStatistics(state.currentStatistics);
+    }
+  });
 }
 
 initDashboard().catch((error) => {

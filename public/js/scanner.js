@@ -1,5 +1,6 @@
 import { requireLogin } from './guards.js';
 import { apiUrl } from './config.js';
+import { setupLanguageSelectors, t } from './i18n.js';
 import { pagePath } from './path.js';
 import { byId, cardTypeLabel, escapeHtml, normalizeCode, renderBusinessHeader, showMessage, walletPreviewHtml } from './ui.js';
 import { cardEmblemMeta } from './cardEmblems.js';
@@ -499,11 +500,11 @@ async function loadCardByCode(rawCode) {
   const code = normalizeCode(rawCode);
 
   if (!code) {
-    showMessage(scannerMessage, 'Bitte einen Kundencode eingeben.', 'error');
+    showMessage(scannerMessage, t('scanner.enterCode'), 'error');
     return;
   }
 
-  showMessage(scannerMessage, 'Kundenkarte wird geladen ...');
+  showMessage(scannerMessage, t('scanner.loadingCard'));
 
   let card = await state.client.selectRows('customer_cards', {
     select: customerCardScannerSelect,
@@ -524,7 +525,7 @@ async function loadCardByCode(rawCode) {
   }
 
   if (!card) {
-    showMessage(scannerMessage, 'Keine Kundenkarte gefunden.', 'error');
+    showMessage(scannerMessage, t('scanner.noCard'), 'error');
     return;
   }
 
@@ -536,7 +537,7 @@ async function loadCardByCode(rawCode) {
   state.currentCardInstance = await loadCardInstanceForCard(card);
   state.originalCard = structuredClone(card);
   renderCard();
-  showMessage(scannerMessage, 'Kundenkarte geladen.', 'success');
+  showMessage(scannerMessage, t('scanner.cardLoaded'), 'success');
 }
 
 function readEditedCard() {
@@ -937,11 +938,11 @@ async function startCamera() {
   stopCamera();
 
   if (!navigator.mediaDevices?.getUserMedia) {
-    showMessage(scannerMessage, 'Kamera-Zugriff ist in diesem Browser nicht verfügbar. Bitte Kundencode manuell eingeben.', 'error');
+    showMessage(scannerMessage, t('scanner.cameraUnavailable', 'Kamera-Zugriff ist in diesem Browser nicht verfügbar. Bitte Kundencode manuell eingeben.'), 'error');
     return;
   }
 
-  showMessage(scannerMessage, 'Kamera wird gestartet ...');
+  showMessage(scannerMessage, t('scanner.cameraStarting', 'Kamera wird gestartet ...'));
 
   let detector = null;
 
@@ -995,13 +996,15 @@ async function startCamera() {
   showMessage(
     scannerMessage,
     state.scannerMode === 'jsqr'
-      ? 'Scanner aktiv. Mobile QR-Erkennung ist eingeschaltet.'
-      : 'Scanner aktiv.',
+      ? t('scanner.activeJsqr', 'Scanner aktiv. Mobile QR-Erkennung ist eingeschaltet.')
+      : t('scanner.active', 'Scanner aktiv.'),
     'success'
   );
 }
 
 async function initScanner() {
+  setupLanguageSelectors(document);
+
   const context = await requireLogin({ requireUnlock: true });
 
   if (!context) {

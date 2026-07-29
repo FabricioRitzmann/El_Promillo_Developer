@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>El Promillo - Karten-Editor</title>
+    <title data-i18n="editor.title">El Promillo - Karten-Editor</title>
     <link rel="stylesheet" href="styles.css">
   </head>
   <body>
@@ -19,9 +19,9 @@
     </header>
 
     <nav class="app-tabbar" aria-label="Hauptbereiche">
-      <a class="app-tab" href="dashboard.html#dashboardOverview">Dashboard</a>
-      <a class="app-tab" href="dashboard.html#visitorStatistics">Besucherstatistik</a>
-      <a class="app-tab" href="scanner.html">Scanner</a>
+      <a class="app-tab" href="dashboard.html#dashboardOverview" data-i18n="nav.dashboard">Dashboard</a>
+      <a class="app-tab" href="dashboard.html#visitorStatistics" data-i18n="nav.visitors">Besucherstatistik</a>
+      <a class="app-tab" href="scanner.html" data-i18n="nav.scanner">Scanner</a>
       <a class="app-tab app-tab-account" href="account.html" aria-label="Konto">
         <svg class="account-tab-icon" viewBox="0 0 24 24" aria-hidden="true">
           <circle cx="12" cy="8" r="4"></circle>
@@ -33,10 +33,10 @@
     <main class="page-shell">
       <section class="page-heading">
         <div>
-          <p class="eyebrow">Karten-Editor</p>
-          <h1 id="editorPageTitle">Neue Karte erstellen</h1>
+          <p class="eyebrow" data-i18n="editor.eyebrow">Karten-Editor</p>
+          <h1 id="editorPageTitle" data-i18n="editor.newTitle">Neue Karte erstellen</h1>
         </div>
-        <a class="button secondary" href="dashboard.html">Zurück zur Übersicht</a>
+        <a class="button secondary" href="dashboard.html" data-i18n="editor.backOverview">Zurück zur Übersicht</a>
       </section>
 
       <div id="editorMessage" class="message" hidden></div>
@@ -44,21 +44,21 @@
       <form id="templateForm" class="panel editor-panel">
         <div class="panel-heading">
           <div>
-            <h2 id="editorModeTitle">Neue Karte erstellen</h2>
-            <p class="muted" id="editorModeText">Jedes gespeicherte Template bekommt automatisch seinen eigenen Claim-Link und QR-Code.</p>
+            <h2 id="editorModeTitle" data-i18n="editor.newTitle">Neue Karte erstellen</h2>
+            <p class="muted" id="editorModeText" data-i18n="editor.modeTextNew">Jedes gespeicherte Template bekommt automatisch seinen eigenen Claim-Link und QR-Code.</p>
           </div>
-          <a class="button secondary" href="editor.html">Neue Karte</a>
+          <a class="button secondary" href="editor.html" data-i18n="editor.newCard">Neue Karte</a>
         </div>
 
         <div class="editor-grid">
           <div class="editor-fields">
-            <label>Geschäftsname
+            <label><span data-i18n="editor.businessName">Geschäftsname</span>
               <input name="business_name" required>
             </label>
-            <label>Kartenname
+            <label><span data-i18n="editor.cardName">Kartenname</span>
               <input name="card_name" required>
             </label>
-            <label>Kartentyp
+            <label><span data-i18n="editor.cardType">Kartentyp</span>
               <select id="templateType" name="template_type">
                 <option value="generic_card">Generische Basiskarte</option>
                 <option value="stamp_card">Stempelkarte</option>
@@ -67,18 +67,18 @@
                 <option value="club_card">Clubkarte</option>
               </select>
             </label>
-            <label>Beschreibung
+            <label><span data-i18n="common.description">Beschreibung</span>
               <textarea name="description" rows="3"></textarea>
             </label>
             <div class="split-row">
-              <label>Hauptfarbe
+              <label><span data-i18n="editor.primaryColor">Hauptfarbe</span>
                 <input name="primary_color" type="color" value="#fffdf9">
               </label>
-              <label>Textfarbe
+              <label><span data-i18n="editor.textColor">Textfarbe</span>
                 <input name="text_color" type="color" value="#8b4f2f">
               </label>
             </div>
-            <label data-reward-field hidden>Belohnungstext
+            <label data-reward-field hidden><span data-i18n="editor.rewardText">Belohnungstext</span>
               <input name="reward_text">
             </label>
 
@@ -269,13 +269,13 @@
             </div>
 
             <div class="button-row wrap">
-              <button id="templateSubmitButton" class="primary" type="submit">Template speichern</button>
-              <a class="button secondary" href="dashboard.html">Zur Übersicht</a>
+              <button id="templateSubmitButton" class="primary" type="submit" data-i18n="editor.saveTemplate">Template speichern</button>
+              <a class="button secondary" href="dashboard.html" data-i18n="editor.backOverview">Zur Übersicht</a>
             </div>
           </div>
 
           <aside class="editor-preview-panel" aria-live="polite">
-            <p class="eyebrow">Live-Vorschau</p>
+            <p class="eyebrow" data-i18n="editor.livePreview">Live-Vorschau</p>
             <div id="editorPreview" class="preview-slot"></div>
             <div id="editorQrPanel" class="qr-download-panel" hidden>
               <p class="eyebrow">Claim-QR</p>
@@ -287,7 +287,7 @@
                 <a id="editorPdfA5" class="button secondary" href="#">PDF A5</a>
               </div>
             </div>
-            <p id="editorQrHint" class="muted">Nach dem Speichern erscheint hier der Claim-QR mit PDF-Downloads.</p>
+            <p id="editorQrHint" class="muted" data-i18n="editor.qrHint">Nach dem Speichern erscheint hier der Claim-QR mit PDF-Downloads.</p>
           </aside>
         </div>
       </form>
@@ -295,20 +295,20 @@
       <section id="walletNotificationsPanel" class="panel wallet-notification-panel" hidden>
         <div class="panel-heading">
           <div>
-            <h2>Wallet Benachrichtigungen</h2>
-            <p class="muted">Nachrichten werden als Apple-Wallet-Pass-Update oder Google-Wallet-Message verarbeitet.</p>
+            <h2 data-i18n="editor.walletNotifications">Wallet Benachrichtigungen</h2>
+            <p class="muted" data-i18n="editor.walletNotificationsText">Nachrichten werden als Apple-Wallet-Pass-Update oder Google-Wallet-Message verarbeitet.</p>
           </div>
-          <span id="walletNotificationTemplateLabel" class="pill">Aktuelles Template</span>
+          <span id="walletNotificationTemplateLabel" class="pill" data-i18n="editor.currentTemplate">Aktuelles Template</span>
         </div>
 
         <div id="walletNotificationMessage" class="message" hidden></div>
 
         <div class="wallet-notification-grid">
           <form id="walletNotificationForm" class="wallet-notification-form">
-            <label>Template
+            <label><span data-i18n="dashboard.template">Template</span>
               <select id="walletNotificationTemplate" name="template_id"></select>
             </label>
-            <label>Zielgruppe
+            <label><span>Zielgruppe</span>
               <select id="walletNotificationTarget" name="target_type"></select>
             </label>
             <div id="walletNotificationTargetFilters" class="target-filter-fields" hidden>
@@ -354,18 +354,18 @@
                 </div>
               </fieldset>
             </div>
-            <label>Titel
+            <label><span data-i18n="editor.notificationTitle">Titel</span>
               <input name="title" maxlength="120" placeholder="Kurzer Wallet-Hinweis" required>
             </label>
-            <label>Nachricht
+            <label><span data-i18n="editor.notificationMessage">Nachricht</span>
               <textarea name="message" rows="4" maxlength="500" placeholder="Text für Apple Wallet und Google Wallet" required></textarea>
             </label>
             <div class="split-row">
-              <label>Versand
+              <label><span data-i18n="editor.sendType">Versand</span>
                 <select id="walletNotificationSendType" name="send_type">
-                  <option value="now">Sofort senden</option>
-                  <option value="scheduled">Planen</option>
-                  <option value="location_based">Standortbasiert vorbereiten</option>
+                  <option value="now" data-i18n="editor.sendNow">Sofort senden</option>
+                  <option value="scheduled" data-i18n="editor.schedule">Planen</option>
+                  <option value="location_based" data-i18n="editor.locationBased">Standortbasiert vorbereiten</option>
                 </select>
               </label>
               <label id="walletNotificationScheduledAtField" hidden>Zeitpunkt
@@ -392,7 +392,7 @@
           </form>
 
           <div class="wallet-notification-preview">
-            <h3>Vorschau</h3>
+            <h3 data-i18n="editor.preview">Vorschau</h3>
             <div class="notification-preview-card">
               <p class="eyebrow">Apple Wallet</p>
               <strong id="appleNotificationPreviewTitle">Titel</strong>

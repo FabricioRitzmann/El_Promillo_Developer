@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>El Promillo - Scanner</title>
+    <title data-i18n="scanner.title">El Promillo - Scanner</title>
     <link rel="stylesheet" href="styles.css">
   </head>
   <body>
@@ -19,10 +19,10 @@
     </header>
 
     <nav class="app-tabbar" aria-label="Hauptbereiche">
-      <a class="app-tab desktop-only-link" href="dashboard.html#dashboardOverview">Dashboard</a>
-      <a class="app-tab desktop-only-link" href="dashboard.html#visitorStatistics">Besucherstatistik</a>
-      <a class="app-tab is-active" href="scanner.html" aria-current="page">Scanner</a>
-      <button id="scannerOnlyLogoutButton" class="app-tab scanner-only-logout" type="button">Logout</button>
+      <a class="app-tab desktop-only-link" href="dashboard.html#dashboardOverview" data-i18n="nav.dashboard">Dashboard</a>
+      <a class="app-tab desktop-only-link" href="dashboard.html#visitorStatistics" data-i18n="nav.visitors">Besucherstatistik</a>
+      <a class="app-tab is-active" href="scanner.html" aria-current="page" data-i18n="nav.scanner">Scanner</a>
+      <button id="scannerOnlyLogoutButton" class="app-tab scanner-only-logout" type="button" data-i18n="common.logout">Logout</button>
       <a class="app-tab app-tab-account" href="account.html" aria-label="Konto">
         <svg class="account-tab-icon" viewBox="0 0 24 24" aria-hidden="true">
           <circle cx="12" cy="8" r="4"></circle>
@@ -34,8 +34,8 @@
     <main class="page-shell scanner-shell">
       <section class="page-heading">
         <div>
-          <h1>Scanner</h1>
-          <p class="view-subtitle">Kundenkarte laden, per Kamera oder Kundencode prüfen und bearbeiten.</p>
+          <h1 data-i18n="scanner.heading">Scanner</h1>
+          <p class="view-subtitle" data-i18n="scanner.subtitle">Kundenkarte laden, per Kamera oder Kundencode prüfen und bearbeiten.</p>
         </div>
       </section>
 
@@ -43,21 +43,21 @@
 
       <section class="scanner-grid">
         <div class="panel">
-          <h2>Kamera</h2>
-          <p class="muted scanner-camera-hint">Scan funktioniert auf Mobile mit nativer QR-Erkennung oder automatischem Fallback. Bitte Kamera-Zugriff erlauben.</p>
+          <h2 data-i18n="scanner.camera">Kamera</h2>
+          <p class="muted scanner-camera-hint" data-i18n="scanner.cameraHint">Scan funktioniert auf Mobile mit nativer QR-Erkennung oder automatischem Fallback. Bitte Kamera-Zugriff erlauben.</p>
           <video id="scannerVideo" class="scanner-video" playsinline muted></video>
           <div class="button-row">
-            <button id="startScanner" class="primary" type="button">Scan starten</button>
-            <button id="stopScanner" class="secondary" type="button">Stop</button>
+            <button id="startScanner" class="primary" type="button" data-i18n="scanner.start">Scan starten</button>
+            <button id="stopScanner" class="secondary" type="button" data-i18n="scanner.stop">Stop</button>
           </div>
         </div>
 
         <form id="manualScanForm" class="panel">
-          <h2>Manuelle Eingabe</h2>
-          <label>Kundencode
+          <h2 data-i18n="scanner.manual">Manuelle Eingabe</h2>
+          <label><span data-i18n="scanner.customerCode">Kundencode</span>
             <input name="customer_code" placeholder="WC-..." autocomplete="off" autocapitalize="characters" spellcheck="false">
           </label>
-          <button class="primary" type="submit">Karte laden</button>
+          <button class="primary" type="submit" data-i18n="scanner.loadCard">Karte laden</button>
         </form>
       </section>
 
@@ -65,28 +65,28 @@
 
       <section id="demographicsModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="demographicsTitle" hidden>
         <form id="demographicsForm" class="modal-panel demographics-panel">
-          <p class="eyebrow" id="demographicsTemplateType">Erstscan</p>
-          <h2 id="demographicsTitle">Erster Besuch erfassen</h2>
-          <p class="muted">Bitte Geschlecht und Altersgruppe auswählen, bevor die Karte verarbeitet wird.</p>
+          <p class="eyebrow" id="demographicsTemplateType" data-i18n="scanner.firstScan">Erstscan</p>
+          <h2 id="demographicsTitle" data-i18n="scanner.firstVisit">Erster Besuch erfassen</h2>
+          <p class="muted" data-i18n="scanner.demographicsHint">Bitte Geschlecht und Altersgruppe auswählen, bevor die Karte verarbeitet wird.</p>
           <div id="demographicsClubInfo" class="demographics-club-info" hidden>
-            <strong>Clubkarte erkannt</strong>
+            <strong data-i18n="scanner.clubDetected">Clubkarte erkannt</strong>
             <div id="demographicsClubBadges" class="badge-row"></div>
           </div>
           <fieldset class="choice-fieldset">
-            <legend>Geschlecht</legend>
+            <legend data-i18n="dashboard.gender">Geschlecht</legend>
             <div class="choice-grid">
               <label class="choice-card">
                 <input type="radio" name="gender" value="male" required>
-                <span>Männlich</span>
+                <span data-i18n="dashboard.male">Männlich</span>
               </label>
               <label class="choice-card">
                 <input type="radio" name="gender" value="female" required>
-                <span>Weiblich</span>
+                <span data-i18n="dashboard.female">Weiblich</span>
               </label>
             </div>
           </fieldset>
           <fieldset class="choice-fieldset">
-            <legend>Altersgruppe</legend>
+            <legend data-i18n="dashboard.ageGroup">Altersgruppe</legend>
             <div class="choice-grid three">
               <label class="choice-card">
                 <input type="radio" name="age_group" value="18_plus" required>
@@ -102,10 +102,10 @@
               </label>
             </div>
           </fieldset>
-          <p class="privacy-note">Hinweis: Diese Erfassung dient der anonymisierten Besucherstatistik. Bitte stelle sicher, dass die Nutzung den geltenden Datenschutzregeln und deinen lokalen Informationspflichten entspricht.</p>
+          <p class="privacy-note" data-i18n="dashboard.privacyNote">Hinweis: Diese Erfassung dient der anonymisierten Besucherstatistik. Bitte stelle sicher, dass die Nutzung den geltenden Datenschutzregeln und deinen lokalen Informationspflichten entspricht.</p>
           <div id="demographicsMessage" class="message" hidden></div>
           <div class="button-row wrap">
-            <button class="primary" type="submit">Speichern und Scan fortsetzen</button>
+            <button class="primary" type="submit" data-i18n="scanner.saveAndContinue">Speichern und Scan fortsetzen</button>
           </div>
         </form>
       </section>
