@@ -379,6 +379,20 @@ SUPABASE_ACCESS_TOKEN=<dein-supabase-token> npm run auth-email:unlock-only
 
 Das Script gibt keine Secret-Werte aus. SMTP-Zugangsdaten werden nicht im Repository gepflegt; sie müssen entweder im Supabase Dashboard unter `Authentication` -> `Emails`/`SMTP Settings` eingetragen werden oder separat über die Supabase Management API gesetzt werden, wenn Host, Benutzer, Passwort, Port und Absendername vollständig vorliegen.
 
+## Passwort vergessen und Passwort ändern
+
+Der Loginbereich enthält eine Passwort-vergessen-Funktion. Sie ruft Supabase Auth Password Recovery auf und sendet eine Reset-Mail an die angegebene Betreiber-E-Mail. Der Redirect zeigt zurück auf:
+
+```text
+index.html?recovery=1
+```
+
+Nach dem Klick auf den Supabase-Link erkennt die Login-Seite den Recovery-Flow, speichert das neue Passwort über Supabase Auth und leitet danach je nach Freischaltung ins Dashboard, in den Scanner oder auf die Warteseite.
+
+Die Kontoseite enthält zusätzlich `Passwort ändern`. Dort muss der Betreiber zuerst das aktuelle Passwort eingeben; die App prüft es per Supabase-Login und speichert danach das neue Passwort direkt über Supabase Auth.
+
+Wichtig für Free-Tier: Password Recovery ist mit Supabase Auth nutzbar. Wenn das Projekt den Supabase-Default-Mailprovider verwendet, kann die Reset-Mail bei neuen Free-Tier-Projekten aber nicht frei gebrandet werden. Für eigene Betreffzeilen, HTML, Signatur oder Absender wie `Fabricio@el-promillo.ch` ist Custom SMTP oder Supabase Pro nötig.
+
 ## Kein PassKit im aktiven Wallet-Pfad
 
 Der aktuelle Wallet-Benachrichtigungspfad, die öffentliche Claim-Seite und der Scanner verwenden kein PassKit. Apple Wallet wird direkt über Supabase Edge Functions, Apple Pass Web Service, signierte `.pkpass`-Dateien und APNS angebunden. Google Wallet wird direkt über die Google Wallet API angebunden.

@@ -25,7 +25,34 @@
             <label>Passwort
               <input name="password" type="password" autocomplete="current-password" required>
             </label>
-            <button class="primary" type="submit">Einloggen</button>
+            <div class="button-row wrap">
+              <button class="primary" type="submit">Einloggen</button>
+              <button id="showForgotPasswordButton" class="secondary" type="button">Passwort vergessen</button>
+            </div>
+          </form>
+
+          <form id="forgotPasswordForm" class="panel" hidden>
+            <h2>Passwort zurücksetzen</h2>
+            <p class="muted">Du erhältst eine E-Mail von Supabase mit einem Link zum Setzen eines neuen Passworts.</p>
+            <label>E-Mail
+              <input name="email" type="email" autocomplete="email" required>
+            </label>
+            <div class="button-row wrap">
+              <button class="primary" type="submit">Reset-Link senden</button>
+              <button id="cancelForgotPasswordButton" class="secondary" type="button">Abbrechen</button>
+            </div>
+          </form>
+
+          <form id="resetPasswordForm" class="panel" hidden>
+            <h2>Neues Passwort setzen</h2>
+            <p class="muted">Bitte wähle ein neues Passwort für deinen Betreiberzugang.</p>
+            <label>Neues Passwort
+              <input name="password" type="password" autocomplete="new-password" minlength="6" required>
+            </label>
+            <label>Neues Passwort wiederholen
+              <input name="password_repeat" type="password" autocomplete="new-password" minlength="6" required>
+            </label>
+            <button class="primary" type="submit">Passwort speichern</button>
           </form>
 
           <form id="registerForm" class="panel">

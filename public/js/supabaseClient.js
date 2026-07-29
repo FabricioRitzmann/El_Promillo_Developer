@@ -185,6 +185,53 @@ export class SupabaseRestClient {
     return data;
   }
 
+  async resetPasswordForEmail(email, redirectTo) {
+    const url = new URL(`${this.supabaseUrl}/auth/v1/recover`);
+
+    if (redirectTo) {
+      url.searchParams.set('redirect_to', redirectTo);
+    }
+
+    const response = await fetch(url.toString(), {
+      method: 'POST',
+      headers: this.baseHeaders(false),
+      body: JSON.stringify({ email })
+    });
+    const data = await parseResponse(response);
+
+    if (!response.ok) {
+      throw new Error(data?.error_description || data?.msg || data?.message || 'Passwort-Zurücksetzung konnte nicht gestartet werden.');
+    }
+
+    return data;
+  }
+
+  async updatePassword(password) {
+    const session = await this.ensureSession();
+
+    if (!session?.access_token) {
+      throw new Error('Bitte öffne den Passwort-Link erneut oder logge dich neu ein.');
+    }
+
+    const response = await fetch(`${this.supabaseUrl}/auth/v1/user`, {
+      method: 'PUT',
+      headers: this.baseHeaders(true, session.access_token),
+      body: JSON.stringify({ password })
+    });
+    const data = await parseResponse(response);
+
+    if (!response.ok) {
+      throw new Error(data?.error_description || data?.msg || data?.message || 'Passwort konnte nicht geändert werden.');
+    }
+
+    this.storeSession({
+      ...session,
+      user: data?.user || data
+    });
+
+    return data;
+  }
+
   async signOut() {
     const session = this.getStoredSession();
 

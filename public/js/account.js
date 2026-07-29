@@ -38,6 +38,7 @@ const businessAccountSelect = [
 const accountMessage = byId('accountMessage');
 const loginDataList = byId('loginDataList');
 const businessForm = byId('accountBusinessForm');
+const passwordChangeForm = byId('passwordChangeForm');
 const mobileAccountCompanyName = byId('mobileAccountCompanyName');
 const companyLogoPreview = byId('companyLogoPreview');
 const companyLogoUpload = byId('companyLogoUpload');
@@ -173,6 +174,24 @@ function validateBusinessPayload(payload) {
   }
 }
 
+function validatePasswordChangePayload({ currentPassword, newPassword, repeatPassword }) {
+  if (!currentPassword) {
+    throw new Error('Bitte das aktuelle Passwort eingeben.');
+  }
+
+  if (String(newPassword || '').length < 6) {
+    throw new Error('Bitte mindestens 6 Zeichen für das neue Passwort verwenden.');
+  }
+
+  if (newPassword !== repeatPassword) {
+    throw new Error('Die neuen Passwörter stimmen nicht überein.');
+  }
+
+  if (currentPassword === newPassword) {
+    throw new Error('Das neue Passwort muss sich vom aktuellen Passwort unterscheiden.');
+  }
+}
+
 async function persistBusiness(extraPayload = {}) {
   const payload = {
     ...businessPayloadFromForm(),
@@ -202,6 +221,44 @@ async function saveBusiness(event) {
 
   await persistBusiness();
   showMessage(accountMessage, 'Kontodaten gespeichert.', 'success');
+}
+
+async function changePassword(event) {
+  event.preventDefault();
+  showMessage(accountMessage, 'Aktuelles Passwort wird geprüft ...');
+
+  const formData = new FormData(passwordChangeForm);
+  const payload = {
+    currentPassword: String(formData.get('current_password') || ''),
+    newPassword: String(formData.get('new_password') || ''),
+    repeatPassword: String(formData.get('new_password_repeat') || '')
+  };
+
+  validatePasswordChangePayload(payload);
+
+  const email = state.session?.user?.email || state.profile?.email;
+
+  if (!email) {
+    throw new Error('Login-E-Mail konnte nicht ermittelt werden.');
+  }
+
+  try {
+    const refreshedSession = await state.client.signIn({
+      email,
+      password: payload.currentPassword
+    });
+
+    state.session = refreshedSession;
+  } catch {
+    throw new Error('Das aktuelle Passwort ist nicht korrekt.');
+  }
+
+  showMessage(accountMessage, 'Neues Passwort wird gespeichert ...');
+  await state.client.updatePassword(payload.newPassword);
+  state.session = await state.client.ensureSession();
+  passwordChangeForm.reset();
+  renderLoginData();
+  showMessage(accountMessage, 'Passwort wurde geändert.', 'success');
 }
 
 function renderCompanyLogoPreview() {
@@ -341,6 +398,10 @@ async function initAccount() {
 
   businessForm?.addEventListener('submit', (event) => {
     saveBusiness(event).catch((error) => showMessage(accountMessage, error.message, 'error'));
+  });
+
+  passwordChangeForm?.addEventListener('submit', (event) => {
+    changePassword(event).catch((error) => showMessage(accountMessage, error.message, 'error'));
   });
 
   businessForm?.addEventListener('input', () => {
