@@ -343,6 +343,34 @@ Damit die Mail von `Fabricio@el-promillo.ch` kommt, muss in Supabase Auth ein SM
 
 Standardmässig nutzt `send-operator-verification-email` `OPERATOR_VERIFICATION_MAIL_MODE=supabase_auth`, also die Supabase Auth Magic-Link-Mail. Optional kann später `OPERATOR_VERIFICATION_MAIL_MODE=resend` mit `RESEND_API_KEY`, `MAIL_FROM_EMAIL=Fabricio@el-promillo.ch` und `MAIL_FROM_NAME=El Promillo` verwendet werden.
 
+Die Magic-Link-Mailvorlage liegt versioniert unter:
+
+```text
+supabase/templates/operator-magic-link.html
+```
+
+Die Vorlage enthält bewusst einen HTML-Kommentar `SIGNATURE_PLACEHOLDER`. Sobald die finale Outlook-Signatur vorliegt, wird sie dort als HTML eingesetzt und danach erneut in Supabase veröffentlicht.
+
+Für gehostete Supabase-Projekte kann die Auth-Mailvorlage per Management API gesetzt werden. Der Befehl aktualisiert die Magic-Link-Mail, setzt die Site URL auf `https://el-promillo.ch`, ergänzt die Redirect-Allowlist für Produktion, GitHub-Developer-Page und lokale Entwicklung und stellt sicher, dass unbestätigte E-Mails nicht einloggen dürfen:
+
+```bash
+SUPABASE_ACCESS_TOKEN=<dein-supabase-token> npm run auth-email:apply
+```
+
+Vorher kann die geplante Änderung ohne Supabase-Schreibzugriff geprüft werden:
+
+```bash
+npm run auth-email:dry-run
+```
+
+Falls Supabase die Mailvorlage wegen Free-Tier/Standard-Mailprovider blockiert, kann wenigstens die Auth-Routing-Konfiguration gesetzt werden. Die Mailvorlage bleibt dann lokal vorbereitet und wird erst nach aktiviertem Custom SMTP oder passendem Supabase-Plan veröffentlicht:
+
+```bash
+SUPABASE_ACCESS_TOKEN=<dein-supabase-token> npm run auth-email:apply -- --routing-only
+```
+
+Das Script gibt keine Secret-Werte aus. SMTP-Zugangsdaten werden nicht im Repository gepflegt; sie müssen entweder im Supabase Dashboard unter `Authentication` -> `Emails`/`SMTP Settings` eingetragen werden oder separat über die Supabase Management API gesetzt werden, wenn Host, Benutzer, Passwort, Port und Absendername vollständig vorliegen.
+
 ## Kein PassKit im aktiven Wallet-Pfad
 
 Der aktuelle Wallet-Benachrichtigungspfad, die öffentliche Claim-Seite und der Scanner verwenden kein PassKit. Apple Wallet wird direkt über Supabase Edge Functions, Apple Pass Web Service, signierte `.pkpass`-Dateien und APNS angebunden. Google Wallet wird direkt über die Google Wallet API angebunden.
