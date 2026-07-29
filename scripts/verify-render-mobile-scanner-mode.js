@@ -23,6 +23,14 @@ function assertIncludes(relativePath, needles) {
   }
 }
 
+function assertNotIncludes(relativePath, needles) {
+  const source = read(relativePath);
+
+  for (const needle of needles) {
+    assert(!source.includes(needle), `${relativePath} darf nicht enthalten: ${needle}`);
+  }
+}
+
 assertIncludes('public/js/appMode.js', [
   'CUSTOMER_RENDER_HOSTS',
   "'el-promillo.ch'",
@@ -75,6 +83,8 @@ assertIncludes('public/js/scanner.js', [
 
 assertIncludes('public/styles.css', [
   '.scanner-only-logout',
+  '.desktop-only-link',
+  'display: inline-flex;',
   '.scanner-only-mode .scanner-only-logout',
   '.scanner-only-mode .app-tabbar a[href^="dashboard.html"]',
   '.scanner-only-mode .app-tab-account',
@@ -82,6 +92,10 @@ assertIncludes('public/styles.css', [
   '.scanner-only-mode .account-grid',
   '.scanner-only-mode .account-form',
   '.desktop-only-link'
+]);
+
+assertNotIncludes('public/styles.css', [
+  '@media (max-width: 767px) {\n  .desktop-only-link {\n    display: none;\n  }\n}'
 ]);
 
 assertIncludes('package.json', [

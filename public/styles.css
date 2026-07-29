@@ -770,6 +770,10 @@ textarea {
   display: none;
 }
 
+.desktop-only-link {
+  display: inline-flex;
+}
+
 .scanner-only-mode .app-tabbar a[href^="dashboard.html"],
 .scanner-only-mode .scanner-only-logout {
   display: none;
@@ -2253,12 +2257,6 @@ body:has(.modal-backdrop:not([hidden])) {
   .qr-row img {
     width: 110px;
     height: 110px;
-  }
-}
-
-@media (max-width: 767px) {
-  .desktop-only-link {
-    display: none;
   }
 }
 

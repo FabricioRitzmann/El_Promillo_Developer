@@ -119,8 +119,9 @@ assertAll('public/scanner.html', 'Mobile Scanner-only Navigation', [
 ]);
 
 assertAll('public/styles.css', 'Mobile Scanner-only Styles', [
-  '@media (max-width: 767px)',
-  '.desktop-only-link'
+  '.desktop-only-link',
+  'display: inline-flex;',
+  '.scanner-only-mode .app-tabbar a[href^="dashboard.html"]'
 ]);
 
 assertAll('server/index.js', 'Server Scanner API', [
