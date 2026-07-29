@@ -13,7 +13,7 @@ Diese Checkliste beschreibt die produktive Endabnahme für die direkte Apple-Wal
 - `APP_PUBLIC_BASE_URL` zeigt auf die öffentliche Webapp-Domain.
 - `APPLE_WEB_SERVICE_BASE_URL` zeigt exakt auf `https://<PROJECT_REF>.supabase.co/functions/v1/apple-wallet-webservice`, ohne weiteres `/v1`.
 - `WALLET_CRON_SECRET` und `PAYMENT_WEBHOOK_SECRET` sind mindestens 32 Zeichen lang.
-- Supabase Auth SMTP ist so konfiguriert, dass Magic-Link-Mails von `Fabricio@el-promillo.ch` versendet werden. Alternativ ist `OPERATOR_VERIFICATION_MAIL_MODE=resend` mit `RESEND_API_KEY`, `MAIL_FROM_EMAIL` und `MAIL_FROM_NAME` gesetzt.
+- Im aktuellen Unlock-only-Zwischenmodus ist `OPERATOR_EMAIL_VERIFICATION_REQUIRED=false`, damit `unlock=true` für den Betreiberzugang genügt. Für die spätere Magic-Link-Verifizierung muss Supabase Auth SMTP so konfiguriert sein, dass Magic-Link-Mails von `Fabricio@el-promillo.ch` versendet werden; alternativ ist `OPERATOR_VERIFICATION_MAIL_MODE=resend` mit `RESEND_API_KEY`, `MAIL_FROM_EMAIL` und `MAIL_FROM_NAME` gesetzt.
 - `OPERATOR_VERIFICATION_REDIRECT_PATH` zeigt auf `/dashboard.html`; `OPERATOR_VERIFICATION_CRON_SECRET` kann leer bleiben, wenn der bestehende `WALLET_CRON_SECRET` genutzt wird.
 - Optional `node scripts/prepare-supabase-secrets-local.js --write` ausführen, um vorhandene lokale Supabase-/Apple-Werte, PEM-Dateien aus `certs/`, Google-Issuer-/Service-Account-Dateien, Samsung-Portalwerte, `samsung-wallet-keys/samsung_wallet_private.key`, `samsung-wallet-keys/samsung_public_cert.pem`, abgeleitete Wallet-URLs und lokale Cron-/Payment-Secrets in `supabase/secrets.local.env` vorzubereiten. Fehlende externe Werte wie APNs Key ID/Auth Key, Google Wallet Service Account oder ein Samsung Private Key, der nicht zum Partner-Zertifikat passt, werden nur als Kommentar geschrieben.
 - Fehlende Apple-/Google-Werte nach [docs/WALLET_EXTERNAL_CREDENTIALS.md](docs/WALLET_EXTERNAL_CREDENTIALS.md) (`Wallet External Credentials`) beschaffen: Apple APNs `.p8`, `APPLE_APNS_KEY_ID`, Google Wallet Issuer ID und Google Service Account JSON.
@@ -45,6 +45,7 @@ Pflicht:
 Betreiber-Onboarding:
 
 - `OPERATOR_VERIFICATION_MAIL_MODE`
+- `OPERATOR_EMAIL_VERIFICATION_REQUIRED`
 - `OPERATOR_VERIFICATION_CRON_SECRET`
 - `OPERATOR_VERIFICATION_REDIRECT_PATH`
 - `OPERATOR_VERIFICATION_MAX_ATTEMPTS`

@@ -298,7 +298,7 @@ Die SQL-Datei erstellt:
 - Guthaben-Transaktionen und Topup-Sessions für `balance_card` und explizit aktivierte Zusatz-Guthaben
 - die direkten Wallet-Benachrichtigungstabellen `wallet_notification_campaigns`, `wallet_notification_recipients`, `wallet_push_logs`, `wallet_update_queue`, `apple_wallet_devices`, `apple_wallet_registrations`, `apple_pass_versions` und `google_wallet_objects`
 
-Neue Betreiber werden automatisch mit `unlock = false` angelegt. Die Registrierung läuft über die Edge Function `register-operator`, damit Supabase nicht sofort eine Bestätigungs-Mail sendet. Nach der manuellen Freigabe markiert ein SQL-Trigger den Betreiber für die Verifizierungs-Mail; `send-operator-verification-email` sendet danach per Supabase Magic Link die Bestätigung. Dashboard, Editor, Scanner und alle RLS-geschützten Daten sind erst zugänglich, wenn `unlock = true` und die Supabase-E-Mail bestätigt ist.
+Neue Betreiber werden automatisch mit `unlock = false` angelegt. Die Registrierung läuft über die Edge Function `register-operator`, damit Supabase nicht sofort eine Bestätigungs-Mail sendet. Bis Supabase Pro bzw. Custom SMTP aktiv ist, gilt vorübergehend der Unlock-only-Modus: Dashboard, Editor, Scanner und alle RLS-geschützten Daten sind zugänglich, sobald `unlock = true` gesetzt wurde. Die Magic-Link-Verifizierungsstrecke bleibt vorbereitet und kann später mit `OPERATOR_EMAIL_VERIFICATION_REQUIRED=true`, SMTP/Mailtemplate und dem bestehenden `send-operator-verification-email` Cron wieder aktiviert werden.
 
 Wichtig für Bilder, Karteninstanzen und die Feature-Matrix: Führe `supabase/schema.sql` erneut komplett im SQL Editor aus, damit `template_type`, `card_instance_number`, `card_instances`, `balance_transactions`, `topup_payment_sessions`, `wallet_update_jobs`, `wallet_device_registrations`, die Matrix-Validierung, der Bucket `wallet-assets` und die Storage Policies vorhanden sind. Danach landen Uploads automatisch unter:
 
@@ -329,7 +329,9 @@ set unlock = true
 where email = 'betreiber@example.com';
 ```
 
-Durch den Trigger werden `approved_at`, `verification_email_requested_at` und `verification_email_status = 'pending'` gesetzt. Der Supabase Cron ruft danach `send-operator-verification-email` auf. Diese Function sendet den Magic Link erst nach der Freigabe. Nach dem Klick auf den Magic Link wird die E-Mail in Supabase Auth bestätigt und der Betreiber kommt ins Dashboard.
+Im aktuellen Unlock-only-Modus setzt der Trigger nur `approved_at`; der Betreiber kann sich danach direkt einloggen. Die Felder `verification_email_requested_at`, `verification_email_sent_at`, `verification_email_last_error`, `verification_email_attempts` und `verification_email_status` bleiben für den späteren Magic-Link-Prozess vorbereitet, werden aber vorerst nicht als Zugriffsvoraussetzung verwendet.
+
+Sobald Supabase Pro bzw. Custom SMTP aktiv ist, kann der vorbereitete Prozess wieder aufgenommen werden: `OPERATOR_EMAIL_VERIFICATION_REQUIRED=true` als Supabase Secret setzen, das Auth-Mailtemplate veröffentlichen, `mailer_allow_unverified_email_sign_ins=false` setzen und den Unlock-Trigger wieder so konfigurieren, dass er `verification_email_requested_at` und `verification_email_status='pending'` vormerkt.
 
 Damit die Mail von `Fabricio@el-promillo.ch` kommt, muss in Supabase Auth ein SMTP-Absender für diese Adresse hinterlegt sein:
 
@@ -367,6 +369,12 @@ Falls Supabase die Mailvorlage wegen Free-Tier/Standard-Mailprovider blockiert, 
 
 ```bash
 SUPABASE_ACCESS_TOKEN=<dein-supabase-token> npm run auth-email:apply -- --routing-only
+```
+
+Der vorübergehende Unlock-only-Modus erlaubt unbestätigten Auth-Usern den Login, sperrt die App aber weiterhin über `operator_profiles.unlock=false`. Für diesen Zwischenzustand:
+
+```bash
+SUPABASE_ACCESS_TOKEN=<dein-supabase-token> npm run auth-email:unlock-only
 ```
 
 Das Script gibt keine Secret-Werte aus. SMTP-Zugangsdaten werden nicht im Repository gepflegt; sie müssen entweder im Supabase Dashboard unter `Authentication` -> `Emails`/`SMTP Settings` eingetragen werden oder separat über die Supabase Management API gesetzt werden, wenn Host, Benutzer, Passwort, Port und Absendername vollständig vorliegen.
@@ -888,6 +896,7 @@ Cron für geplante Wallet-Benachrichtigungen und Queue-Jobs:
 Operator-Registrierungs- und Magic-Link-Secrets:
 
 - `OPERATOR_VERIFICATION_MAIL_MODE`, Default `supabase_auth`; optional `resend`
+- `OPERATOR_EMAIL_VERIFICATION_REQUIRED`, aktuell `false`; später bei Supabase Pro/Custom SMTP auf `true` setzen
 - `OPERATOR_VERIFICATION_CRON_SECRET`, optional separates Cron-Secret; wenn leer, nutzt die Function `WALLET_CRON_SECRET`
 - `OPERATOR_VERIFICATION_REDIRECT_PATH`, Default `/dashboard.html`
 - `OPERATOR_VERIFICATION_MAX_ATTEMPTS`, Default `5`

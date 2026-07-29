@@ -3997,10 +3997,10 @@ as $$
 begin
   if new.unlock is true and coalesce(old.unlock, false) is false then
     new.approved_at = coalesce(new.approved_at, now());
-    new.verification_email_requested_at = now();
+    new.verification_email_requested_at = null;
     new.verification_email_sent_at = null;
     new.verification_email_last_error = null;
-    new.verification_email_status = 'pending';
+    new.verification_email_status = 'not_requested';
   end if;
 
   if new.unlock is false and coalesce(old.unlock, false) is true then
@@ -4029,9 +4029,8 @@ set search_path = public
 as $$
   select coalesce(
     (
-      select op.unlock and coalesce(au.email_confirmed_at, au.confirmed_at) is not null
+      select op.unlock
       from public.operator_profiles op
-      join auth.users au on au.id = op.id
       where op.id = auth.uid()
     ),
     false

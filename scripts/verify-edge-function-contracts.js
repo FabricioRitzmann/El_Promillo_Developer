@@ -78,7 +78,8 @@ const publicServiceRoleFunctions = {
     'validateOperatorEmail(body.email)',
     'DISPOSABLE_EMAIL_DOMAINS',
     'supabaseAdmin.auth.admin.createUser',
-    'email_confirm: false',
+    'OPERATOR_EMAIL_VERIFICATION_REQUIRED',
+    'email_confirm: !requireEmailVerification',
     'unlock: false',
     'enforcePublicClaimRateLimit(supabaseAdmin, request, \'register-operator\''
   ],

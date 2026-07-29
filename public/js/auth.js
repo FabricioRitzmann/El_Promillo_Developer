@@ -71,7 +71,7 @@ async function initAuthPage() {
       await redirectAfterLogin(client, session);
     } catch (error) {
       const message = /email not confirmed/i.test(error.message)
-        ? 'Deine E-Mail ist noch nicht verifiziert. Nach deiner Freigabe erhältst du den Magic Link automatisch per E-Mail.'
+        ? 'Dein Account ist noch nicht vollständig freigeschaltet. Bitte versuche es später erneut oder kontaktiere den Support.'
         : error.message;
 
       showMessage(authMessage, message, 'error');
@@ -97,7 +97,7 @@ async function initAuthPage() {
         displayName: formData.get('display_name')
       });
 
-      showMessage(authMessage, 'Account erstellt. Nach deiner manuellen Freigabe senden wir dir automatisch den Verifizierungslink per E-Mail.', 'success');
+      showMessage(authMessage, 'Account erstellt. Sobald dein Account manuell freigeschaltet wurde, kannst du dich einloggen.', 'success');
       registerForm.reset();
     } catch (error) {
       showMessage(authMessage, error.message, 'error');

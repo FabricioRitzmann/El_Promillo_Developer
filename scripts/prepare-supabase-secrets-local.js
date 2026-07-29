@@ -462,6 +462,10 @@ function buildEntries(config) {
     getPath(config, ['operatorRegistration', 'verificationMailMode']),
     'supabase_auth'
   ), 'config/default');
+  add(entries, 'OPERATOR_EMAIL_VERIFICATION_REQUIRED', firstConfigured(
+    getPath(config, ['operatorRegistration', 'emailVerificationRequired']),
+    'false'
+  ), 'config/default');
   add(entries, 'OPERATOR_VERIFICATION_CRON_SECRET', firstConfigured(
     getPath(config, ['operatorRegistration', 'operatorVerificationCronSecret']),
     ''

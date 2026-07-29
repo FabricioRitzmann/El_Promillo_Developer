@@ -72,12 +72,12 @@ export async function requireLogin({ requireUnlock = false } = {}) {
 
   const profile = await getOwnProfile(client, session);
 
-  if (requireUnlock && (!profile?.unlock || !isSessionEmailVerified(session))) {
+  if (requireUnlock && !profile?.unlock) {
     window.location.replace(pagePath('wait.html'));
     return null;
   }
 
-  if (isSessionEmailVerified(session) && shouldRedirectToScannerOnlyPage(profile)) {
+  if (shouldRedirectToScannerOnlyPage(profile)) {
     window.location.replace(pagePath('scanner.html'));
     return null;
   }
@@ -88,7 +88,7 @@ export async function requireLogin({ requireUnlock = false } = {}) {
 export async function redirectAfterLogin(client, session) {
   const profile = await getOwnProfile(client, session);
 
-  if (profile?.unlock && isSessionEmailVerified(session)) {
+  if (profile?.unlock) {
     window.location.replace(operatorHomePath());
     return;
   }

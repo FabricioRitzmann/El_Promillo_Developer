@@ -24,6 +24,7 @@
   },
   "operatorRegistration": {
     "registrationFunction": "register-operator",
+    "emailVerificationRequired": false,
     "verificationMailMode": "supabase_auth",
     "verificationSenderEmail": "Fabricio@el-promillo.ch",
     "verificationRedirectPath": "/dashboard.html",

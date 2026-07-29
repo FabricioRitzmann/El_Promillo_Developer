@@ -1,9 +1,9 @@
 // Supabase Edge Function: Betreiber registrieren.
 //
 // Die Registrierung läuft bewusst serverseitig, damit Supabase nicht sofort
-// eine Bestätigungs-Mail versendet. Der User wird unbestätigt angelegt,
-// `unlock=false` bleibt Standard, und die Magic-Link-Mail folgt erst nach
-// manueller Freigabe über `send-operator-verification-email`.
+// eine Bestätigungs-Mail versendet. Bis Custom SMTP/Supabase Pro aktiv ist,
+// reicht die manuelle Freigabe über `unlock=true`; die Magic-Link-Strecke
+// bleibt über OPERATOR_EMAIL_VERIFICATION_REQUIRED vorbereitet.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
 import { enforcePublicClaimRateLimit } from '../_shared/publicRateLimit.ts';
@@ -174,6 +174,12 @@ function isDuplicateUserError(error: any) {
     || message.includes('exists');
 }
 
+function emailVerificationRequired() {
+  return String(Deno.env.get('OPERATOR_EMAIL_VERIFICATION_REQUIRED') || '')
+    .trim()
+    .toLowerCase() === 'true';
+}
+
 Deno.serve(async (request) => {
   if (request.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -200,11 +206,12 @@ Deno.serve(async (request) => {
     const email = validateOperatorEmail(body.email);
     const password = validatePassword(body.password);
     const name = displayName(body.displayName || body.display_name);
+    const requireEmailVerification = emailVerificationRequired();
 
     const { data, error } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
-      email_confirm: false,
+      email_confirm: !requireEmailVerification,
       user_metadata: {
         display_name: name
       }
@@ -261,7 +268,9 @@ Deno.serve(async (request) => {
     return json({
       ok: true,
       status: 'pending',
-      message: 'Account erstellt. Nach der manuellen Freigabe senden wir dir automatisch den Verifizierungslink.'
+      message: requireEmailVerification
+        ? 'Account erstellt. Nach der manuellen Freigabe senden wir dir automatisch den Verifizierungslink.'
+        : 'Account erstellt. Sobald dein Account manuell freigeschaltet wurde, kannst du dich einloggen.'
     });
   } catch (error) {
     return errorJson(error);

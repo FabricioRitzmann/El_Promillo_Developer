@@ -24,6 +24,7 @@ Options:
   --redirect-url <url>      Add an allowed redirect URL. Can be repeated.
   --no-merge-redirects      Replace redirect allow list instead of merging existing values.
   --routing-only            Only update Site URL, redirects and verification login rules.
+  --unlock-only             Temporary mode: unlock=true is enough; unverified email sign-ins are allowed.
 `);
 }
 
@@ -36,7 +37,8 @@ function parseArgs(argv) {
     siteUrl: process.env.AUTH_SITE_URL || process.env.APP_PUBLIC_BASE_URL || 'https://el-promillo.ch',
     redirects: [],
     mergeRedirects: true,
-    routingOnly: false
+    routingOnly: false,
+    unlockOnly: false
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -61,6 +63,9 @@ function parseArgs(argv) {
       options.mergeRedirects = false;
     } else if (arg === '--routing-only') {
       options.routingOnly = true;
+    } else if (arg === '--unlock-only') {
+      options.routingOnly = true;
+      options.unlockOnly = true;
     } else if (arg === '-h' || arg === '--help') {
       usage();
       process.exit(0);
@@ -212,7 +217,7 @@ async function main() {
     site_url: siteUrl,
     uri_allow_list: mergedRedirects.join(','),
     mailer_autoconfirm: false,
-    mailer_allow_unverified_email_sign_ins: false
+    mailer_allow_unverified_email_sign_ins: options.unlockOnly
   };
 
   if (!options.routingOnly) {
@@ -233,7 +238,9 @@ async function main() {
   }
 
   await patchAuthConfig(projectRef, accessToken, patch);
-  if (options.routingOnly) {
+  if (options.unlockOnly) {
+    console.log('Supabase Auth Unlock-only-Zwischenmodus wurde aktualisiert.');
+  } else if (options.routingOnly) {
     console.log('Supabase Auth Routing- und Verifizierungsregeln wurden aktualisiert.');
   } else {
     console.log('Supabase Auth Magic-Link-Template und Redirect-Einstellungen wurden aktualisiert.');
