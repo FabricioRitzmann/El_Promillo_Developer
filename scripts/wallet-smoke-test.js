@@ -19,8 +19,11 @@ const webChecks = [
 const publicFunctionChecks = [
   'claim-card',
   'get-public-template',
+  'get-wallet-message',
   'claim-apple-pass',
   'google-wallet-save-link',
+  'register-operator',
+  'send-operator-verification-email',
   'create-topup-payment-session',
   'confirm-topup-payment',
   'apple-wallet-webservice',

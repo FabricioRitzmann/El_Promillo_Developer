@@ -19,7 +19,15 @@
     "walletCronSecret": "SET_AS_SUPABASE_EDGE_SECRET_WALLET_CRON_SECRET",
     "walletMessageLinkSecret": "SET_AS_SUPABASE_EDGE_SECRET_WALLET_MESSAGE_LINK_SECRET_OPTIONAL",
     "scheduledNotificationsFunction": "process-scheduled-wallet-notifications",
-    "walletUpdateQueueFunction": "process-wallet-update-queue"
+    "walletUpdateQueueFunction": "process-wallet-update-queue",
+    "operatorVerificationFunction": "send-operator-verification-email"
+  },
+  "operatorRegistration": {
+    "registrationFunction": "register-operator",
+    "verificationMailMode": "supabase_auth",
+    "verificationSenderEmail": "Fabricio@el-promillo.ch",
+    "verificationRedirectPath": "/dashboard.html",
+    "operatorVerificationCronSecret": "SET_AS_SUPABASE_EDGE_SECRET_OPERATOR_VERIFICATION_CRON_SECRET_OPTIONAL"
   },
   "supabase": {
     "url": "YOUR_SUPABASE_URL",

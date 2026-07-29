@@ -2934,15 +2934,16 @@ export const walletNotificationService = {
 
     const recoveredProcessingCount = await recoverStaleProcessingRecipients(context.supabaseAdmin, campaign.id);
 
-    if (['scheduled', 'location_based'].includes(campaign.send_type)) {
+    let existingRecipientCount = await countCampaignRecipients(context.supabaseAdmin, campaign);
+
+    if (['scheduled', 'location_based'].includes(campaign.send_type) && existingRecipientCount === 0) {
       await this.resolveRecipients(context, campaign);
+      existingRecipientCount = await countCampaignRecipients(context.supabaseAdmin, campaign);
     }
 
     let recipients = await loadPendingCampaignRecipients(context.supabaseAdmin, campaign);
 
     if (!recipients.length) {
-      const existingRecipientCount = await countCampaignRecipients(context.supabaseAdmin, campaign);
-
       if (existingRecipientCount > 0) {
         const campaignStatus = await updateCampaignStatus(context.supabaseAdmin, campaign);
 

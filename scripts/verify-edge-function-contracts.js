@@ -58,6 +58,12 @@ const publicServiceRoleFunctions = {
     'CLAIM_LINK_REQUIRED',
     'get-public-template'
   ],
+  'get-wallet-message': [
+    'verifyWalletMessageToken(cardInstance, token)',
+    'MESSAGE_LINK_INVALID',
+    'enforcePublicClaimRateLimit(supabaseAdmin, request, \'get-wallet-message\'',
+    'walletMessageLinkPayload'
+  ],
   'claim-apple-pass': [
     'walletObjectId',
     'APPLE_CLAIM_TOKEN_MISMATCH',
@@ -67,6 +73,23 @@ const publicServiceRoleFunctions = {
     'walletObjectId',
     'GOOGLE_CLAIM_TOKEN_MISMATCH',
     'https://pay.google.com/gp/v/save/'
+  ],
+  'register-operator': [
+    'validateOperatorEmail(body.email)',
+    'DISPOSABLE_EMAIL_DOMAINS',
+    'supabaseAdmin.auth.admin.createUser',
+    'email_confirm: false',
+    'unlock: false',
+    'enforcePublicClaimRateLimit(supabaseAdmin, request, \'register-operator\''
+  ],
+  'send-operator-verification-email': [
+    'OPERATOR_VERIFICATION_CRON_SECRET',
+    'WALLET_CRON_SECRET',
+    'timingSafeSecretMatches(configured, bearerToken)',
+    'signInWithOtp',
+    'generateLink',
+    'verification_email_status',
+    'verification_email_sent_at'
   ],
   'apple-wallet-webservice': [
     'applePassToken(request)',

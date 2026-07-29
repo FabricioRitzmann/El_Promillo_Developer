@@ -40,6 +40,60 @@ export class SupabaseRestClient {
     this.anonKey = config.supabase.anonKey;
   }
 
+  cleanAuthRedirectUrl() {
+    if (!window.history?.replaceState) {
+      return;
+    }
+
+    const cleanUrl = `${window.location.pathname}${window.location.search}`;
+    window.history.replaceState(null, document.title, cleanUrl);
+  }
+
+  async fetchUser(accessToken) {
+    const response = await fetch(`${this.supabaseUrl}/auth/v1/user`, {
+      method: 'GET',
+      headers: this.baseHeaders(true, accessToken)
+    });
+    const data = await parseResponse(response);
+
+    if (!response.ok) {
+      throw new Error(data?.msg || data?.error_description || data?.message || 'Session konnte nicht geprüft werden.');
+    }
+
+    return data;
+  }
+
+  async consumeAuthRedirectSession() {
+    const hash = String(window.location.hash || '').replace(/^#/, '');
+
+    if (!hash) {
+      return null;
+    }
+
+    const params = new URLSearchParams(hash);
+    const accessToken = params.get('access_token');
+    const refreshToken = params.get('refresh_token');
+
+    if (!accessToken || !refreshToken) {
+      return null;
+    }
+
+    const expiresIn = Number(params.get('expires_in') || 3600);
+    const session = {
+      access_token: accessToken,
+      refresh_token: refreshToken,
+      expires_in: expiresIn,
+      expires_at: Math.floor(Date.now() / 1000) + expiresIn,
+      token_type: params.get('token_type') || 'bearer',
+      user: await this.fetchUser(accessToken)
+    };
+
+    this.storeSession(session);
+    this.cleanAuthRedirectUrl();
+
+    return session;
+  }
+
   getStoredSession() {
     const rawSession = window.localStorage.getItem(sessionStorageKey);
 
@@ -94,6 +148,26 @@ export class SupabaseRestClient {
     return data;
   }
 
+  async registerOperator({ email, password, displayName }) {
+    const response = await fetch(`${this.supabaseUrl}/functions/v1/register-operator`, {
+      method: 'POST',
+      headers: this.baseHeaders(false),
+      body: JSON.stringify({
+        email,
+        password,
+        displayName: displayName || ''
+      })
+    });
+
+    const data = await parseResponse(response);
+
+    if (!response.ok) {
+      throw new Error(data?.error_reason || data?.error_message || data?.message || 'Registrierung fehlgeschlagen.');
+    }
+
+    return data;
+  }
+
   async signIn({ email, password }) {
     const response = await fetch(`${this.supabaseUrl}/auth/v1/token?grant_type=password`, {
       method: 'POST',
@@ -125,6 +199,12 @@ export class SupabaseRestClient {
   }
 
   async ensureSession() {
+    const redirectSession = await this.consumeAuthRedirectSession();
+
+    if (redirectSession) {
+      return redirectSession;
+    }
+
     const session = this.getStoredSession();
 
     if (!session) {
@@ -134,6 +214,22 @@ export class SupabaseRestClient {
     const now = Math.floor(Date.now() / 1000);
 
     if (session.expires_at && session.expires_at > now + 60) {
+      if (!session.user?.id && session.access_token) {
+        try {
+          const user = await this.fetchUser(session.access_token);
+          const refreshedSession = {
+            ...session,
+            user
+          };
+
+          this.storeSession(refreshedSession);
+          return refreshedSession;
+        } catch {
+          this.clearSession();
+          return null;
+        }
+      }
+
       return session;
     }
 

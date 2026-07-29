@@ -8,6 +8,12 @@ const operatorProfileSelect = [
   'email',
   'display_name',
   'unlock',
+  'approved_at',
+  'verification_email_requested_at',
+  'verification_email_sent_at',
+  'verification_email_last_error',
+  'verification_email_attempts',
+  'verification_email_status',
   'created_at',
   'updated_at'
 ].join(',');
@@ -31,6 +37,12 @@ function shouldRedirectToScannerOnlyPage(profile) {
   return Boolean(profile?.unlock)
     && isMobileScannerOnly()
     && !SCANNER_ONLY_ALLOWED_PAGES.has(currentPageName());
+}
+
+export function isSessionEmailVerified(session) {
+  const user = session?.user || {};
+
+  return Boolean(user.email_confirmed_at || user.confirmed_at);
 }
 
 export async function getOwnProfile(client, session) {
@@ -60,12 +72,12 @@ export async function requireLogin({ requireUnlock = false } = {}) {
 
   const profile = await getOwnProfile(client, session);
 
-  if (requireUnlock && !profile?.unlock) {
+  if (requireUnlock && (!profile?.unlock || !isSessionEmailVerified(session))) {
     window.location.replace(pagePath('wait.html'));
     return null;
   }
 
-  if (shouldRedirectToScannerOnlyPage(profile)) {
+  if (isSessionEmailVerified(session) && shouldRedirectToScannerOnlyPage(profile)) {
     window.location.replace(pagePath('scanner.html'));
     return null;
   }
@@ -76,7 +88,7 @@ export async function requireLogin({ requireUnlock = false } = {}) {
 export async function redirectAfterLogin(client, session) {
   const profile = await getOwnProfile(client, session);
 
-  if (profile?.unlock) {
+  if (profile?.unlock && isSessionEmailVerified(session)) {
     window.location.replace(operatorHomePath());
     return;
   }

@@ -49,7 +49,8 @@ assertIncludes('Auth Submit-Handler', authJs, [
   "registerForm?.addEventListener('submit'",
   'event.preventDefault();',
   'client.signIn',
-  'client.signUp'
+  'validateOperatorEmail',
+  'client.registerOperator'
 ]);
 
 console.log('Auth Enter-Submit ist fuer Login und Registrierung statisch abgesichert.');

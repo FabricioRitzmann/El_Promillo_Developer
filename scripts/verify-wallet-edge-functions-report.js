@@ -30,7 +30,10 @@ const packageJson = read('package.json');
 const requiredFunctions = [
   'claim-card',
   'get-public-template',
+  'get-wallet-message',
   'claim-apple-pass',
+  'register-operator',
+  'send-operator-verification-email',
   'create-topup-payment-session',
   'confirm-topup-payment',
   'redeem-balance',

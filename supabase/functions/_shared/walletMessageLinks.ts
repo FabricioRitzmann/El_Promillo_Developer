@@ -30,7 +30,6 @@ function walletMessageSecret() {
     Deno.env.get('WALLET_MESSAGE_LINK_SECRET')
       || Deno.env.get('WALLET_CRON_SECRET')
       || Deno.env.get('APPLE_PASS_AUTHENTICATION_TOKEN_SECRET')
-      || Deno.env.get('PASSKIT_AUTHENTICATION_TOKEN_SECRET')
   );
 }
 

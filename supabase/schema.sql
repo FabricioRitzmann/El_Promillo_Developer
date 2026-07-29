@@ -20,9 +20,37 @@ create table if not exists public.operator_profiles (
   email text,
   display_name text,
   unlock boolean not null default false,
+  approved_at timestamptz,
+  verification_email_requested_at timestamptz,
+  verification_email_sent_at timestamptz,
+  verification_email_last_error text,
+  verification_email_attempts integer not null default 0,
+  verification_email_status text not null default 'not_requested',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.operator_profiles
+add column if not exists approved_at timestamptz,
+add column if not exists verification_email_requested_at timestamptz,
+add column if not exists verification_email_sent_at timestamptz,
+add column if not exists verification_email_last_error text,
+add column if not exists verification_email_attempts integer not null default 0,
+add column if not exists verification_email_status text not null default 'not_requested';
+
+alter table public.operator_profiles
+drop constraint if exists operator_profiles_verification_email_attempts_check;
+
+alter table public.operator_profiles
+add constraint operator_profiles_verification_email_attempts_check
+check (verification_email_attempts >= 0) not valid;
+
+alter table public.operator_profiles
+drop constraint if exists operator_profiles_verification_email_status_check;
+
+alter table public.operator_profiles
+add constraint operator_profiles_verification_email_status_check
+check (verification_email_status in ('not_requested', 'pending', 'sent', 'failed')) not valid;
 
 create table if not exists public.businesses (
   id uuid primary key default gen_random_uuid(),
@@ -3960,6 +3988,38 @@ create trigger on_auth_user_created_create_operator_profile
 after insert on auth.users
 for each row execute function public.handle_new_operator();
 
+create or replace function public.request_operator_verification_on_unlock()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.unlock is true and coalesce(old.unlock, false) is false then
+    new.approved_at = coalesce(new.approved_at, now());
+    new.verification_email_requested_at = now();
+    new.verification_email_sent_at = null;
+    new.verification_email_last_error = null;
+    new.verification_email_status = 'pending';
+  end if;
+
+  if new.unlock is false and coalesce(old.unlock, false) is true then
+    new.approved_at = null;
+    new.verification_email_requested_at = null;
+    new.verification_email_sent_at = null;
+    new.verification_email_last_error = null;
+    new.verification_email_status = 'not_requested';
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists request_operator_verification_on_unlock on public.operator_profiles;
+create trigger request_operator_verification_on_unlock
+before update of unlock on public.operator_profiles
+for each row execute function public.request_operator_verification_on_unlock();
+
 create or replace function public.current_operator_unlocked()
 returns boolean
 language sql
@@ -3968,7 +4028,12 @@ security definer
 set search_path = public
 as $$
   select coalesce(
-    (select unlock from public.operator_profiles where id = auth.uid()),
+    (
+      select op.unlock and coalesce(au.email_confirmed_at, au.confirmed_at) is not null
+      from public.operator_profiles op
+      join auth.users au on au.id = op.id
+      where op.id = auth.uid()
+    ),
     false
   );
 $$;
@@ -4283,6 +4348,12 @@ grant select (
   email,
   display_name,
   unlock,
+  approved_at,
+  verification_email_requested_at,
+  verification_email_sent_at,
+  verification_email_last_error,
+  verification_email_attempts,
+  verification_email_status,
   created_at,
   updated_at
 ) on public.operator_profiles to authenticated;
@@ -4821,15 +4892,11 @@ to authenticated
 with check (
   bucket_id = 'business-logos'
   and lower(name) ~ '\.(png|jpg|jpeg|webp)$'
-  and coalesce(metadata->>'mimetype', '') in ('image/png', 'image/jpeg', 'image/webp')
-  and metadata ? 'size'
-  and (metadata->>'size') ~ '^[0-9]+$'
-  and (metadata->>'size')::bigint <= 2097152
   and public.current_operator_unlocked()
   and exists (
     select 1
     from public.businesses business
-    where business.id::text = (storage.foldername(name))[1]
+    where business.id::text = (storage.foldername(storage.objects.name))[1]
       and business.owner_id = auth.uid()
   )
 );
@@ -4845,22 +4912,18 @@ using (
   and exists (
     select 1
     from public.businesses business
-    where business.id::text = (storage.foldername(name))[1]
+    where business.id::text = (storage.foldername(storage.objects.name))[1]
       and business.owner_id = auth.uid()
   )
 )
 with check (
   bucket_id = 'business-logos'
   and lower(name) ~ '\.(png|jpg|jpeg|webp)$'
-  and coalesce(metadata->>'mimetype', '') in ('image/png', 'image/jpeg', 'image/webp')
-  and metadata ? 'size'
-  and (metadata->>'size') ~ '^[0-9]+$'
-  and (metadata->>'size')::bigint <= 2097152
   and public.current_operator_unlocked()
   and exists (
     select 1
     from public.businesses business
-    where business.id::text = (storage.foldername(name))[1]
+    where business.id::text = (storage.foldername(storage.objects.name))[1]
       and business.owner_id = auth.uid()
   )
 );
@@ -4876,7 +4939,7 @@ using (
   and exists (
     select 1
     from public.businesses business
-    where business.id::text = (storage.foldername(name))[1]
+    where business.id::text = (storage.foldername(storage.objects.name))[1]
       and business.owner_id = auth.uid()
   )
 );

@@ -289,8 +289,20 @@ function canvasToPngBlob(canvas) {
   });
 }
 
+function pngUploadFileFromBlob(blob) {
+  if (typeof File === 'function') {
+    return new File([blob], 'company-logo.png', { type: 'image/png' });
+  }
+
+  return blob;
+}
+
 async function logoFileToAppleSafePng(file) {
   validateLogoFile(file);
+
+  if (String(file.type || '').toLowerCase() === 'image/png' && file.size <= maxLogoFileBytes) {
+    return file;
+  }
 
   const image = await imageFromLogoFile(file);
   const width = image.naturalWidth || image.width;
@@ -300,30 +312,34 @@ async function logoFileToAppleSafePng(file) {
     throw new Error('Logo konnte nicht gelesen werden.');
   }
 
-  const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
+  try {
+    for (const scale of [1, 0.85, 0.7, 0.55, 0.45, 0.35]) {
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(width * scale));
+      canvas.height = Math.max(1, Math.round(height * scale));
 
-  const context = canvas.getContext('2d');
+      const context = canvas.getContext('2d');
 
-  if (!context) {
-    throw new Error('Logo konnte nicht vorbereitet werden.');
+      if (!context) {
+        throw new Error('Logo konnte nicht vorbereitet werden.');
+      }
+
+      context.clearRect(0, 0, canvas.width, canvas.height);
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+      const pngBlob = await canvasToPngBlob(canvas);
+
+      if (pngBlob.size <= maxLogoFileBytes) {
+        return pngUploadFileFromBlob(pngBlob);
+      }
+    }
+  } finally {
+    if (typeof image.close === 'function') {
+      image.close();
+    }
   }
 
-  context.clearRect(0, 0, width, height);
-  context.drawImage(image, 0, 0, width, height);
-
-  if (typeof image.close === 'function') {
-    image.close();
-  }
-
-  const pngBlob = await canvasToPngBlob(canvas);
-
-  if (pngBlob.size > maxLogoFileBytes) {
-    throw new Error('Logo ist nach der PNG-Konvertierung zu gross. Maximal 2 MB erlaubt.');
-  }
-
-  return new File([pngBlob], 'company-logo.png', { type: 'image/png' });
+  throw new Error('Logo ist nach der PNG-Konvertierung zu gross. Bitte eine kleinere Bilddatei verwenden.');
 }
 
 async function uploadCompanyLogo(file) {

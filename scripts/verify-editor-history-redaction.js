@@ -54,7 +54,7 @@ assertExcludes(editorSource, [
 
 assertIncludes(schemaSource, [
   'revoke select, insert, update, delete on public.operator_profiles from authenticated',
-  'grant select (\n  id,\n  email,\n  display_name,\n  unlock,\n  created_at,\n  updated_at\n) on public.operator_profiles to authenticated',
+  'grant select (\n  id,\n  email,\n  display_name,\n  unlock,\n  approved_at,\n  verification_email_requested_at,\n  verification_email_sent_at,\n  verification_email_last_error,\n  verification_email_attempts,\n  verification_email_status,\n  created_at,\n  updated_at\n) on public.operator_profiles to authenticated',
   'revoke select, insert, update, delete on public.businesses from authenticated',
   'grant select (\n  id,\n  owner_id,\n  name,\n  description,\n  address,\n  location_lat,\n  location_lng,\n  phone,\n  website,\n  logo_url,\n  company_logo_path,\n  company_logo_updated_at,\n  created_at,\n  updated_at\n) on public.businesses to authenticated',
   'grant insert (\n  owner_id,\n  name,\n  description,\n  address,\n  location_lat,\n  location_lng,\n  phone,\n  website,\n  logo_url,\n  company_logo_path,\n  company_logo_updated_at\n) on public.businesses to authenticated',

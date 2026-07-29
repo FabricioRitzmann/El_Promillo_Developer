@@ -1,11 +1,12 @@
 # Wallet Cron Setup
 
-Stand: 2026-07-03
+Stand: 2026-07-29
 
-Geplante Wallet-Benachrichtigungen und vorbereitete Kartenupdates laufen im MVP nicht automatisch im Browser. Sie werden serverseitig durch zwei Supabase Edge Functions verarbeitet:
+Geplante Wallet-Benachrichtigungen, vorbereitete Kartenupdates und Betreiber-Verifizierungs-Mails laufen im MVP nicht automatisch im Browser. Sie werden serverseitig durch drei Supabase Edge Functions verarbeitet:
 
 - `process-scheduled-wallet-notifications`
 - `process-wallet-update-queue`
+- `send-operator-verification-email`
 
 ## Variante A: Supabase Cron
 
@@ -14,6 +15,7 @@ Geplante Wallet-Benachrichtigungen und vorbereitete Kartenupdates laufen im MVP 
 ```bash
 supabase functions deploy process-scheduled-wallet-notifications
 supabase functions deploy process-wallet-update-queue
+supabase functions deploy send-operator-verification-email
 ```
 
 2. Cron Secret setzen:
@@ -45,10 +47,11 @@ Alternativ kannst du weiterhin in `supabase/cron.example.sql` diese Platzhalter 
 
 Danach die bearbeitete SQL-Datei im Supabase SQL Editor ausführen.
 
-Die Vorlage aktiviert `pg_cron` und `pg_net`, entfernt vorhandene gleichnamige Jobs und legt zwei Jobs an:
+Die Vorlage aktiviert `pg_cron` und `pg_net`, entfernt vorhandene gleichnamige Jobs und legt drei Jobs an:
 
 - `wallet-process-scheduled-notifications`: jede Minute
 - `wallet-process-update-queue`: alle zwei Minuten
+- `operator-send-verification-email`: alle fünf Minuten
 
 Die Requests werden per `POST` an die Edge Functions geschickt und senden `x-cron-secret`. Die Functions akzeptieren alternativ auch `Authorization: Bearer <WALLET_CRON_SECRET>`.
 
@@ -64,6 +67,10 @@ curl -X POST \
 curl -X POST \
   -H "x-cron-secret: $WALLET_CRON_SECRET" \
   "https://<PROJECT_REF>.supabase.co/functions/v1/process-wallet-update-queue"
+
+curl -X POST \
+  -H "x-cron-secret: $WALLET_CRON_SECRET" \
+  "https://<PROJECT_REF>.supabase.co/functions/v1/send-operator-verification-email"
 ```
 
 ## Sicherheit
@@ -82,6 +89,7 @@ Nach dem Ausführen der SQL-Vorlage:
 select jobid, jobname, schedule, active
 from cron.job
 where jobname in (
+  'operator-send-verification-email',
   'wallet-process-scheduled-notifications',
   'wallet-process-update-queue'
 )
@@ -94,3 +102,4 @@ In der App bzw. Datenbank prüfen:
 - `wallet_notification_recipients` erhalten Providerstatus.
 - `wallet_push_logs` enthält Versand-, Fallback- oder Fehlerlogs.
 - `wallet_update_queue` Jobs wechseln von `pending` zu `sent` oder `failed`.
+- Freigegebene Betreiberprofile wechseln bei erfolgreichem Mailversand von `verification_email_status = 'pending'` zu `sent`.

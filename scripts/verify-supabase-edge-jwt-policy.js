@@ -11,8 +11,11 @@ const config = fs.readFileSync(configPath, 'utf8');
 const expectedNoJwtFunctions = new Set([
   'claim-card',
   'get-public-template',
+  'get-wallet-message',
   'claim-apple-pass',
   'google-wallet-save-link',
+  'register-operator',
+  'send-operator-verification-email',
   'create-topup-payment-session',
   'confirm-topup-payment',
   'apple-wallet-webservice',
@@ -47,6 +50,12 @@ const publicClaimGuards = {
     ".eq('is_active', true)",
     'CLAIM_LINK_REQUIRED'
   ],
+  'get-wallet-message': [
+    'verifyWalletMessageToken(cardInstance, token)',
+    'MESSAGE_LINK_INVALID',
+    'enforcePublicClaimRateLimit(supabaseAdmin, request, \'get-wallet-message\'',
+    'walletMessageLinkPayload'
+  ],
   'claim-apple-pass': [
     'walletObjectId',
     'APPLE_CLAIM_TOKEN_MISMATCH',
@@ -59,6 +68,23 @@ const publicClaimGuards = {
     'acceptedClaimKeys.has(walletObjectId)',
     'signJwt(payload, config.privateKey)',
     'https://pay.google.com/gp/v/save/'
+  ],
+  'register-operator': [
+    'validateOperatorEmail(body.email)',
+    'DISPOSABLE_EMAIL_DOMAINS',
+    'supabaseAdmin.auth.admin.createUser',
+    'email_confirm: false',
+    'unlock: false',
+    'enforcePublicClaimRateLimit(supabaseAdmin, request, \'register-operator\''
+  ],
+  'send-operator-verification-email': [
+    'OPERATOR_VERIFICATION_CRON_SECRET',
+    'WALLET_CRON_SECRET',
+    'timingSafeSecretMatches(configured, bearerToken)',
+    'signInWithOtp',
+    'type: \'magiclink\'',
+    'verification_email_status',
+    'verification_email_sent_at'
   ],
 
 

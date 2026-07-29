@@ -298,7 +298,7 @@ Die SQL-Datei erstellt:
 - Guthaben-Transaktionen und Topup-Sessions für `balance_card` und explizit aktivierte Zusatz-Guthaben
 - die direkten Wallet-Benachrichtigungstabellen `wallet_notification_campaigns`, `wallet_notification_recipients`, `wallet_push_logs`, `wallet_update_queue`, `apple_wallet_devices`, `apple_wallet_registrations`, `apple_pass_versions` und `google_wallet_objects`
 
-Neue Betreiber werden automatisch mit `unlock = false` angelegt.
+Neue Betreiber werden automatisch mit `unlock = false` angelegt. Die Registrierung läuft über die Edge Function `register-operator`, damit Supabase nicht sofort eine Bestätigungs-Mail sendet. Nach der manuellen Freigabe markiert ein SQL-Trigger den Betreiber für die Verifizierungs-Mail; `send-operator-verification-email` sendet danach per Supabase Magic Link die Bestätigung. Dashboard, Editor, Scanner und alle RLS-geschützten Daten sind erst zugänglich, wenn `unlock = true` und die Supabase-E-Mail bestätigt ist.
 
 Wichtig für Bilder, Karteninstanzen und die Feature-Matrix: Führe `supabase/schema.sql` erneut komplett im SQL Editor aus, damit `template_type`, `card_instance_number`, `card_instances`, `balance_transactions`, `topup_payment_sessions`, `wallet_update_jobs`, `wallet_device_registrations`, die Matrix-Validierung, der Bucket `wallet-assets` und die Storage Policies vorhanden sind. Danach landen Uploads automatisch unter:
 
@@ -319,7 +319,7 @@ Die Datei schaltet diesen Demo-Betreiber frei und erzeugt Demo-Business, Apple-/
 
 ## Betreiber freischalten
 
-Nach der Registrierung sieht ein Betreiber nur die Warteseite. Die Freischaltung erfolgt im MVP manuell in Supabase.
+Nach der Registrierung bekommt der Betreiber noch keinen Zugriff und keine Bestätigungs-Mail. Die Freischaltung erfolgt im MVP manuell in Supabase.
 
 Im Supabase SQL Editor:
 
@@ -329,7 +329,19 @@ set unlock = true
 where email = 'betreiber@example.com';
 ```
 
-Danach kann der Betreiber den Status auf der Warteseite erneut prüfen oder sich neu einloggen.
+Durch den Trigger werden `approved_at`, `verification_email_requested_at` und `verification_email_status = 'pending'` gesetzt. Der Supabase Cron ruft danach `send-operator-verification-email` auf. Diese Function sendet den Magic Link erst nach der Freigabe. Nach dem Klick auf den Magic Link wird die E-Mail in Supabase Auth bestätigt und der Betreiber kommt ins Dashboard.
+
+Damit die Mail von `Fabricio@el-promillo.ch` kommt, muss in Supabase Auth ein SMTP-Absender für diese Adresse hinterlegt sein:
+
+1. Supabase Dashboard öffnen.
+2. Projekt öffnen.
+3. `Authentication` -> `Emails` bzw. `SMTP Settings` öffnen.
+4. Custom SMTP aktivieren.
+5. Absenderadresse auf `Fabricio@el-promillo.ch` setzen.
+6. Die Domain bzw. SMTP-Zugangsdaten deines Mailproviders eintragen und speichern.
+7. Unter `Authentication` -> `URL Configuration` die öffentliche App-URL, z. B. `https://el-promillo.ch`, als Site URL und Redirect URL erlauben.
+
+Standardmässig nutzt `send-operator-verification-email` `OPERATOR_VERIFICATION_MAIL_MODE=supabase_auth`, also die Supabase Auth Magic-Link-Mail. Optional kann später `OPERATOR_VERIFICATION_MAIL_MODE=resend` mit `RESEND_API_KEY`, `MAIL_FROM_EMAIL=Fabricio@el-promillo.ch` und `MAIL_FROM_NAME=El Promillo` verwendet werden.
 
 ## Kein PassKit im aktiven Wallet-Pfad
 
@@ -770,7 +782,10 @@ Einzelbefehle, falls du bewusst manuell deployen willst:
 ```bash
 supabase functions deploy claim-card
 supabase functions deploy get-public-template
+supabase functions deploy get-wallet-message
 supabase functions deploy claim-apple-pass
+supabase functions deploy register-operator
+supabase functions deploy send-operator-verification-email
 supabase functions deploy create-topup-payment-session
 supabase functions deploy confirm-topup-payment
 supabase functions deploy redeem-balance
@@ -801,8 +816,11 @@ Die Datei `supabase/config.toml` ist Teil des Projekts und setzt `verify_jwt = f
 ```text
 claim-card
 get-public-template
+get-wallet-message
 claim-apple-pass
 google-wallet-save-link
+register-operator
+send-operator-verification-email
 samsung-wallet-add-link
 samsung-wallet-server
 update-samsung-wallet-pass
@@ -813,7 +831,7 @@ process-scheduled-wallet-notifications
 process-wallet-update-queue
 ```
 
-Das ist notwendig, weil Supabase Edge Functions mit aktivem `verify_jwt` Requests ohne gültigen User-JWT bereits vor deinem Code mit `401` blockieren. Diese Functions prüfen stattdessen im eigenen Code den passenden Zugriff: Apple `Authorization: ApplePass <authenticationToken>`, Claim-Schlüssel aus der Karteninstanz, öffentlich rate-limitierte Template-Vorschau, `PAYMENT_WEBHOOK_SECRET` für Zahlungsbestätigungen oder `WALLET_CRON_SECRET`. Betreiber-Functions wie `create-wallet-notification-campaign`, `send-wallet-notification`, `scanner-actions`, `get-business-scan-statistics`, `issue-apple-pass`, `update-apple-pass`, `send-apple-wallet-update`, `issue-google-wallet-pass`, `update-google-wallet-pass` und `send-google-wallet-message` bleiben mit normaler Supabase-Auth abgesichert. `pnpm check` prüft diese Grenze mit `scripts/verify-supabase-edge-jwt-policy.js`, damit keine Operator-Function versehentlich `verify_jwt = false` bekommt.
+Das ist notwendig, weil Supabase Edge Functions mit aktivem `verify_jwt` Requests ohne gültigen User-JWT bereits vor deinem Code mit `401` blockieren. Diese Functions prüfen stattdessen im eigenen Code den passenden Zugriff: Apple `Authorization: ApplePass <authenticationToken>`, Claim-Schlüssel aus der Karteninstanz, öffentlich rate-limitierte Template-Vorschau, Rate-Limit plus serverseitige User-Erstellung bei `register-operator`, Cron-Secret für die Betreiber-Verifizierung, `PAYMENT_WEBHOOK_SECRET` für Zahlungsbestätigungen oder `WALLET_CRON_SECRET`. Betreiber-Functions wie `create-wallet-notification-campaign`, `send-wallet-notification`, `scanner-actions`, `get-business-scan-statistics`, `issue-apple-pass`, `update-apple-pass`, `send-apple-wallet-update`, `issue-google-wallet-pass`, `update-google-wallet-pass` und `send-google-wallet-message` bleiben mit normaler Supabase-Auth abgesichert. `pnpm check` prüft diese Grenze mit `scripts/verify-supabase-edge-jwt-policy.js`, damit keine Operator-Function versehentlich `verify_jwt = false` bekommt.
 
 Nach dem Deploy muss `config.json -> supabase.url` weiterhin auf dein Supabase-Projekt zeigen. Die Claim-Seite ruft Edge Functions über `https://<PROJECT_REF>.supabase.co/functions/v1/...` auf; für echte Apple-Updates muss `APPLE_WEB_SERVICE_BASE_URL` exakt auf die deployte `apple-wallet-webservice` Function zeigen.
 
@@ -836,7 +854,20 @@ Cron für geplante Wallet-Benachrichtigungen und Queue-Jobs:
 - Der Cron ruft die Function per `POST` auf und sendet entweder `Authorization: Bearer <WALLET_CRON_SECRET>` oder `x-cron-secret: <WALLET_CRON_SECRET>`.
 - Mit Cron-Secret werden alle fälligen Kampagnen/Jobs über alle Businesses verarbeitet; die Verarbeitung setzt intern pro Kampagne/Job wieder `owner_id` und `business_id`.
 - Konkrete Supabase-Cron-Vorlage: `supabase/cron.example.sql`; Setup-Anleitung: [docs/WALLET_CRON_SETUP.md](docs/WALLET_CRON_SETUP.md).
+- Die gleiche Cron-Vorlage verarbeitet auch freigegebene Betreiber-Verifizierungen über `send-operator-verification-email`. Der Job läuft alle 5 Minuten und nutzt denselben `x-cron-secret`; optional kann `OPERATOR_VERIFICATION_CRON_SECRET` separat gesetzt werden.
 - `location_based` wird im MVP best-effort umgesetzt: Apple bekommt `locations[].relevantText`, Google bekommt ein Karten-Object-Update ohne echten Standort-Push. Der Preflight zeigt dafür `LOCATION_BASED_BEST_EFFORT`, Apple-iOS-Relevanzhinweise und Google-Fallback-Hinweise direkt im Editor an. Der Standortradius wird durch Editor, Edge Backend und SQL einheitlich auf ganzzahlige 50 bis 100000 Meter begrenzt.
+
+Operator-Registrierungs- und Magic-Link-Secrets:
+
+- `OPERATOR_VERIFICATION_MAIL_MODE`, Default `supabase_auth`; optional `resend`
+- `OPERATOR_VERIFICATION_CRON_SECRET`, optional separates Cron-Secret; wenn leer, nutzt die Function `WALLET_CRON_SECRET`
+- `OPERATOR_VERIFICATION_REDIRECT_PATH`, Default `/dashboard.html`
+- `OPERATOR_VERIFICATION_MAX_ATTEMPTS`, Default `5`
+- `OPERATOR_REGISTER_RATE_LIMIT`, Default `12`
+- `OPERATOR_REGISTER_RATE_LIMIT_WINDOW_SECONDS`, Default `3600`
+- `MAIL_FROM_EMAIL`, bei Resend-Modus `Fabricio@el-promillo.ch`; bei Supabase-Auth-Modus muss diese Adresse in Supabase SMTP konfiguriert sein
+- `MAIL_FROM_NAME`, z. B. `El Promillo`
+- `RESEND_API_KEY`, nur nötig bei `OPERATOR_VERIFICATION_MAIL_MODE=resend`
 
 Limit-Secrets für Wallet-Benachrichtigungen:
 
@@ -845,6 +876,7 @@ Limit-Secrets für Wallet-Benachrichtigungen:
 - `WALLET_CARD_DAILY_LIMIT`, Default `6`
 - `WALLET_CUSTOMER_DAILY_LIMIT` gruppiert über `card_instances.customer_id`, wenn vorhanden, sonst über die verknüpfte `customer_card_id`.
 - `WALLET_GOOGLE_TEXT_AND_NOTIFY_LIMIT_PER_PASS_24H`, Default `3`
+- `WALLET_MESSAGE_LINK_SECRET`, optional; wenn leer, wird für signierte Nachrichtenlinks `WALLET_CRON_SECRET` verwendet
 - `WALLET_DUPLICATE_WINDOW_MINUTES`, Default `10`, blockiert identische Kampagnen desselben Businesses innerhalb dieses Zeitfensters.
 - `WALLET_PUBLIC_CLAIM_RATE_LIMIT`, Default `80`, begrenzt öffentliche Claim-/Wallet-Installationsanfragen pro Route und Client-Fingerprint.
 - `WALLET_PUBLIC_CLAIM_RATE_LIMIT_WINDOW_SECONDS`, Default `900`, definiert das Zeitfenster für diese öffentlichen Claim-Limits.
@@ -872,19 +904,20 @@ GET /api/templates/:templateId/qr.pdf?format=a5
 ## Nutzung
 
 1. Betreiber registriert sich unter `/index.html`.
-2. Betreiber wartet auf Freischaltung.
+2. Die Registrierung wird serverseitig erstellt, offensichtliche Test-/Wegwerf-Adressen werden blockiert, und `unlock=false` bleibt gesetzt.
 3. Admin setzt `unlock = true` in Supabase.
-4. Betreiber legt im Dashboard ein Geschäftsprofil an.
-5. Betreiber öffnet über `/editor.html` den separaten Karten-Editor und erstellt beliebig viele Templates.
-6. Der Editor zeigt die Karte live an; Icons werden in Supabase Storage hochgeladen.
-7. Der Editor blendet Funktionen anhand der zentralen Template-Feature-Matrix ein oder aus.
-8. Dashboard zeigt pro Template einen eigenen QR-Code zur Claim-Seite und PDF-Downloads für A4/A5.
-9. Bestehende Karten können in der Kartenübersicht angeklickt und auf `/editor.html?template=<template_id>` bearbeitet werden.
-10. Im Editor steht bei gespeicherten Templates die Kartenvorschau links und der separate Claim-QR rechts.
-11. Kunde scannt QR-Code, öffnet `/claim.html?token=<public_claim_token>` und erhält je nach Gerät den passenden Wallet-Pfad: Apple über `claim-card` plus `claim-apple-pass`, Google über `claim-card` plus `google-wallet-save-link`, Samsung über `samsung-wallet-add-link`; bestehende alte `/claim.html?template=<template_id>` Links bleiben gültig, spätere Samsung Update-/Cancel-Aktionen laufen geschützt über `update-samsung-wallet-pass`.
-12. Jede ausgestellte Karte bekommt eine sichtbare, eindeutige Karten-ID (`card_instance_number`).
-13. Betreiber scannt die Kundenkarte unter `/scanner.html` oder gibt Kundencode bzw. Karten-ID manuell ein.
-14. Betreiber sieht im Scanner nur Aktionen, die zur Matrix des Templates passen.
+4. Supabase Cron sendet den Magic Link; erst nach Klick auf den Link ist die E-Mail bestätigt.
+5. Betreiber legt im Dashboard ein Geschäftsprofil an.
+6. Betreiber öffnet über `/editor.html` den separaten Karten-Editor und erstellt beliebig viele Templates.
+7. Der Editor zeigt die Karte live an; Icons werden in Supabase Storage hochgeladen.
+8. Der Editor blendet Funktionen anhand der zentralen Template-Feature-Matrix ein oder aus.
+9. Dashboard zeigt pro Template einen eigenen QR-Code zur Claim-Seite und PDF-Downloads für A4/A5.
+10. Bestehende Karten können in der Kartenübersicht angeklickt und auf `/editor.html?template=<template_id>` bearbeitet werden.
+11. Im Editor steht bei gespeicherten Templates die Kartenvorschau links und der separate Claim-QR rechts.
+12. Kunde scannt QR-Code, öffnet `/claim.html?token=<public_claim_token>` und erhält je nach Gerät den passenden Wallet-Pfad: Apple über `claim-card` plus `claim-apple-pass`, Google über `claim-card` plus `google-wallet-save-link`, Samsung über `samsung-wallet-add-link`; bestehende alte `/claim.html?template=<template_id>` Links bleiben gültig, spätere Samsung Update-/Cancel-Aktionen laufen geschützt über `update-samsung-wallet-pass`.
+13. Jede ausgestellte Karte bekommt eine sichtbare, eindeutige Karten-ID (`card_instance_number`).
+14. Betreiber scannt die Kundenkarte unter `/scanner.html` oder gibt Kundencode bzw. Karten-ID manuell ein.
+15. Betreiber sieht im Scanner nur Aktionen, die zur Matrix des Templates passen.
 
 Beispiele:
 

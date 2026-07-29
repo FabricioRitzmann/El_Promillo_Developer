@@ -458,6 +458,27 @@ function buildEntries(config) {
   add(entries, 'PAYMENT_WEBHOOK_SECRET', firstConfigured(getPath(config, ['payment', 'webhookSecret']), randomSecret()), 'generated/local');
 
   add(entries, 'WALLET_CRON_SECRET', firstConfigured(getPath(config, ['automation', 'walletCronSecret']), randomSecret()), 'generated/local');
+  add(entries, 'OPERATOR_VERIFICATION_MAIL_MODE', firstConfigured(
+    getPath(config, ['operatorRegistration', 'verificationMailMode']),
+    'supabase_auth'
+  ), 'config/default');
+  add(entries, 'OPERATOR_VERIFICATION_CRON_SECRET', firstConfigured(
+    getPath(config, ['operatorRegistration', 'operatorVerificationCronSecret']),
+    ''
+  ), 'optional; falls leer wird WALLET_CRON_SECRET genutzt', { allowEmpty: true });
+  add(entries, 'OPERATOR_VERIFICATION_REDIRECT_PATH', firstConfigured(
+    getPath(config, ['operatorRegistration', 'verificationRedirectPath']),
+    '/dashboard.html'
+  ), 'config/default');
+  add(entries, 'OPERATOR_VERIFICATION_MAX_ATTEMPTS', '5', 'config/default');
+  add(entries, 'OPERATOR_REGISTER_RATE_LIMIT', '12', 'config/default');
+  add(entries, 'OPERATOR_REGISTER_RATE_LIMIT_WINDOW_SECONDS', '3600', 'config/default');
+  add(entries, 'MAIL_FROM_EMAIL', firstConfigured(
+    getPath(config, ['operatorRegistration', 'verificationSenderEmail']),
+    'Fabricio@el-promillo.ch'
+  ), 'config/default');
+  add(entries, 'MAIL_FROM_NAME', 'El Promillo', 'config/default');
+  add(entries, 'RESEND_API_KEY', '', 'optional; nur bei OPERATOR_VERIFICATION_MAIL_MODE=resend', { allowEmpty: true });
   add(entries, 'WALLET_BUSINESS_DAILY_LIMIT', deliveryRules.businessDailyLimit || '500', 'config/default');
   add(entries, 'WALLET_CUSTOMER_DAILY_LIMIT', deliveryRules.customerDailyLimit || '12', 'config/default');
   add(entries, 'WALLET_CARD_DAILY_LIMIT', deliveryRules.cardDailyLimit || '6', 'config/default');

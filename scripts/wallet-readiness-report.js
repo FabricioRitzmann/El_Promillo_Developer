@@ -13,7 +13,10 @@ const localSecretsPath = path.join(rootDir, localSecretsDisplayPath);
 
 const requiredEdgeFunctions = [
   'claim-card',
+  'get-wallet-message',
   'claim-apple-pass',
+  'register-operator',
+  'send-operator-verification-email',
   'create-topup-payment-session',
   'confirm-topup-payment',
   'redeem-balance',
@@ -38,8 +41,11 @@ const requiredEdgeFunctions = [
 
 const requiredNoJwtFunctions = [
   'claim-card',
+  'get-wallet-message',
   'claim-apple-pass',
   'google-wallet-save-link',
+  'register-operator',
+  'send-operator-verification-email',
   'create-topup-payment-session',
   'confirm-topup-payment',
   'apple-wallet-webservice',

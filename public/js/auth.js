@@ -1,5 +1,6 @@
 import { createSupabaseRestClient } from './supabaseClient.js';
 import { redirectAfterLogin } from './guards.js';
+import { validateOperatorEmail } from './emailValidation.js';
 import { byId, showMessage } from './ui.js';
 
 const loginForm = byId('loginForm');
@@ -56,14 +57,24 @@ async function initAuthPage() {
     const formData = new FormData(loginForm);
 
     try {
+      const emailCheck = validateOperatorEmail(formData.get('email'));
+
+      if (!emailCheck.ok) {
+        throw new Error(emailCheck.message);
+      }
+
       const session = await client.signIn({
-        email: formData.get('email'),
+        email: emailCheck.email,
         password: formData.get('password')
       });
 
       await redirectAfterLogin(client, session);
     } catch (error) {
-      showMessage(authMessage, error.message, 'error');
+      const message = /email not confirmed/i.test(error.message)
+        ? 'Deine E-Mail ist noch nicht verifiziert. Nach deiner Freigabe erhältst du den Magic Link automatisch per E-Mail.'
+        : error.message;
+
+      showMessage(authMessage, message, 'error');
     }
   });
 
@@ -74,18 +85,19 @@ async function initAuthPage() {
     const formData = new FormData(registerForm);
 
     try {
-      const result = await client.signUp({
-        email: formData.get('email'),
+      const emailCheck = validateOperatorEmail(formData.get('email'));
+
+      if (!emailCheck.ok) {
+        throw new Error(emailCheck.message);
+      }
+
+      await client.registerOperator({
+        email: emailCheck.email,
         password: formData.get('password'),
         displayName: formData.get('display_name')
       });
 
-      if (result?.access_token) {
-        await redirectAfterLogin(client, result);
-        return;
-      }
-
-      showMessage(authMessage, 'Account erstellt. Falls E-Mail-Bestätigung aktiv ist, bestätige zuerst deine Adresse und logge dich danach ein.', 'success');
+      showMessage(authMessage, 'Account erstellt. Nach deiner manuellen Freigabe senden wir dir automatisch den Verifizierungslink per E-Mail.', 'success');
       registerForm.reset();
     } catch (error) {
       showMessage(authMessage, error.message, 'error');

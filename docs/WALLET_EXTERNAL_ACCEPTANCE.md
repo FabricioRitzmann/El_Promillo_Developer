@@ -13,6 +13,8 @@ Diese Checkliste beschreibt die produktive Endabnahme für die direkte Apple-Wal
 - `APP_PUBLIC_BASE_URL` zeigt auf die öffentliche Webapp-Domain.
 - `APPLE_WEB_SERVICE_BASE_URL` zeigt exakt auf `https://<PROJECT_REF>.supabase.co/functions/v1/apple-wallet-webservice`, ohne weiteres `/v1`.
 - `WALLET_CRON_SECRET` und `PAYMENT_WEBHOOK_SECRET` sind mindestens 32 Zeichen lang.
+- Supabase Auth SMTP ist so konfiguriert, dass Magic-Link-Mails von `Fabricio@el-promillo.ch` versendet werden. Alternativ ist `OPERATOR_VERIFICATION_MAIL_MODE=resend` mit `RESEND_API_KEY`, `MAIL_FROM_EMAIL` und `MAIL_FROM_NAME` gesetzt.
+- `OPERATOR_VERIFICATION_REDIRECT_PATH` zeigt auf `/dashboard.html`; `OPERATOR_VERIFICATION_CRON_SECRET` kann leer bleiben, wenn der bestehende `WALLET_CRON_SECRET` genutzt wird.
 - Optional `node scripts/prepare-supabase-secrets-local.js --write` ausführen, um vorhandene lokale Supabase-/Apple-Werte, PEM-Dateien aus `certs/`, Google-Issuer-/Service-Account-Dateien, Samsung-Portalwerte, `samsung-wallet-keys/samsung_wallet_private.key`, `samsung-wallet-keys/samsung_public_cert.pem`, abgeleitete Wallet-URLs und lokale Cron-/Payment-Secrets in `supabase/secrets.local.env` vorzubereiten. Fehlende externe Werte wie APNs Key ID/Auth Key, Google Wallet Service Account oder ein Samsung Private Key, der nicht zum Partner-Zertifikat passt, werden nur als Kommentar geschrieben.
 - Fehlende Apple-/Google-Werte nach [docs/WALLET_EXTERNAL_CREDENTIALS.md](docs/WALLET_EXTERNAL_CREDENTIALS.md) (`Wallet External Credentials`) beschaffen: Apple APNs `.p8`, `APPLE_APNS_KEY_ID`, Google Wallet Issuer ID und Google Service Account JSON.
 - Danach `bash scripts/set-supabase-secrets.sh --dry-run` und `bash scripts/set-supabase-secrets.sh` ausführen. Das Script nutzt `supabase`, `pnpm dlx supabase`, `npx --yes supabase` oder `SUPABASE_CLI_BIN`, leitet die Project Ref aus `config.json -> supabase.url` ab und gibt keine Secret-Werte aus. Alternativ `supabase/secrets.example.env` nach `supabase/secrets.local.env` kopieren und manuell füllen. PEM-/p8-/JSON-Werte können auch per `supabase secrets set NAME="$(cat datei)"` gesetzt werden.
@@ -37,7 +39,20 @@ Pflicht:
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `APP_PUBLIC_BASE_URL`
 - `WALLET_CRON_SECRET`
+- `WALLET_MESSAGE_LINK_SECRET`
 - `PAYMENT_WEBHOOK_SECRET`
+
+Betreiber-Onboarding:
+
+- `OPERATOR_VERIFICATION_MAIL_MODE`
+- `OPERATOR_VERIFICATION_CRON_SECRET`
+- `OPERATOR_VERIFICATION_REDIRECT_PATH`
+- `OPERATOR_VERIFICATION_MAX_ATTEMPTS`
+- `OPERATOR_REGISTER_RATE_LIMIT`
+- `OPERATOR_REGISTER_RATE_LIMIT_WINDOW_SECONDS`
+- `MAIL_FROM_EMAIL`
+- `MAIL_FROM_NAME`
+- `RESEND_API_KEY`
 
 Apple:
 

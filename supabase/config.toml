@@ -19,6 +19,13 @@ verify_jwt = false
 
 [functions.google-wallet-save-link]
 verify_jwt = false
+
+[functions.register-operator]
+verify_jwt = false
+
+[functions.send-operator-verification-email]
+verify_jwt = false
+
 [functions.create-topup-payment-session]
 verify_jwt = false
 
