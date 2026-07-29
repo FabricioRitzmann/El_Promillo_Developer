@@ -33,14 +33,25 @@ const readmeSource = read('README.md');
 
 assertIncludes(editorSource, [
   'const maxAssetFileBytes = 2 * 1024 * 1024',
-  'const allowedAssetMimeTypes = new Map',
-  "['image/png', 'png']",
-  "['image/jpeg', 'jpg']",
-  "['image/webp', 'webp']",
-  '!allowedAssetMimeTypes.has(mimeType)',
-  'file.size > maxAssetFileBytes',
+  'const maxAssetSourceFileBytes = 25 * 1024 * 1024',
+  "import { imageFileToPngUnderLimit } from './imageUploadOptimizer.js';",
+  'imageFileToPngUnderLimit(file',
+  'maxBytes: maxAssetFileBytes',
+  'maxSourceBytes: maxAssetSourceFileBytes',
+  "filename: `${kind}.png`",
   'SVG und andere Dateitypen sind für Wallet-Assets deaktiviert'
-], 'Editor-Asset-Upload muss Dateityp und Grösse vor dem Upload begrenzen');
+], 'Editor-Asset-Upload muss Bildtypen validieren und Dateien vor dem Upload unter 2 MB vorbereiten');
+
+const imageUploadOptimizerSource = read('public/js/imageUploadOptimizer.js');
+
+assertIncludes(imageUploadOptimizerSource, [
+  'image/png',
+  'image/jpeg',
+  'image/webp',
+  'allowedImageMimeTypes.has(mimeType)',
+  'file.size > options.maxSourceBytes',
+  'pngBlob.size <= settings.maxBytes'
+], 'Image-Upload-Optimizer muss Bildtypen begrenzen und PNGs unter der Zielgrösse erzeugen');
 
 assertExcludes(editorSource, [
   "file.type.startsWith('image/')",
@@ -65,8 +76,8 @@ assertExcludes(schemaSource, [
 
 assertIncludes(readmeSource, [
   'PNG, JPEG oder WebP',
-  'maximal 2 MB',
+  'automatisch als PNG unter 2 MB vorbereitet',
   'SVG ist für Wallet-Assets bewusst deaktiviert'
 ], 'README muss die Wallet-Asset-Upload-Grenzen dokumentieren');
 
-console.log('Wallet-Asset-Uploads sind auf sichere Bildtypen, Betreiberordner und 2 MB begrenzt.');
+console.log('Wallet-Asset-Uploads werden clientseitig vorbereitet und serverseitig auf sichere Bildtypen, Betreiberordner und 2 MB begrenzt.');

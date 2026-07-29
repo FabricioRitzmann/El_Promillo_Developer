@@ -1,6 +1,7 @@
 import { requireLogin } from './guards.js';
 import { appUrl, apiUrl } from './config.js';
 import { pagePath } from './path.js';
+import { imageFileToPngUnderLimit } from './imageUploadOptimizer.js';
 import { byId, escapeHtml, renderBusinessHeader, showMessage, walletPreviewHtml } from './ui.js';
 import {
   CLUB_FEATURE_DEFAULTS,
@@ -117,11 +118,7 @@ const walletAppleUnregisteredCount = byId('walletAppleUnregisteredCount');
 const walletNotificationHistory = byId('walletNotificationHistory');
 const assetBucket = 'wallet-assets';
 const maxAssetFileBytes = 2 * 1024 * 1024;
-const allowedAssetMimeTypes = new Map([
-  ['image/png', 'png'],
-  ['image/jpeg', 'jpg'],
-  ['image/webp', 'webp']
-]);
+const maxAssetSourceFileBytes = 25 * 1024 * 1024;
 
 function templateClaimUrl() {
   const claimToken = String(state.template?.public_claim_token || '').trim();
@@ -1761,39 +1758,29 @@ function handleOptionalFeatureToggle(event) {
   updateConditionalTemplateFields();
 }
 
-function safeAssetExtension(file) {
-  const mimeType = String(file?.type || '').toLowerCase();
-  const extension = String(file?.name || '').split('.').pop()?.toLowerCase().replace(/[^a-z0-9]/g, '') || '';
-
-  if (mimeType === 'image/jpeg' && ['jpg', 'jpeg'].includes(extension)) {
-    return extension;
-  }
-
-  return allowedAssetMimeTypes.get(mimeType) || 'png';
-}
-
 async function uploadTemplateAsset(file, kind) {
   if (!file) {
     return null;
   }
 
-  const mimeType = String(file.type || '').toLowerCase();
-
-  if (!allowedAssetMimeTypes.has(mimeType)) {
-    throw new Error('Bitte ein PNG-, JPEG- oder WebP-Bild auswählen. SVG und andere Dateitypen sind für Wallet-Assets deaktiviert.');
-  }
-
-  if (file.size > maxAssetFileBytes) {
-    throw new Error('Das Bild ist zu gross. Bitte maximal 2 MB hochladen.');
-  }
-
-  const extension = safeAssetExtension(file);
+  const pngAssetFile = await imageFileToPngUnderLimit(file, {
+    maxBytes: maxAssetFileBytes,
+    maxSourceBytes: maxAssetSourceFileBytes,
+    filename: `${kind}.png`,
+    preserveSmallPng: true,
+    emptyMessage: 'Bitte eine Bilddatei auswählen.',
+    typeMessage: 'Bitte ein PNG-, JPEG- oder WebP-Bild auswählen. SVG und andere Dateitypen sind für Wallet-Assets deaktiviert.',
+    sourceTooLargeMessage: 'Die Originaldatei ist sehr gross. Bitte maximal 25 MB auswählen.',
+    readErrorMessage: 'Bild konnte nicht gelesen werden.',
+    prepareErrorMessage: 'Bild konnte nicht vorbereitet werden.',
+    outputTooLargeMessage: 'Bild konnte nicht klein genug vorbereitet werden. Bitte ein weniger detailreiches Bild verwenden.'
+  });
   const randomPart = globalThis.crypto?.randomUUID
     ? globalThis.crypto.randomUUID()
     : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-  const objectPath = `${state.session.user.id}/templates/${kind}-${randomPart}.${extension}`;
+  const objectPath = `${state.session.user.id}/templates/${kind}-${randomPart}.png`;
 
-  return state.client.uploadStorageObject(assetBucket, objectPath, file);
+  return state.client.uploadStorageObject(assetBucket, objectPath, pngAssetFile);
 }
 
 async function handleAssetUpload(event, targetFieldName, kind) {
@@ -1803,7 +1790,7 @@ async function handleAssetUpload(event, targetFieldName, kind) {
     return;
   }
 
-  showMessage(editorMessage, 'Bild wird in Supabase Storage hochgeladen ...');
+  showMessage(editorMessage, 'Bild wird vorbereitet und hochgeladen ...');
 
   try {
     const result = await uploadTemplateAsset(file, kind);
