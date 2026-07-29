@@ -306,7 +306,7 @@ Wichtig für Bilder, Karteninstanzen und die Feature-Matrix: Führe `supabase/sc
 wallet-assets/<operator-user-id>/templates/...
 ```
 
-Wallet-Assets für Logos, Icons und Kartenbilder dürfen als PNG, JPEG oder WebP ausgewählt werden und werden im Editor automatisch als PNG unter 2 MB vorbereitet. SVG ist für Wallet-Assets bewusst deaktiviert, weil der Bucket öffentlich lesbar ist und die Dateien direkt in Wallet-Passes, Vorschauen und PDFs verwendet werden. Die finale Grenze wird zusätzlich in den Supabase Storage Policies serverseitig inklusive Grössen-Metadaten geprüft.
+Wallet-Assets für Logos, Icons und Kartenbilder dürfen als PNG, JPEG oder WebP ausgewählt werden und werden im Editor automatisch zentriert, ohne Beschnitt in den passenden Zielrahmen eingepasst und als PNG unter 2 MB vorbereitet. SVG ist für Wallet-Assets bewusst deaktiviert, weil der Bucket öffentlich lesbar ist und die Dateien direkt in Wallet-Passes, Vorschauen und PDFs verwendet werden. Die finale Grenze wird zusätzlich in den Supabase Storage Policies serverseitig inklusive Grössen-Metadaten geprüft.
 
 Optionale Testdaten:
 

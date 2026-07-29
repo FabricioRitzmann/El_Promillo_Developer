@@ -38,6 +38,13 @@ assertIncludes(editorSource, [
   'imageFileToPngUnderLimit(file',
   'maxBytes: maxAssetFileBytes',
   'maxSourceBytes: maxAssetSourceFileBytes',
+  'assetUploadFrames',
+  "'event-apple-background': { width: 1000, height: 1500",
+  "'event-google-hero': { width: 1200, height: 400",
+  "'stamp-icon': { width: 512, height: 512",
+  "'streak-icon': { width: 512, height: 512",
+  'targetWidth: uploadFrame.width',
+  'targetHeight: uploadFrame.height',
   "filename: `${kind}.png`",
   'SVG und andere Dateitypen sind für Wallet-Assets deaktiviert'
 ], 'Editor-Asset-Upload muss Bildtypen validieren und Dateien vor dem Upload unter 2 MB vorbereiten');
@@ -50,6 +57,10 @@ assertIncludes(imageUploadOptimizerSource, [
   'image/webp',
   'allowedImageMimeTypes.has(mimeType)',
   'file.size > options.maxSourceBytes',
+  'drawImageContained',
+  'Math.min(canvasWidth / imageWidth, canvasHeight / imageHeight)',
+  'Math.round((canvasWidth - drawWidth) / 2)',
+  'Math.round((canvasHeight - drawHeight) / 2)',
   'pngBlob.size <= settings.maxBytes'
 ], 'Image-Upload-Optimizer muss Bildtypen begrenzen und PNGs unter der Zielgrösse erzeugen');
 
@@ -76,7 +87,7 @@ assertExcludes(schemaSource, [
 
 assertIncludes(readmeSource, [
   'PNG, JPEG oder WebP',
-  'automatisch als PNG unter 2 MB vorbereitet',
+  'automatisch zentriert, ohne Beschnitt in den passenden Zielrahmen eingepasst und als PNG unter 2 MB vorbereitet',
   'SVG ist für Wallet-Assets bewusst deaktiviert'
 ], 'README muss die Wallet-Asset-Upload-Grenzen dokumentieren');
 

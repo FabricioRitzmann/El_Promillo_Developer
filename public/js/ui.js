@@ -309,7 +309,7 @@ export function walletPreviewHtml(template, card = null) {
     ? settings.eventAppleBackgroundImageUrl || settings.eventGoogleHeroImageUrl || settings.eventBackgroundImageUrl
     : '';
   const eventBackgroundStyle = eventBackgroundImageUrl
-    ? ` background-image: linear-gradient(rgba(91, 52, 35, 0.28), rgba(91, 52, 35, 0.28)), url('${escapeCssUrl(eventBackgroundImageUrl)}'); background-size: cover; background-position: center;`
+    ? ` background-image: linear-gradient(rgba(91, 52, 35, 0.28), rgba(91, 52, 35, 0.28)), url('${escapeCssUrl(eventBackgroundImageUrl)}'); background-size: cover, contain; background-position: center; background-repeat: no-repeat;`
     : '';
 
   return `

@@ -119,6 +119,12 @@ const walletNotificationHistory = byId('walletNotificationHistory');
 const assetBucket = 'wallet-assets';
 const maxAssetFileBytes = 2 * 1024 * 1024;
 const maxAssetSourceFileBytes = 25 * 1024 * 1024;
+const assetUploadFrames = {
+  'event-apple-background': { width: 1000, height: 1500, backgroundColor: '#fffdf9' },
+  'event-google-hero': { width: 1200, height: 400, backgroundColor: '#fffdf9' },
+  'stamp-icon': { width: 512, height: 512, backgroundColor: 'transparent' },
+  'streak-icon': { width: 512, height: 512, backgroundColor: 'transparent' }
+};
 
 function templateClaimUrl() {
   const claimToken = String(state.template?.public_claim_token || '').trim();
@@ -1763,11 +1769,14 @@ async function uploadTemplateAsset(file, kind) {
     return null;
   }
 
+  const uploadFrame = assetUploadFrames[kind] || { width: 1024, height: 1024, backgroundColor: 'transparent' };
   const pngAssetFile = await imageFileToPngUnderLimit(file, {
     maxBytes: maxAssetFileBytes,
     maxSourceBytes: maxAssetSourceFileBytes,
     filename: `${kind}.png`,
-    preserveSmallPng: true,
+    targetWidth: uploadFrame.width,
+    targetHeight: uploadFrame.height,
+    backgroundColor: uploadFrame.backgroundColor,
     emptyMessage: 'Bitte eine Bilddatei auswählen.',
     typeMessage: 'Bitte ein PNG-, JPEG- oder WebP-Bild auswählen. SVG und andere Dateitypen sind für Wallet-Assets deaktiviert.',
     sourceTooLargeMessage: 'Die Originaldatei ist sehr gross. Bitte maximal 25 MB auswählen.',

@@ -436,7 +436,7 @@ textarea {
 .account-logo-preview img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
 }
 
 .account-logo-controls {
@@ -586,7 +586,7 @@ textarea {
 .business-brand-logo img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
 }
 
 .business-brand-name {
@@ -1216,7 +1216,7 @@ textarea {
   width: 2.35rem;
   height: 2.35rem;
   border-radius: var(--radius-sm);
-  object-fit: cover;
+  object-fit: contain;
   background: var(--surface-soft);
   flex: 0 0 auto;
 }
@@ -1674,7 +1674,7 @@ textarea {
   color: currentColor;
   font-size: 0.72rem;
   font-weight: 750;
-  object-fit: cover;
+  object-fit: contain;
 }
 
 .wallet-brand-lockup,

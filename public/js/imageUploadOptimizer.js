@@ -78,12 +78,50 @@ function scaleStepsForImage(width, height, maxSideCandidates) {
     .sort((a, b) => b - a);
 }
 
+function normalizedPositiveInteger(value) {
+  const numberValue = Math.round(Number(value) || 0);
+
+  return numberValue > 0 ? numberValue : 0;
+}
+
+function canvasPlansForImage(width, height, settings) {
+  const targetWidth = normalizedPositiveInteger(settings.targetWidth);
+  const targetHeight = normalizedPositiveInteger(settings.targetHeight);
+
+  if (targetWidth && targetHeight) {
+    return scaleStepsForImage(targetWidth, targetHeight, settings.maxSideCandidates)
+      .map((scale) => ({
+        width: Math.max(1, Math.round(targetWidth * scale)),
+        height: Math.max(1, Math.round(targetHeight * scale))
+      }));
+  }
+
+  return scaleStepsForImage(width, height, settings.maxSideCandidates)
+    .map((scale) => ({
+      width: Math.max(1, Math.round(width * scale)),
+      height: Math.max(1, Math.round(height * scale))
+    }));
+}
+
+function drawImageContained(context, image, imageWidth, imageHeight, canvasWidth, canvasHeight) {
+  const scale = Math.min(canvasWidth / imageWidth, canvasHeight / imageHeight);
+  const drawWidth = Math.max(1, Math.round(imageWidth * scale));
+  const drawHeight = Math.max(1, Math.round(imageHeight * scale));
+  const drawX = Math.round((canvasWidth - drawWidth) / 2);
+  const drawY = Math.round((canvasHeight - drawHeight) / 2);
+
+  context.drawImage(image, drawX, drawY, drawWidth, drawHeight);
+}
+
 export async function imageFileToPngUnderLimit(file, options = {}) {
   const settings = {
     maxBytes: 2 * 1024 * 1024,
     maxSourceBytes: defaultMaxSourceFileBytes,
     filename: 'upload-image.png',
     preserveSmallPng: false,
+    targetWidth: 0,
+    targetHeight: 0,
+    backgroundColor: 'transparent',
     maxSideCandidates: [1600, 1400, 1200, 1000, 900, 800, 700, 600, 500, 420, 360, 300, 240],
     emptyMessage: 'Bitte eine Bilddatei auswählen.',
     typeMessage: 'Bitte ein PNG-, JPEG- oder WebP-Bild auswählen.',
@@ -98,6 +136,8 @@ export async function imageFileToPngUnderLimit(file, options = {}) {
 
   if (
     settings.preserveSmallPng
+    && !normalizedPositiveInteger(settings.targetWidth)
+    && !normalizedPositiveInteger(settings.targetHeight)
     && String(file.type || '').toLowerCase() === 'image/png'
     && file.size <= settings.maxBytes
   ) {
@@ -117,10 +157,10 @@ export async function imageFileToPngUnderLimit(file, options = {}) {
   }
 
   try {
-    for (const scale of scaleStepsForImage(width, height, settings.maxSideCandidates)) {
+    for (const canvasPlan of canvasPlansForImage(width, height, settings)) {
       const canvas = document.createElement('canvas');
-      canvas.width = Math.max(1, Math.round(width * scale));
-      canvas.height = Math.max(1, Math.round(height * scale));
+      canvas.width = canvasPlan.width;
+      canvas.height = canvasPlan.height;
 
       const context = canvas.getContext('2d');
 
@@ -129,7 +169,13 @@ export async function imageFileToPngUnderLimit(file, options = {}) {
       }
 
       context.clearRect(0, 0, canvas.width, canvas.height);
-      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+      if (settings.backgroundColor && settings.backgroundColor !== 'transparent') {
+        context.fillStyle = settings.backgroundColor;
+        context.fillRect(0, 0, canvas.width, canvas.height);
+      }
+
+      drawImageContained(context, image, width, height, canvas.width, canvas.height);
 
       const pngBlob = await canvasToPngBlob(canvas, settings.prepareErrorMessage);
 
