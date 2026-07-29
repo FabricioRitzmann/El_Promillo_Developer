@@ -47,6 +47,10 @@
   --topbar-height: 5.1rem;
   --tabbar-height: 3.45rem;
   --sticky-stack-height: calc(var(--topbar-height) + var(--tabbar-height));
+  --language-switcher-width: 15.25rem;
+  --language-switcher-compact-width: 13.75rem;
+  --nav-tab-min-width: 8.25rem;
+  --page-action-min-width: 10.75rem;
   --z-sticky-header: 30;
   --z-sticky-tabbar: 29;
   --z-modal: 80;
@@ -135,6 +139,7 @@ button,
   min-height: 2.55rem;
   padding: 0.64rem 0.98rem;
   text-decoration: none;
+  text-align: center;
   font: inherit;
   font-weight: 600;
   letter-spacing: 0;
@@ -249,14 +254,15 @@ label {
   justify-content: space-between;
   gap: 1rem;
   flex-wrap: wrap;
+  min-height: 4.25rem;
 }
 
 .language-switcher {
   display: inline-grid;
-  grid-template-columns: auto minmax(7rem, auto);
+  grid-template-columns: 4.7rem minmax(0, 1fr);
   align-items: center;
   gap: 0.55rem;
-  width: fit-content;
+  width: min(100%, var(--language-switcher-width));
   padding: 0.38rem 0.45rem 0.38rem 0.72rem;
   border: 1px solid var(--border-gold);
   border-radius: 999px;
@@ -266,10 +272,14 @@ label {
 }
 
 .language-switcher.compact {
-  grid-template-columns: auto minmax(6.5rem, auto);
+  grid-template-columns: 4.7rem minmax(0, 1fr);
+  width: min(100%, var(--language-switcher-compact-width));
 }
 
 .language-switcher span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-size: 0.78rem;
   font-weight: 700;
   text-transform: uppercase;
@@ -278,6 +288,8 @@ label {
 
 .language-switcher select {
   min-height: 2.05rem;
+  width: 100%;
+  min-width: 0;
   border: 0;
   border-radius: 999px;
   padding: 0.32rem 2rem 0.32rem 0.68rem;
@@ -286,6 +298,7 @@ label {
   font-size: 0.9rem;
   font-weight: 700;
   cursor: pointer;
+  white-space: nowrap;
 }
 
 input,
@@ -628,7 +641,7 @@ textarea {
   display: inline-flex;
   align-items: center;
   gap: 0.85rem;
-  flex: 1 1 auto;
+  flex: 1 1 0;
   min-width: 0;
   color: var(--ink);
   text-decoration: none;
@@ -668,7 +681,7 @@ textarea {
 }
 
 .app-brand-mark {
-  flex: 0 1 auto;
+  flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
   justify-content: flex-end;
@@ -733,6 +746,7 @@ textarea {
 
 .app-tab {
   flex: 0 0 auto;
+  min-width: min(var(--nav-tab-min-width), 34vw);
   min-height: 2.4rem;
   padding: 0.52rem 0.78rem;
   color: var(--muted);
@@ -742,6 +756,7 @@ textarea {
   opacity: 0.82;
   border-radius: 0;
   white-space: nowrap;
+  text-align: center;
   transition: background 0.18s ease, color 0.18s ease, opacity 0.18s ease;
 }
 
@@ -786,6 +801,7 @@ textarea {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  min-width: 2.4rem;
   width: 2.4rem;
   height: 2.4rem;
   padding: 0;
@@ -832,8 +848,8 @@ textarea {
 .page-heading,
 .section-title,
 .panel-heading {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 1rem;
   align-items: center;
   min-width: 0;
@@ -851,6 +867,7 @@ textarea {
   align-items: flex-end;
   padding: 0.1rem 0 1rem;
   margin-bottom: 1rem;
+  min-height: 6.2rem;
 }
 
 .page-heading::after,
@@ -876,6 +893,8 @@ textarea {
 
 .page-heading h1 {
   font-size: clamp(2.05rem, 4vw, 3.15rem);
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 
 .stats-section > .section-title h2 {
@@ -891,9 +910,20 @@ textarea {
 .view-subtitle,
 .stats-section > .section-title .muted {
   max-width: 620px;
+  min-height: 1.45rem;
   margin: 0.45rem 0 0;
   color: var(--text-secondary);
   font-size: 0.98rem;
+}
+
+.page-heading > .button,
+.section-title > .button,
+.section-title > button,
+.panel-heading > .button,
+.panel-heading > button {
+  min-width: var(--page-action-min-width);
+  max-width: min(18rem, 38vw);
+  white-space: normal;
 }
 
 .section-block {
@@ -2190,7 +2220,7 @@ body:has(.modal-backdrop:not([hidden])) {
   .panel-heading,
   .chart-card-header {
     align-items: flex-start;
-    flex-direction: column;
+    grid-template-columns: 1fr;
     gap: 0.75rem;
   }
 
@@ -2321,6 +2351,7 @@ body:has(.modal-backdrop:not([hidden])) {
 
   .app-tab-account {
     margin-left: 0;
+    min-width: 2.2rem;
   }
 
   .qr-row {

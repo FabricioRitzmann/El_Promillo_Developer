@@ -45,12 +45,25 @@ assertIncludes(
   '.notification-preview-card span'
 ].forEach((needle) => assertIncludes(css, needle, 'Responsive Wallet-Notification-CSS fehlt'));
 
+[
+  '--language-switcher-width:',
+  '--nav-tab-min-width:',
+  'grid-template-columns: 4.7rem minmax(0, 1fr);',
+  'width: min(100%, var(--language-switcher-width));',
+  'min-width: min(var(--nav-tab-min-width), 34vw);',
+  'grid-template-columns: minmax(0, 1fr) auto;',
+  'min-height: 6.2rem;',
+  'min-width: var(--page-action-min-width);',
+  'min-width: 2.4rem;'
+].forEach((needle) => assertIncludes(css, needle, 'Sprachwechsel darf Header, Tabs und Titel nicht verschieben'));
+
 const tabletBlock = mediaBlock('@media (max-width: 860px)');
 
 [
   '.wallet-notification-grid',
   '.detail-grid',
   '.split-row',
+  '.page-heading',
   'grid-template-columns: 1fr;'
 ].forEach((needle) => assertIncludes(tabletBlock, needle, 'Tablet/Mobile Layout muss Wallet-Benachrichtigungen einspaltig machen'));
 
