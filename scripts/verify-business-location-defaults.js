@@ -16,6 +16,7 @@ function includes(source, needle, label) {
 
 const accountHtml = read('public/account.html');
 const accountJs = read('public/js/account.js');
+const i18nJs = read('public/js/i18n.js');
 const editorJs = read('public/js/editor.js');
 const schemaSql = read('supabase/schema.sql');
 
@@ -33,9 +34,14 @@ const schemaSql = read('supabase/schema.sql');
   "'location_lng'",
   'numberOrNull(formData.get(\'location_lat\'))',
   'numberOrNull(formData.get(\'location_lng\'))',
+  "t('account.latitudeInvalid')",
+  "t('account.longitudeInvalid')"
+].forEach((needle) => includes(accountJs, needle, 'Konto muss Koordinaten laden, validieren und speichern'));
+
+[
   'Latitude muss zwischen -90 und 90 liegen.',
   'Longitude muss zwischen -180 und 180 liegen.'
-].forEach((needle) => includes(accountJs, needle, 'Konto muss Koordinaten laden, validieren und speichern'));
+].forEach((needle) => includes(i18nJs, needle, 'Konto muss Standort-Fehlermeldungen uebersetzen'));
 
 [
   "'location_lat'",

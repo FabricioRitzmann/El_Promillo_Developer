@@ -23,12 +23,16 @@ function assertIncludes(label, source, needles) {
 
 const indexHtml = read('public/index.html');
 const authJs = read('public/js/auth.js');
+const supabaseClientJs = read('public/js/supabaseClient.js');
+const i18nJs = read('public/js/i18n.js');
 
 assertIncludes('Auth-Formulare', indexHtml, [
   'id="loginForm"',
   'id="registerForm"',
-  '<button class="primary" type="submit">Einloggen</button>',
-  '<button class="secondary" type="submit">Account erstellen</button>'
+  'name="remember_me"',
+  'data-language-select',
+  'data-i18n="auth.loginButton"',
+  'data-i18n="auth.registerButton"'
 ]);
 
 assertIncludes('Auth Enter-Submit', authJs, [
@@ -49,8 +53,27 @@ assertIncludes('Auth Submit-Handler', authJs, [
   "registerForm?.addEventListener('submit'",
   'event.preventDefault();',
   'client.signIn',
+  'remember: Boolean(formData.get(\'remember_me\'))',
   'validateOperatorEmail',
   'client.registerOperator'
 ]);
 
-console.log('Auth Enter-Submit ist fuer Login und Registrierung statisch abgesichert.');
+assertIncludes('Auth Sprache', i18nJs, [
+  "const defaultLanguage = 'de';",
+  "{ code: 'de', short: 'DE', label: 'Deutsch' }",
+  "{ code: 'en', short: 'EN', label: 'English' }",
+  "{ code: 'fr', short: 'FR', label: 'Français' }",
+  "{ code: 'it', short: 'IT', label: 'Italiano' }",
+  'export function setupLanguageSelectors'
+]);
+
+assertIncludes('Auth Session-Speicher', supabaseClientJs, [
+  'const persistentSessionFlagKey',
+  'window.sessionStorage.getItem(sessionStorageKey)',
+  'isRememberedSession()',
+  'window.localStorage.setItem(persistentSessionFlagKey, \'true\')',
+  'window.sessionStorage.setItem(sessionStorageKey, serializedSession)',
+  'window.localStorage.removeItem(persistentSessionFlagKey)'
+]);
+
+console.log('Auth Enter-Submit, Sprachwahl und Remember-me-Session sind statisch abgesichert.');

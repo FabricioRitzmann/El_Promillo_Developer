@@ -19,9 +19,9 @@
     </header>
 
     <nav class="app-tabbar" aria-label="Hauptbereiche">
-      <a class="app-tab" href="dashboard.html#dashboardOverview">Dashboard</a>
-      <a class="app-tab" href="dashboard.html#visitorStatistics">Besucherstatistik</a>
-      <a class="app-tab" href="scanner.html">Scanner</a>
+      <a class="app-tab" href="dashboard.html#dashboardOverview" data-i18n="nav.dashboard">Dashboard</a>
+      <a class="app-tab" href="dashboard.html#visitorStatistics" data-i18n="nav.visitors">Besucherstatistik</a>
+      <a class="app-tab" href="scanner.html" data-i18n="nav.scanner">Scanner</a>
       <a class="app-tab app-tab-account is-active" href="account.html" aria-current="page" aria-label="Konto">
         <svg class="account-tab-icon" viewBox="0 0 24 24" aria-hidden="true">
           <circle cx="12" cy="8" r="4"></circle>
@@ -33,69 +33,87 @@
     <main class="page-shell account-shell">
       <section class="page-heading">
         <div>
-          <p class="eyebrow">Konto</p>
-          <h1>Konto & Geschäft</h1>
+          <p class="eyebrow" data-i18n="account.title">Konto</p>
+          <h1 data-i18n="account.heading">Konto & Geschäft</h1>
         </div>
+        <label class="language-switcher">
+          <span data-i18n="common.language">Sprache</span>
+          <select data-language-select aria-label="Sprache" data-i18n-aria-label="common.language">
+            <option value="de">DE · Deutsch</option>
+            <option value="en">EN · English</option>
+            <option value="fr">FR · Français</option>
+            <option value="it">IT · Italiano</option>
+          </select>
+        </label>
       </section>
 
       <div id="accountMessage" class="message" hidden></div>
 
       <section class="panel mobile-account-summary" aria-label="Mobiles Konto">
-        <p class="eyebrow">Konto</p>
+        <p class="eyebrow" data-i18n="account.mobileLabel">Konto</p>
         <h1 id="mobileAccountCompanyName">Mein Unternehmen</h1>
-        <button id="mobileLogoutButton" class="primary" type="button">Logout</button>
+        <label class="language-switcher compact">
+          <span data-i18n="common.language">Sprache</span>
+          <select data-language-select aria-label="Sprache" data-i18n-aria-label="common.language">
+            <option value="de">DE · Deutsch</option>
+            <option value="en">EN · English</option>
+            <option value="fr">FR · Français</option>
+            <option value="it">IT · Italiano</option>
+          </select>
+        </label>
+        <button id="mobileLogoutButton" class="primary" type="button" data-i18n="common.logout">Logout</button>
       </section>
 
       <section class="account-grid">
         <article class="panel account-panel">
-          <h2>Login-Daten</h2>
+          <h2 data-i18n="account.loginData">Login-Daten</h2>
           <dl id="loginDataList" class="account-detail-list"></dl>
         </article>
 
         <form id="passwordChangeForm" class="panel account-panel">
-          <h2>Passwort ändern</h2>
-          <p class="muted">Das aktuelle Passwort wird zuerst geprüft. Danach wird das neue Passwort direkt in Supabase Auth gespeichert.</p>
-          <label>Aktuelles Passwort
+          <h2 data-i18n="account.passwordChange">Passwort ändern</h2>
+          <p class="muted" data-i18n="account.passwordChangeHint">Das aktuelle Passwort wird zuerst geprüft. Danach wird das neue Passwort direkt in Supabase Auth gespeichert.</p>
+          <label><span data-i18n="account.currentPassword">Aktuelles Passwort</span>
             <input name="current_password" type="password" autocomplete="current-password" required>
           </label>
-          <label>Neues Passwort
+          <label><span data-i18n="auth.newPassword">Neues Passwort</span>
             <input name="new_password" type="password" autocomplete="new-password" minlength="6" required>
           </label>
-          <label>Neues Passwort wiederholen
+          <label><span data-i18n="auth.repeatNewPassword">Neues Passwort wiederholen</span>
             <input name="new_password_repeat" type="password" autocomplete="new-password" minlength="6" required>
           </label>
-          <button class="primary" type="submit">Passwort speichern</button>
+          <button class="primary" type="submit" data-i18n="auth.savePassword">Passwort speichern</button>
         </form>
 
         <article class="panel account-panel">
-          <h2>Abmeldung</h2>
-          <p class="muted">Beendet die lokale Sitzung auf diesem Gerät.</p>
-          <button id="logoutButton" class="secondary" type="button">Logout</button>
+          <h2 data-i18n="account.logoutTitle">Abmeldung</h2>
+          <p class="muted" data-i18n="account.logoutHint">Beendet die lokale Sitzung auf diesem Gerät.</p>
+          <button id="logoutButton" class="secondary" type="button" data-i18n="common.logout">Logout</button>
         </article>
       </section>
 
       <form id="accountBusinessForm" class="panel account-form">
         <div class="section-title">
           <div>
-            <h2>Firmendaten</h2>
-            <p class="muted">Diese Daten werden für Templates, Vorschauen und Wallet-Karten als Standardwerte verwendet.</p>
+            <h2 data-i18n="account.businessData">Firmendaten</h2>
+            <p class="muted" data-i18n="account.businessHint">Diese Daten werden für Templates, Vorschauen und Wallet-Karten als Standardwerte verwendet.</p>
           </div>
-          <button class="primary" type="submit">Speichern</button>
+          <button class="primary" type="submit" data-i18n="common.save">Speichern</button>
         </div>
 
         <div class="account-form-grid">
-          <label>Firmenname
+          <label><span data-i18n="account.companyName">Firmenname</span>
             <input name="name" required autocomplete="organization">
           </label>
-          <label>Telefon
+          <label><span data-i18n="common.phone">Telefon</span>
             <input name="phone" autocomplete="tel">
           </label>
-          <label>Website
+          <label><span data-i18n="common.website">Website</span>
             <input name="website" type="url" autocomplete="url">
           </label>
           <input name="logo_url" type="hidden">
           <input name="company_logo_path" type="hidden">
-          <label class="full-span">Beschreibung
+          <label class="full-span"><span data-i18n="common.description">Beschreibung</span>
             <textarea name="description" rows="3"></textarea>
           </label>
         </div>
@@ -103,20 +121,20 @@
         <div class="account-logo-block">
           <div id="companyLogoPreview" class="account-logo-preview">MU</div>
           <div class="account-logo-controls">
-            <h3>Firmenlogo</h3>
-            <p class="muted">Dieses Logo erscheint im Header, in Kartenvorschauen, Wallet-Karten, QR/PDF-Dateien und auf der öffentlichen Claim-Seite.</p>
+            <h3 data-i18n="account.logoTitle">Firmenlogo</h3>
+            <p class="muted" data-i18n="account.logoHint">Dieses Logo erscheint im Header, in Kartenvorschauen, Wallet-Karten, QR/PDF-Dateien und auf der öffentlichen Claim-Seite.</p>
             <input id="companyLogoUpload" type="file" accept="image/png,image/jpeg,image/webp" hidden>
             <div class="button-row wrap">
-              <button id="uploadCompanyLogoButton" class="secondary" type="button">Logo hochladen</button>
-              <button id="removeCompanyLogoButton" class="secondary danger-soft" type="button">Logo entfernen</button>
+              <button id="uploadCompanyLogoButton" class="secondary" type="button" data-i18n="account.logoUpload">Logo hochladen</button>
+              <button id="removeCompanyLogoButton" class="secondary danger-soft" type="button" data-i18n="account.logoRemove">Logo entfernen</button>
             </div>
-            <p id="companyLogoHint" class="muted">PNG, JPG, JPEG oder WEBP. Rundes Logo empfohlen, damit es in Wallet-Karten am besten passt. Wird automatisch für den Wallet-Upload verkleinert.</p>
+            <p id="companyLogoHint" class="muted" data-i18n="account.logoFileHint">PNG, JPG, JPEG oder WEBP. Rundes Logo empfohlen, damit es in Wallet-Karten am besten passt. Wird automatisch für den Wallet-Upload verkleinert.</p>
           </div>
         </div>
 
         <div class="account-location-block">
-          <h2>Standortangaben</h2>
-          <label>Adresse / Standort
+          <h2 data-i18n="account.locationTitle">Standortangaben</h2>
+          <label><span data-i18n="account.address">Adresse / Standort</span>
             <input name="address" autocomplete="street-address">
           </label>
           <div class="split-row">
@@ -127,7 +145,7 @@
               <input name="location_lng" type="number" step="0.000001" min="-180" max="180" placeholder="8.541694">
             </label>
           </div>
-          <p class="muted">Diese Koordinaten werden für standortbasierte Wallet-Benachrichtigungen im Editor automatisch übernommen.</p>
+          <p class="muted" data-i18n="account.locationHint">Diese Koordinaten werden für standortbasierte Wallet-Benachrichtigungen im Editor automatisch übernommen.</p>
         </div>
       </form>
     </main>

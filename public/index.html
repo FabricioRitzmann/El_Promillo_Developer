@@ -11,62 +11,77 @@
       <section class="auth-panel">
         <div class="brand-block">
           <p class="eyebrow">El Promillo</p>
-          <h1>Betreiberzugang</h1>
+          <div class="auth-heading-row">
+            <h1 data-i18n="auth.operatorAccess">Betreiberzugang</h1>
+            <label class="language-switcher">
+              <span data-i18n="common.language">Sprache</span>
+              <select data-language-select aria-label="Sprache" data-i18n-aria-label="common.language">
+                <option value="de">DE · Deutsch</option>
+                <option value="en">EN · English</option>
+                <option value="fr">FR · Français</option>
+                <option value="it">IT · Italiano</option>
+              </select>
+            </label>
+          </div>
         </div>
 
         <div id="authMessage" class="message" hidden></div>
 
         <div class="auth-grid">
           <form id="loginForm" class="panel">
-            <h2>Login</h2>
-            <label>E-Mail
+            <h2 data-i18n="auth.loginTitle">Login</h2>
+            <label><span data-i18n="common.email">E-Mail</span>
               <input name="email" type="email" autocomplete="email" required>
             </label>
-            <label>Passwort
+            <label><span data-i18n="common.password">Passwort</span>
               <input name="password" type="password" autocomplete="current-password" required>
             </label>
+            <label class="checkbox-line">
+              <input name="remember_me" type="checkbox">
+              <span data-i18n="auth.rememberMe">Eingeloggt bleiben</span>
+            </label>
             <div class="button-row wrap">
-              <button class="primary" type="submit">Einloggen</button>
-              <button id="showForgotPasswordButton" class="secondary" type="button">Passwort vergessen</button>
+              <button class="primary" type="submit" data-i18n="auth.loginButton">Einloggen</button>
+              <button id="showForgotPasswordButton" class="secondary" type="button" data-i18n="auth.forgotButton">Passwort vergessen</button>
             </div>
           </form>
 
           <form id="forgotPasswordForm" class="panel" hidden>
-            <h2>Passwort zurücksetzen</h2>
-            <p class="muted">Du erhältst eine E-Mail von Supabase mit einem Link zum Setzen eines neuen Passworts.</p>
-            <label>E-Mail
+            <h2 data-i18n="auth.resetTitle">Passwort zurücksetzen</h2>
+            <p class="muted" data-i18n="auth.resetHint">Du erhältst eine E-Mail von Supabase mit einem Link zum Setzen eines neuen Passworts.</p>
+            <label><span data-i18n="common.email">E-Mail</span>
               <input name="email" type="email" autocomplete="email" required>
             </label>
             <div class="button-row wrap">
-              <button class="primary" type="submit">Reset-Link senden</button>
-              <button id="cancelForgotPasswordButton" class="secondary" type="button">Abbrechen</button>
+              <button class="primary" type="submit" data-i18n="auth.sendReset">Reset-Link senden</button>
+              <button id="cancelForgotPasswordButton" class="secondary" type="button" data-i18n="common.cancel">Abbrechen</button>
             </div>
           </form>
 
           <form id="resetPasswordForm" class="panel" hidden>
-            <h2>Neues Passwort setzen</h2>
-            <p class="muted">Bitte wähle ein neues Passwort für deinen Betreiberzugang.</p>
-            <label>Neues Passwort
+            <h2 data-i18n="auth.newPasswordTitle">Neues Passwort setzen</h2>
+            <p class="muted" data-i18n="auth.newPasswordHint">Bitte wähle ein neues Passwort für deinen Betreiberzugang.</p>
+            <label><span data-i18n="auth.newPassword">Neues Passwort</span>
               <input name="password" type="password" autocomplete="new-password" minlength="6" required>
             </label>
-            <label>Neues Passwort wiederholen
+            <label><span data-i18n="auth.repeatNewPassword">Neues Passwort wiederholen</span>
               <input name="password_repeat" type="password" autocomplete="new-password" minlength="6" required>
             </label>
-            <button class="primary" type="submit">Passwort speichern</button>
+            <button class="primary" type="submit" data-i18n="auth.savePassword">Passwort speichern</button>
           </form>
 
           <form id="registerForm" class="panel">
-            <h2>Registrieren</h2>
-            <label>Name
+            <h2 data-i18n="auth.registerTitle">Registrieren</h2>
+            <label><span data-i18n="common.name">Name</span>
               <input name="display_name" autocomplete="name">
             </label>
-            <label>E-Mail
+            <label><span data-i18n="common.email">E-Mail</span>
               <input name="email" type="email" autocomplete="email" required>
             </label>
-            <label>Passwort
+            <label><span data-i18n="common.password">Passwort</span>
               <input name="password" type="password" autocomplete="new-password" minlength="6" required>
             </label>
-            <button class="secondary" type="submit">Account erstellen</button>
+            <button class="secondary" type="submit" data-i18n="auth.registerButton">Account erstellen</button>
           </form>
         </div>
       </section>

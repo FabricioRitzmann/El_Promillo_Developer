@@ -1,6 +1,8 @@
 import { loadPublicConfig } from './config.js';
+import { t } from './i18n.js';
 
 const sessionStorageKey = 'wallet_cards_mvp_session';
+const persistentSessionFlagKey = 'wallet_cards_mvp_session_persistent';
 
 function encodeFilterValue(value) {
   if (value === null) {
@@ -57,7 +59,7 @@ export class SupabaseRestClient {
     const data = await parseResponse(response);
 
     if (!response.ok) {
-      throw new Error(data?.msg || data?.error_description || data?.message || 'Session konnte nicht geprüft werden.');
+      throw new Error(data?.msg || data?.error_description || data?.message || t('supabase.sessionCheckFailed'));
     }
 
     return data;
@@ -95,9 +97,17 @@ export class SupabaseRestClient {
   }
 
   getStoredSession() {
-    const rawSession = window.localStorage.getItem(sessionStorageKey);
+    const rawSession = window.sessionStorage.getItem(sessionStorageKey)
+      || (
+        this.isRememberedSession()
+          ? window.localStorage.getItem(sessionStorageKey)
+          : null
+      );
 
     if (!rawSession) {
+      if (!this.isRememberedSession()) {
+        window.localStorage.removeItem(sessionStorageKey);
+      }
       return null;
     }
 
@@ -105,21 +115,40 @@ export class SupabaseRestClient {
       return JSON.parse(rawSession);
     } catch {
       window.localStorage.removeItem(sessionStorageKey);
+      window.sessionStorage.removeItem(sessionStorageKey);
+      window.localStorage.removeItem(persistentSessionFlagKey);
       return null;
     }
   }
 
-  storeSession(session) {
-    const expiresAt = session.expires_at || Math.floor(Date.now() / 1000) + Number(session.expires_in || 3600);
+  isRememberedSession() {
+    return window.localStorage.getItem(persistentSessionFlagKey) === 'true'
+      && Boolean(window.localStorage.getItem(sessionStorageKey));
+  }
 
-    window.localStorage.setItem(sessionStorageKey, JSON.stringify({
+  storeSession(session, { remember = false } = {}) {
+    const expiresAt = session.expires_at || Math.floor(Date.now() / 1000) + Number(session.expires_in || 3600);
+    const serializedSession = JSON.stringify({
       ...session,
       expires_at: expiresAt
-    }));
+    });
+
+    if (remember) {
+      window.localStorage.setItem(persistentSessionFlagKey, 'true');
+      window.localStorage.setItem(sessionStorageKey, serializedSession);
+      window.sessionStorage.removeItem(sessionStorageKey);
+      return;
+    }
+
+    window.localStorage.removeItem(persistentSessionFlagKey);
+    window.localStorage.removeItem(sessionStorageKey);
+    window.sessionStorage.setItem(sessionStorageKey, serializedSession);
   }
 
   clearSession() {
     window.localStorage.removeItem(sessionStorageKey);
+    window.localStorage.removeItem(persistentSessionFlagKey);
+    window.sessionStorage.removeItem(sessionStorageKey);
   }
 
   async signUp({ email, password, displayName }) {
@@ -138,7 +167,7 @@ export class SupabaseRestClient {
     const data = await parseResponse(response);
 
     if (!response.ok) {
-      throw new Error(data?.msg || data?.error_description || data?.message || 'Registrierung fehlgeschlagen.');
+      throw new Error(data?.msg || data?.error_description || data?.message || t('auth.registerFailed'));
     }
 
     if (data?.access_token) {
@@ -168,7 +197,7 @@ export class SupabaseRestClient {
     return data;
   }
 
-  async signIn({ email, password }) {
+  async signIn({ email, password, remember = false }) {
     const response = await fetch(`${this.supabaseUrl}/auth/v1/token?grant_type=password`, {
       method: 'POST',
       headers: this.baseHeaders(false),
@@ -178,10 +207,10 @@ export class SupabaseRestClient {
     const data = await parseResponse(response);
 
     if (!response.ok) {
-      throw new Error(data?.error_description || data?.msg || data?.message || 'Login fehlgeschlagen.');
+      throw new Error(data?.error_description || data?.msg || data?.message || t('auth.loginFailed'));
     }
 
-    this.storeSession(data);
+    this.storeSession(data, { remember });
     return data;
   }
 
@@ -200,7 +229,7 @@ export class SupabaseRestClient {
     const data = await parseResponse(response);
 
     if (!response.ok) {
-      throw new Error(data?.error_description || data?.msg || data?.message || 'Passwort-Zurücksetzung konnte nicht gestartet werden.');
+      throw new Error(data?.error_description || data?.msg || data?.message || t('auth.resetStartFailed'));
     }
 
     return data;
@@ -210,7 +239,7 @@ export class SupabaseRestClient {
     const session = await this.ensureSession();
 
     if (!session?.access_token) {
-      throw new Error('Bitte öffne den Passwort-Link erneut oder logge dich neu ein.');
+      throw new Error(t('auth.openResetLinkAgain'));
     }
 
     const response = await fetch(`${this.supabaseUrl}/auth/v1/user`, {
@@ -221,12 +250,14 @@ export class SupabaseRestClient {
     const data = await parseResponse(response);
 
     if (!response.ok) {
-      throw new Error(data?.error_description || data?.msg || data?.message || 'Passwort konnte nicht geändert werden.');
+      throw new Error(data?.error_description || data?.msg || data?.message || t('auth.passwordUpdateFailed'));
     }
 
     this.storeSession({
       ...session,
       user: data?.user || data
+    }, {
+      remember: this.isRememberedSession()
     });
 
     return data;
@@ -269,7 +300,7 @@ export class SupabaseRestClient {
             user
           };
 
-          this.storeSession(refreshedSession);
+          this.storeSession(refreshedSession, { remember: this.isRememberedSession() });
           return refreshedSession;
         } catch {
           this.clearSession();
@@ -300,7 +331,7 @@ export class SupabaseRestClient {
       return null;
     }
 
-    this.storeSession(data);
+    this.storeSession(data, { remember: this.isRememberedSession() });
     return data;
   }
 
@@ -327,7 +358,7 @@ export class SupabaseRestClient {
     const session = auth ? await this.ensureSession() : null;
 
     if (auth && !session) {
-      throw new Error('Bitte erneut einloggen.');
+      throw new Error(t('supabase.retryLogin'));
     }
 
     const url = new URL(`${this.supabaseUrl}/rest/v1/${table}`);
@@ -371,7 +402,7 @@ export class SupabaseRestClient {
     const data = await parseResponse(response);
 
     if (!response.ok) {
-      throw new Error(data?.message || data?.hint || data?.error || 'Supabase-Anfrage fehlgeschlagen.');
+      throw new Error(data?.message || data?.hint || data?.error || t('supabase.requestFailed'));
     }
 
     if (maybeSingle && Array.isArray(data)) {
@@ -425,7 +456,7 @@ export class SupabaseRestClient {
     const session = await this.ensureSession();
 
     if (!session) {
-      throw new Error('Bitte erneut einloggen.');
+      throw new Error(t('supabase.retryLogin'));
     }
 
     const response = await fetch(
@@ -446,7 +477,7 @@ export class SupabaseRestClient {
     const data = await parseResponse(response);
 
     if (!response.ok) {
-      throw new Error(data?.message || data?.error || 'Bild konnte nicht in Supabase Storage hochgeladen werden.');
+      throw new Error(data?.message || data?.error || t('supabase.imageUploadFailed'));
     }
 
     return {
@@ -460,7 +491,7 @@ export class SupabaseRestClient {
     const session = await this.ensureSession();
 
     if (!session) {
-      throw new Error('Bitte erneut einloggen.');
+      throw new Error(t('supabase.retryLogin'));
     }
 
     const prefixes = objectPaths.map((entry) => String(entry || '').trim()).filter(Boolean);
@@ -481,7 +512,7 @@ export class SupabaseRestClient {
     const data = await parseResponse(response);
 
     if (!response.ok) {
-      throw new Error(data?.message || data?.error || 'Logo konnte nicht aus Supabase Storage entfernt werden.');
+      throw new Error(data?.message || data?.error || t('supabase.logoDeleteFailed'));
     }
 
     return data;

@@ -1,4 +1,5 @@
 import { requireLogin } from './guards.js';
+import { localeForCurrentLanguage, setupLanguageSelectors, t } from './i18n.js';
 import { pagePath } from './path.js';
 import {
   businessDisplayName,
@@ -59,7 +60,7 @@ function formatDate(value) {
     return '-';
   }
 
-  return new Intl.DateTimeFormat('de-CH', {
+  return new Intl.DateTimeFormat(localeForCurrentLanguage(), {
     dateStyle: 'medium',
     timeStyle: 'short'
   }).format(date);
@@ -83,13 +84,13 @@ function renderLoginData() {
   const displayName = state.profile?.display_name || user.user_metadata?.display_name || '';
 
   loginDataList.innerHTML = [
-    detailRow('Login-E-Mail', user.email || state.profile?.email),
-    detailRow('Anzeigename', displayName),
-    detailRow('Account-ID', user.id || state.profile?.id),
-    detailRow('Freischaltung', state.profile?.unlock ? 'Freigeschaltet' : 'Wartet auf Freischaltung'),
-    detailRow('Account erstellt', formatDate(state.profile?.created_at || user.created_at)),
-    detailRow('Letzter Login', formatDate(user.last_sign_in_at)),
-    detailRow('Profil aktualisiert', formatDate(state.profile?.updated_at || user.updated_at))
+    detailRow(t('account.loginEmail'), user.email || state.profile?.email),
+    detailRow(t('account.displayName'), displayName),
+    detailRow(t('account.accountId'), user.id || state.profile?.id),
+    detailRow(t('account.unlock'), state.profile?.unlock ? t('account.unlocked') : t('account.waitingUnlock')),
+    detailRow(t('account.accountCreated'), formatDate(state.profile?.created_at || user.created_at)),
+    detailRow(t('account.lastLogin'), formatDate(user.last_sign_in_at)),
+    detailRow(t('account.profileUpdated'), formatDate(state.profile?.updated_at || user.updated_at))
   ].join('');
 }
 
@@ -162,33 +163,33 @@ function businessPayloadFromForm() {
 
 function validateBusinessPayload(payload) {
   if (!payload.name) {
-    throw new Error('Bitte einen Firmennamen eintragen.');
+    throw new Error(t('account.businessNameRequired'));
   }
 
   if (payload.location_lat != null && (payload.location_lat < -90 || payload.location_lat > 90)) {
-    throw new Error('Latitude muss zwischen -90 und 90 liegen.');
+    throw new Error(t('account.latitudeInvalid'));
   }
 
   if (payload.location_lng != null && (payload.location_lng < -180 || payload.location_lng > 180)) {
-    throw new Error('Longitude muss zwischen -180 und 180 liegen.');
+    throw new Error(t('account.longitudeInvalid'));
   }
 }
 
 function validatePasswordChangePayload({ currentPassword, newPassword, repeatPassword }) {
   if (!currentPassword) {
-    throw new Error('Bitte das aktuelle Passwort eingeben.');
+    throw new Error(t('account.currentPasswordRequired'));
   }
 
   if (String(newPassword || '').length < 6) {
-    throw new Error('Bitte mindestens 6 Zeichen für das neue Passwort verwenden.');
+    throw new Error(t('auth.passwordMin'));
   }
 
   if (newPassword !== repeatPassword) {
-    throw new Error('Die neuen Passwörter stimmen nicht überein.');
+    throw new Error(t('auth.passwordMismatch'));
   }
 
   if (currentPassword === newPassword) {
-    throw new Error('Das neue Passwort muss sich vom aktuellen Passwort unterscheiden.');
+    throw new Error(t('account.passwordSame'));
   }
 }
 
@@ -217,15 +218,15 @@ async function persistBusiness(extraPayload = {}) {
 
 async function saveBusiness(event) {
   event.preventDefault();
-  showMessage(accountMessage, 'Kontodaten werden gespeichert ...');
+  showMessage(accountMessage, t('account.saving'));
 
   await persistBusiness();
-  showMessage(accountMessage, 'Kontodaten gespeichert.', 'success');
+  showMessage(accountMessage, t('account.saved'), 'success');
 }
 
 async function changePassword(event) {
   event.preventDefault();
-  showMessage(accountMessage, 'Aktuelles Passwort wird geprüft ...');
+  showMessage(accountMessage, t('account.passwordChecking'));
 
   const formData = new FormData(passwordChangeForm);
   const payload = {
@@ -239,26 +240,27 @@ async function changePassword(event) {
   const email = state.session?.user?.email || state.profile?.email;
 
   if (!email) {
-    throw new Error('Login-E-Mail konnte nicht ermittelt werden.');
+    throw new Error(t('account.emailMissing'));
   }
 
   try {
     const refreshedSession = await state.client.signIn({
       email,
-      password: payload.currentPassword
+      password: payload.currentPassword,
+      remember: state.client.isRememberedSession()
     });
 
     state.session = refreshedSession;
   } catch {
-    throw new Error('Das aktuelle Passwort ist nicht korrekt.');
+    throw new Error(t('account.currentPasswordWrong'));
   }
 
-  showMessage(accountMessage, 'Neues Passwort wird gespeichert ...');
+  showMessage(accountMessage, t('account.newPasswordSaving'));
   await state.client.updatePassword(payload.newPassword);
   state.session = await state.client.ensureSession();
   passwordChangeForm.reset();
   renderLoginData();
-  showMessage(accountMessage, 'Passwort wurde geändert.', 'success');
+  showMessage(accountMessage, t('account.passwordChanged'), 'success');
 }
 
 function renderCompanyLogoPreview() {
@@ -299,28 +301,28 @@ async function logoFileToAppleSafePng(file) {
     targetHeight: 1024,
     backgroundColor: 'transparent',
     maxSideCandidates: [1400, 1200, 1000, 900, 800, 700, 600, 500, 420, 360, 300, 240],
-    emptyMessage: 'Bitte eine Logo-Datei auswählen.',
-    typeMessage: 'Bitte PNG, JPG, JPEG oder WEBP verwenden.',
-    sourceTooLargeMessage: 'Die Originaldatei ist sehr gross. Bitte maximal 25 MB auswählen.',
-    readErrorMessage: 'Logo konnte nicht gelesen werden.',
-    prepareErrorMessage: 'Logo konnte nicht vorbereitet werden.',
-    outputTooLargeMessage: 'Logo konnte nicht klein genug vorbereitet werden. Bitte ein weniger detailreiches Bild verwenden.'
+    emptyMessage: t('account.logoEmpty'),
+    typeMessage: t('account.logoType'),
+    sourceTooLargeMessage: t('account.logoSourceTooLarge'),
+    readErrorMessage: t('account.logoReadError'),
+    prepareErrorMessage: t('account.logoPrepareError'),
+    outputTooLargeMessage: t('account.logoOutputTooLarge')
   });
 }
 
 async function uploadCompanyLogo(file) {
   if (uploadCompanyLogoButton) {
     uploadCompanyLogoButton.disabled = true;
-    uploadCompanyLogoButton.textContent = 'Wird vorbereitet ...';
+    uploadCompanyLogoButton.textContent = t('account.logoPreparingButton');
   }
 
   try {
-    showMessage(accountMessage, 'Firmenlogo wird vorbereitet ...');
+    showMessage(accountMessage, t('account.logoPreparing'));
     const pngLogoFile = await logoFileToAppleSafePng(file);
 
-    showMessage(accountMessage, 'Firmenlogo wird hochgeladen ...');
+    showMessage(accountMessage, t('account.logoUploading'));
     if (uploadCompanyLogoButton) {
-      uploadCompanyLogoButton.textContent = 'Wird hochgeladen ...';
+      uploadCompanyLogoButton.textContent = t('account.logoUploadingButton');
     }
 
     const business = await persistBusiness();
@@ -342,7 +344,7 @@ async function uploadCompanyLogo(file) {
     }
 
     fillBusinessForm();
-    showMessage(accountMessage, 'Firmenlogo gespeichert.', 'success');
+    showMessage(accountMessage, t('account.logoSaved'), 'success');
   } finally {
     if (companyLogoUpload) {
       companyLogoUpload.value = '';
@@ -350,18 +352,18 @@ async function uploadCompanyLogo(file) {
 
     if (uploadCompanyLogoButton) {
       uploadCompanyLogoButton.disabled = false;
-      uploadCompanyLogoButton.textContent = 'Logo hochladen';
+      uploadCompanyLogoButton.textContent = t('account.logoUpload');
     }
   }
 }
 
 async function removeCompanyLogo() {
   if (!state.business?.id) {
-    showMessage(accountMessage, 'Es ist noch kein Business gespeichert.', 'info');
+    showMessage(accountMessage, t('account.logoNoBusiness'), 'info');
     return;
   }
 
-  showMessage(accountMessage, 'Firmenlogo wird entfernt ...');
+  showMessage(accountMessage, t('account.logoRemoving'));
   const previousPath = state.business.company_logo_path;
 
   state.business = (await state.client.updateRows('businesses', {
@@ -379,10 +381,12 @@ async function removeCompanyLogo() {
     state.client.deleteStorageObjects(businessLogoBucket, [previousPath]).catch(() => {});
   }
 
-  showMessage(accountMessage, 'Firmenlogo entfernt.', 'success');
+  showMessage(accountMessage, t('account.logoRemoved'), 'success');
 }
 
 async function initAccount() {
+  setupLanguageSelectors(document);
+
   const context = await requireLogin({ requireUnlock: true });
 
   if (!context) {
@@ -395,6 +399,11 @@ async function initAccount() {
 
   renderLoginData();
   await loadBusiness();
+
+  window.addEventListener('el-promillo-language-change', () => {
+    renderLoginData();
+    renderMobileAccountSummary();
+  });
 
   businessForm?.addEventListener('submit', (event) => {
     saveBusiness(event).catch((error) => showMessage(accountMessage, error.message, 'error'));

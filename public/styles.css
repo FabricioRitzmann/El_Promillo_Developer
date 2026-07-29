@@ -226,6 +226,68 @@ label {
   min-height: auto;
 }
 
+.checkbox-line {
+  display: flex;
+  grid-template-columns: none;
+  align-items: center;
+  gap: 0.6rem;
+  width: fit-content;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.checkbox-line input {
+  width: 1.05rem;
+  min-height: auto;
+  height: 1.05rem;
+  accent-color: var(--primary);
+}
+
+.auth-heading-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.language-switcher {
+  display: inline-grid;
+  grid-template-columns: auto minmax(7rem, auto);
+  align-items: center;
+  gap: 0.55rem;
+  width: fit-content;
+  padding: 0.38rem 0.45rem 0.38rem 0.72rem;
+  border: 1px solid var(--border-gold);
+  border-radius: 999px;
+  background: rgba(255, 250, 242, 0.82);
+  color: var(--muted);
+  box-shadow: 0 8px 22px rgba(91, 52, 35, 0.08);
+}
+
+.language-switcher.compact {
+  grid-template-columns: auto minmax(6.5rem, auto);
+}
+
+.language-switcher span {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.language-switcher select {
+  min-height: 2.05rem;
+  border: 0;
+  border-radius: 999px;
+  padding: 0.32rem 2rem 0.32rem 0.68rem;
+  background-color: rgba(231, 211, 175, 0.38);
+  color: var(--ink);
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
 input,
 textarea,
 select {
@@ -292,6 +354,10 @@ textarea {
 
 .auth-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.auth-grid:has(#resetPasswordForm:not([hidden])) {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .dashboard-grid,

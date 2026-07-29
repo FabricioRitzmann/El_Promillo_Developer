@@ -393,6 +393,12 @@ Die Kontoseite enthält zusätzlich `Passwort ändern`. Dort muss der Betreiber 
 
 Wichtig für Free-Tier: Password Recovery ist mit Supabase Auth nutzbar. Wenn das Projekt den Supabase-Default-Mailprovider verwendet, kann die Reset-Mail bei neuen Free-Tier-Projekten aber nicht frei gebrandet werden. Für eigene Betreffzeilen, HTML, Signatur oder Absender wie `Fabricio@el-promillo.ch` ist Custom SMTP oder Supabase Pro nötig.
 
+## Sprache und Login-Sitzung
+
+Login- und Kontoseite enthalten eine moderne Sprachwahl. Deutsch (`DE`) ist immer die Standardsprache; Betreiber können zusätzlich Englisch (`EN`), Französisch (`FR`) und Italienisch (`IT`) wählen. Die Auswahl wird lokal im Browser gespeichert und betrifft nur die angezeigten UI-Texte, nicht Supabase-Daten oder Wallet-Inhalte.
+
+Aus Sicherheitsgründen bleibt ein Login standardmässig nur für die aktuelle Browser-Sitzung aktiv. Erst wenn beim Login `Eingeloggt bleiben` angewählt wird, speichert die App die Supabase-Session dauerhaft im Browser. Beim Logout werden beide Session-Speicher geleert.
+
 ## Kein PassKit im aktiven Wallet-Pfad
 
 Der aktuelle Wallet-Benachrichtigungspfad, die öffentliche Claim-Seite und der Scanner verwenden kein PassKit. Apple Wallet wird direkt über Supabase Edge Functions, Apple Pass Web Service, signierte `.pkpass`-Dateien und APNS angebunden. Google Wallet wird direkt über die Google Wallet API angebunden.

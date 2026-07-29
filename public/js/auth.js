@@ -1,6 +1,7 @@
 import { createSupabaseRestClient } from './supabaseClient.js';
 import { redirectAfterLogin } from './guards.js';
 import { validateOperatorEmail } from './emailValidation.js';
+import { setupLanguageSelectors, t } from './i18n.js';
 import { pageUrl } from './path.js';
 import { byId, showMessage } from './ui.js';
 
@@ -60,11 +61,11 @@ function setPasswordResetPanelVisible(visible) {
 
 function validatePasswordPair(password, repeat) {
   if (String(password || '').length < 6) {
-    throw new Error('Bitte mindestens 6 Zeichen für das neue Passwort verwenden.');
+    throw new Error(t('auth.passwordMin'));
   }
 
   if (password !== repeat) {
-    throw new Error('Die neuen Passwörter stimmen nicht überein.');
+    throw new Error(t('auth.passwordMismatch'));
   }
 }
 
@@ -77,10 +78,12 @@ function showRecoveryMode() {
   forgotPasswordForm.hidden = true;
   loginForm.hidden = true;
   registerForm.hidden = true;
-  showMessage(authMessage, 'Recovery-Link erkannt. Du kannst jetzt ein neues Passwort setzen.', 'info');
+  showMessage(authMessage, t('auth.recoveryDetected'), 'info');
 }
 
 async function initAuthPage() {
+  setupLanguageSelectors(document);
+
   const client = await createSupabaseRestClient();
   const existingSession = await client.ensureSession();
   const recoveryMode = isRecoveryMode();
@@ -99,7 +102,7 @@ async function initAuthPage() {
 
   loginForm?.addEventListener('submit', async (event) => {
     event.preventDefault();
-    showMessage(authMessage, 'Login wird geprüft ...');
+    showMessage(authMessage, t('auth.loginChecking'));
 
     const formData = new FormData(loginForm);
 
@@ -112,13 +115,14 @@ async function initAuthPage() {
 
       const session = await client.signIn({
         email: emailCheck.email,
-        password: formData.get('password')
+        password: formData.get('password'),
+        remember: Boolean(formData.get('remember_me'))
       });
 
       await redirectAfterLogin(client, session);
     } catch (error) {
       const message = /email not confirmed/i.test(error.message)
-        ? 'Dein Account ist noch nicht vollständig freigeschaltet. Bitte versuche es später erneut oder kontaktiere den Support.'
+        ? t('auth.emailNotConfirmed')
         : error.message;
 
       showMessage(authMessage, message, 'error');
@@ -127,7 +131,7 @@ async function initAuthPage() {
 
   byId('showForgotPasswordButton')?.addEventListener('click', () => {
     setPasswordResetPanelVisible(true);
-    showMessage(authMessage, 'Trage deine E-Mail-Adresse ein, dann senden wir dir den Reset-Link.', 'info');
+    showMessage(authMessage, t('auth.forgotIntro'), 'info');
     forgotPasswordForm?.querySelector('input[name="email"]')?.focus();
   });
 
@@ -138,7 +142,7 @@ async function initAuthPage() {
 
   forgotPasswordForm?.addEventListener('submit', async (event) => {
     event.preventDefault();
-    showMessage(authMessage, 'Reset-Link wird angefordert ...');
+    showMessage(authMessage, t('auth.resetRequesting'));
 
     const formData = new FormData(forgotPasswordForm);
 
@@ -151,7 +155,7 @@ async function initAuthPage() {
 
       await client.resetPasswordForEmail(emailCheck.email, pageUrl('index.html?recovery=1'));
       forgotPasswordForm.reset();
-      showMessage(authMessage, 'Wenn diese E-Mail registriert ist, wurde ein Reset-Link versendet.', 'success');
+      showMessage(authMessage, t('auth.resetSent'), 'success');
     } catch (error) {
       showMessage(authMessage, error.message, 'error');
     }
@@ -159,7 +163,7 @@ async function initAuthPage() {
 
   resetPasswordForm?.addEventListener('submit', async (event) => {
     event.preventDefault();
-    showMessage(authMessage, 'Passwort wird gespeichert ...');
+    showMessage(authMessage, t('auth.passwordSaving'));
 
     const formData = new FormData(resetPasswordForm);
 
@@ -170,7 +174,7 @@ async function initAuthPage() {
 
       await client.updatePassword(password);
       resetPasswordForm.reset();
-      showMessage(authMessage, 'Passwort gespeichert. Du wirst weitergeleitet ...', 'success');
+      showMessage(authMessage, t('auth.passwordSavedRedirect'), 'success');
       window.setTimeout(() => {
         redirectAfterLogin(client, client.getStoredSession()).catch((error) => showMessage(authMessage, error.message, 'error'));
       }, 700);
@@ -181,7 +185,7 @@ async function initAuthPage() {
 
   registerForm?.addEventListener('submit', async (event) => {
     event.preventDefault();
-    showMessage(authMessage, 'Account wird erstellt ...');
+    showMessage(authMessage, t('auth.accountCreating'));
 
     const formData = new FormData(registerForm);
 
@@ -198,7 +202,7 @@ async function initAuthPage() {
         displayName: formData.get('display_name')
       });
 
-      showMessage(authMessage, 'Account erstellt. Sobald dein Account manuell freigeschaltet wurde, kannst du dich einloggen.', 'success');
+      showMessage(authMessage, t('auth.accountCreated'), 'success');
       registerForm.reset();
     } catch (error) {
       showMessage(authMessage, error.message, 'error');
