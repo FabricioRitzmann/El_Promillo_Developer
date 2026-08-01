@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { removeEdgeConnectedBackground } from '../public/js/imageUploadOptimizer.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, '..');
@@ -63,6 +64,44 @@ assertIncludes(imageUploadOptimizerSource, [
   'Math.round((canvasHeight - drawHeight) / 2)',
   'pngBlob.size <= settings.maxBytes'
 ], 'Image-Upload-Optimizer muss Bildtypen begrenzen und PNGs unter der Zielgrösse erzeugen');
+
+assertIncludes(read('public/js/account.js'), [
+  'removeBackground: true'
+], 'Firmenlogo-Uploads müssen die automatische Hintergrundentfernung aktivieren');
+
+function syntheticLogo(width, height, background, foreground) {
+  const data = new Uint8ClampedArray(width * height * 4);
+
+  for (let pixelIndex = 0; pixelIndex < width * height; pixelIndex += 1) {
+    data.set([...background, 255], pixelIndex * 4);
+  }
+
+  for (let y = 2; y < height - 2; y += 1) {
+    for (let x = 2; x < width - 2; x += 1) {
+      data.set([...foreground, 255], ((y * width) + x) * 4);
+    }
+  }
+
+  return data;
+}
+
+for (const background of [[255, 255, 255], [22, 96, 170]]) {
+  const result = removeEdgeConnectedBackground(
+    syntheticLogo(7, 7, background, [210, 24, 48]),
+    7,
+    7
+  );
+  assert(result.data[3] === 0, 'Der äussere Logohintergrund muss transparent werden');
+  assert(result.data[((3 * 7) + 3) * 4 + 3] === 255, 'Der mittige Logoschriftzug muss deckend bleiben');
+}
+
+const enclosedBackgroundColor = syntheticLogo(7, 7, [255, 255, 255], [210, 24, 48]);
+enclosedBackgroundColor.set([255, 255, 255, 255], ((3 * 7) + 3) * 4);
+const enclosedResult = removeEdgeConnectedBackground(enclosedBackgroundColor, 7, 7);
+assert(
+  enclosedResult.data[((3 * 7) + 3) * 4 + 3] === 255,
+  'Gleichfarbige, vom Logo eingeschlossene Flächen dürfen nicht entfernt werden'
+);
 
 assertExcludes(editorSource, [
   "file.type.startsWith('image/')",

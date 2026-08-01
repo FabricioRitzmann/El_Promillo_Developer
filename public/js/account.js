@@ -300,6 +300,7 @@ async function logoFileToAppleSafePng(file) {
     targetWidth: 1024,
     targetHeight: 1024,
     backgroundColor: 'transparent',
+    removeBackground: true,
     maxSideCandidates: [1400, 1200, 1000, 900, 800, 700, 600, 500, 420, 360, 300, 240],
     emptyMessage: t('account.logoEmpty'),
     typeMessage: t('account.logoType'),
