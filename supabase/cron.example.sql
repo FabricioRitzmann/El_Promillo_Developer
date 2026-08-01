@@ -94,7 +94,6 @@ select cron.schedule(
 
 select cron.schedule(
   'operator-send-verification-email',
-  'wallet-process-notification-rules',
   '*/5 * * * *',
   $$
   select net.http_post(
@@ -113,6 +112,7 @@ select jobid, jobname, schedule, active
 from cron.job
 where jobname in (
   'operator-send-verification-email',
+  'wallet-process-notification-rules',
   'wallet-process-scheduled-notifications',
   'wallet-process-update-queue'
 )
