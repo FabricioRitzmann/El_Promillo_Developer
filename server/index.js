@@ -1,17 +1,19 @@
 import express from 'express';
 import QRCode from 'qrcode';
 import crypto from 'node:crypto';
+import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadConfig, getPublicConfig } from './config.js';
 import { createSupabaseAdmin, requireSupabaseAdmin } from './supabaseAdmin.js';
-import { buildTemplateQrPdf } from './pdf.js';
+import { buildTemplateQrPdf, loadPdfImageFromBuffer } from './pdf.js';
 import { SCANNER_ACTIONS, featureEnabled, normalizeTemplateType, validateScannerAction } from '../public/js/templateFeatures.js';
 import { resolveCardEmblem, supabaseCardEmblemUrl } from './cardEmblems.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, '..');
 const publicDir = path.join(rootDir, 'public');
+const pdfBrandLogoPath = path.join(publicDir, 'assets', 'el-promillo-title-lockup-new-cutout.png');
 const serveStaticFrontend = process.env.SERVE_STATIC_FRONTEND !== 'false';
 const config = loadConfig();
 const supabaseAdmin = createSupabaseAdmin(config);
@@ -23,6 +25,7 @@ const demographicAgeGroups = new Set(['18_plus', '25_plus', '30_plus']);
 const walletEmblemColumnNames = new Set(['resolved_emblem_key', 'resolved_emblem_url', 'emblem_updated_at']);
 const clubFeatureNames = ['vip', 'balance', 'cloakroom', 'coupon', 'membership'];
 const localPublicRateLimitBuckets = new Map();
+let pdfBrandLogoPromise = null;
 const localTemplatePublicSelect = [
   'id',
   'business_name',
@@ -75,6 +78,119 @@ const localOperatorCardSelect = [
   'updated_at',
   `card_templates(${localTemplateInternalSelect})`
 ].join(',');
+
+async function loadPdfImageFromFile(filePath) {
+  try {
+    return loadPdfImageFromBuffer(await fs.readFile(filePath));
+  } catch (error) {
+    console.warn(`PDF-Bild konnte nicht geladen werden: ${filePath}`, error.message);
+    return null;
+  }
+}
+
+function templateBusinessLogoUrl(template = {}) {
+  const business = Array.isArray(template.businesses) ? template.businesses[0] : template.businesses;
+
+  return String(
+    template.business_logo_url
+      || template.company_logo_url
+      || template.logo_url
+      || business?.logo_url
+      || business?.company_logo_url
+      || ''
+  ).trim();
+}
+
+function appAssetPathFromUrl(value) {
+  const rawValue = String(value || '').trim();
+
+  if (!rawValue.startsWith('/')) {
+    return '';
+  }
+
+  const cleanPath = rawValue.replace(/^\/+/, '');
+
+  if (!cleanPath.startsWith('assets/')) {
+    return '';
+  }
+
+  return path.join(publicDir, cleanPath);
+}
+
+async function loadPdfImageFromUrl(value) {
+  const rawValue = String(value || '').trim();
+
+  if (!rawValue) {
+    return null;
+  }
+
+  const localAssetPath = appAssetPathFromUrl(rawValue);
+  if (localAssetPath) {
+    return loadPdfImageFromFile(localAssetPath);
+  }
+
+  if (rawValue.startsWith('data:image/')) {
+    const [, dataPart = ''] = rawValue.split(',', 2);
+    const isBase64 = rawValue.slice(0, rawValue.indexOf(',')).includes(';base64');
+    const buffer = Buffer.from(isBase64 ? dataPart : decodeURIComponent(dataPart), isBase64 ? 'base64' : 'utf8');
+    return loadPdfImageFromBuffer(buffer);
+  }
+
+  let url;
+  try {
+    url = new URL(rawValue);
+  } catch {
+    return null;
+  }
+
+  if (!['http:', 'https:'].includes(url.protocol)) {
+    return null;
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5000);
+
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    const contentLength = Number(response.headers.get('content-length') || 0);
+
+    if (!response.ok || contentLength > 4 * 1024 * 1024) {
+      return null;
+    }
+
+    const arrayBuffer = await response.arrayBuffer();
+    if (arrayBuffer.byteLength > 4 * 1024 * 1024) {
+      return null;
+    }
+
+    return loadPdfImageFromBuffer(Buffer.from(arrayBuffer));
+  } catch (error) {
+    console.warn(`PDF-Logo konnte nicht geladen werden: ${url.origin}`, error.message);
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function loadPdfBrandLogo() {
+  if (!pdfBrandLogoPromise) {
+    pdfBrandLogoPromise = loadPdfImageFromFile(pdfBrandLogoPath);
+  }
+
+  return pdfBrandLogoPromise;
+}
+
+async function loadTemplatePdfAssets(template = {}) {
+  const [brandLogo, businessLogo] = await Promise.all([
+    loadPdfBrandLogo(),
+    loadPdfImageFromUrl(templateBusinessLogoUrl(template))
+  ]);
+
+  return {
+    brandLogo,
+    businessLogo
+  };
+}
 
 function jsonError(res, error) {
   const statusCode = error.statusCode || 500;
@@ -1619,7 +1735,9 @@ app.get('/api/templates/:templateId/qr.pdf', async (req, res) => {
     const baseUrl = config.app.baseUrl || `http://${host}:${port}`;
     const claimUrl = claimUrlForTemplate(template, baseUrl);
     const format = String(req.query.format || 'a4').toLowerCase();
-    const pdfBuffer = buildTemplateQrPdf({ template: publicCardTemplateResponse(template), claimUrl, format });
+    const publicTemplate = publicCardTemplateResponse(template);
+    const assets = await loadTemplatePdfAssets(publicTemplate);
+    const pdfBuffer = buildTemplateQrPdf({ template: publicTemplate, claimUrl, format, assets });
     const safeName = String(template.card_name || 'karte')
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
