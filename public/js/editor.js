@@ -346,7 +346,7 @@ function syncDefaultsFromBusiness() {
     return;
   }
 
-  if (!templateForm.business_name.value && state.business?.name) {
+  if (state.business?.name) {
     templateForm.business_name.value = state.business.name;
   }
 
@@ -359,7 +359,7 @@ function loadTemplateIntoForm(template) {
 
   syncOptionalFeatureSelectionsFromTemplate(template);
 
-  setTemplateField('business_name', template.business_name || '');
+  setTemplateField('business_name', state.business?.name || template.business_name || '');
   setTemplateField('card_name', template.card_name || '');
   setTemplateField('template_type', templateType);
   setTemplateField('description', template.description || '');
@@ -486,7 +486,7 @@ function templateDraftFromForm() {
 
   return {
     template_type: templateType,
-    business_name: String(formData.get('business_name') || state.business?.name || 'Business').trim(),
+    business_name: String(state.business?.name || formData.get('business_name') || 'Business').trim(),
     card_name: String(formData.get('card_name') || 'Neue Karte').trim(),
     card_type: legacyCardTypeForTemplateType(templateType),
     description: String(formData.get('description') || '').trim(),

@@ -270,6 +270,8 @@ bash scripts/apply-supabase-schema.sh
 4. Den Inhalt von `supabase/schema.sql`, dem generierten Bundle oder den SQL-Editor-Chunks komplett im SQL Editor ausführen, oder alternativ `bash scripts/apply-supabase-schema.sh` mit `SUPABASE_DB_URL` bzw. gelinktem Projekt nutzen.
 5. In `config.json` die Supabase URL, den Anon Key und den Service Role Key eintragen.
 
+Wenn bestehende Templates noch alte Firmenname-/Logo-Snapshots enthalten, kann danach einmalig `supabase/sync-template-business-branding.sql` im Supabase SQL Editor ausgeführt werden. Die App bevorzugt den zentralen Business-Account bereits beim Rendern; die Sync-Datei zieht zusätzlich bestehende Template-Snapshots auf den aktuellen Firmennamen und das aktuelle Firmenlogo nach.
+
 Die SQL-Datei erstellt:
 
 - `operator_profiles`

@@ -217,8 +217,8 @@ export function publicGoogleMessageOperationPayload(payload: unknown) {
 
 export function publicCardTemplateResponse(template: Row = {}) {
   const business = Array.isArray(template.businesses) ? template.businesses[0] : template.businesses;
-  const businessName = business?.name || template.business_name;
-  const businessLogoUrl = business?.logo_url || template.business_logo_url || template.company_logo_url || '';
+  const businessName = business?.name || business?.company_name || template.business_name;
+  const businessLogoUrl = business?.logo_url || business?.company_logo_url || template.business_logo_url || template.company_logo_url || template.logo_url || '';
 
   return {
     id: template.id,

@@ -499,8 +499,8 @@ Deno.serve(async (request) => {
         card_name: template.card_name,
         card_type: template.card_type,
         template_type: template.template_type,
-        business_name: business?.name || template.business_name,
-        business_logo_url: business?.logo_url || ''
+        business_name: business?.name || business?.company_name || template.business_name,
+        business_logo_url: business?.logo_url || business?.company_logo_url || template.business_logo_url || template.logo_url || ''
       },
       googleWalletMessage: card.wallet_platform === 'google'
         ? 'Google Wallet ist vorbereitet. Die Karteninstanz wurde gespeichert; die echte Google-Wallet-Objekterzeugung folgt über eine Wallet-Edge-Funktion.'

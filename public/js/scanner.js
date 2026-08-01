@@ -175,6 +175,14 @@ function renderCard() {
   const card = state.currentCard;
   const cardInstance = state.currentCardInstance || {};
   const template = card.card_templates || {};
+  const businessName = String(state.business?.name || template.business_name || 'Business').trim();
+  const businessLogo = String(state.business?.logo_url || template.business_logo_url || template.logo_url || '').trim();
+  const previewTemplate = {
+    ...template,
+    business_name: businessName,
+    business_logo_url: businessLogo,
+    logo_url: businessLogo
+  };
   const walletPlatform = card.wallet_platform || card.metadata?.wallet_platform || '';
   const cardInstanceNumber = card.card_instance_number || card.metadata?.card_instance_number || card.customer_code;
   const previewCard = {
@@ -199,7 +207,7 @@ function renderCard() {
     `<div><dt>Status</dt><dd>${escapeHtml(card.status)}</dd></div>`,
     `<div><dt>Wallet</dt><dd>${escapeHtml(walletPlatform || 'unknown')}</dd></div>`,
     `<div><dt>Emblem</dt><dd>${escapeHtml(emblem.label)}</dd></div>`,
-    `<div><dt>Aktive Funktionen</dt><dd>${escapeHtml(activeFeatureLabels(template).join(', '))}</dd></div>`
+    `<div><dt>Aktive Funktionen</dt><dd>${escapeHtml(activeFeatureLabels(previewTemplate).join(', '))}</dd></div>`
   ];
 
   if (cardInstance.scan_count != null) {
@@ -345,13 +353,13 @@ function renderCard() {
 
   cardPanel.hidden = false;
   cardPanel.innerHTML = `
-    ${walletPreviewHtml(template, previewCard)}
+    ${walletPreviewHtml(previewTemplate, previewCard)}
     <div class="panel-heading">
       <div>
-        <p class="eyebrow">${escapeHtml(template.business_name || 'Business')}</p>
+        <p class="eyebrow">${escapeHtml(businessName)}</p>
         <h2>${escapeHtml(template.card_name || 'Kundenkarte')}</h2>
       </div>
-      <span class="pill">${escapeHtml(cardTypeLabel(template))}</span>
+      <span class="pill">${escapeHtml(cardTypeLabel(previewTemplate))}</span>
     </div>
     <dl class="detail-grid">
       ${detailItems.join('')}

@@ -62,7 +62,7 @@ export function walletCardModel(template: Row = {}, cardInstance: Row = {}) {
   return {
     business: {
       id: stringValue(template.business_id || cardInstance.business_id),
-      name: stringValue(business.name || template.business_name || 'El Promillo')
+      name: stringValue(business.name || business.company_name || template.business_name || 'El Promillo')
     },
     customer: {
       id: stringValue(cardInstance.customer_id || customer.id),
@@ -83,7 +83,7 @@ export function walletCardModel(template: Row = {}, cardInstance: Row = {}) {
       description: stringValue(template.description)
     },
     branding: {
-      logo: stringValue(business.logo_url || template.business_logo_url || template.logo_url),
+      logo: stringValue(business.logo_url || business.company_logo_url || template.business_logo_url || template.company_logo_url || template.logo_url),
       heroImage: stringValue(template.hero_image_url || settings.heroImageUrl),
       thumbnail: stringValue(template.thumbnail_url || settings.thumbnailUrl),
       primaryColor: stringValue(template.primary_color || '#fffdf9'),
@@ -91,7 +91,7 @@ export function walletCardModel(template: Row = {}, cardInstance: Row = {}) {
       textColor: stringValue(template.text_color || '#5b3423'),
       background: stringValue(template.background || settings.background || template.primary_color || '#fffdf9'),
       title: stringValue(template.card_name || template.name || 'Kundenkarte'),
-      subtitle: stringValue(template.business_name || business.name),
+      subtitle: stringValue(business.name || business.company_name || template.business_name),
       description: stringValue(template.description)
     },
     codes: {

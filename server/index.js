@@ -92,13 +92,24 @@ function templateBusinessLogoUrl(template = {}) {
   const business = Array.isArray(template.businesses) ? template.businesses[0] : template.businesses;
 
   return String(
-    template.business_logo_url
+    business?.logo_url
+      || business?.company_logo_url
+      || template.business_logo_url
       || template.company_logo_url
       || template.logo_url
-      || business?.logo_url
-      || business?.company_logo_url
       || ''
   ).trim();
+}
+
+function templateBusinessName(template = {}) {
+  const business = Array.isArray(template.businesses) ? template.businesses[0] : template.businesses;
+
+  return String(
+    business?.name
+      || business?.company_name
+      || template.business_name
+      || 'Mein Unternehmen'
+  ).trim() || 'Mein Unternehmen';
 }
 
 function appAssetPathFromUrl(value) {
@@ -1849,9 +1860,8 @@ function sanitizeBrowserMetadata(value) {
 }
 
 function publicCardTemplateResponse(template = {}) {
-  const business = Array.isArray(template.businesses) ? template.businesses[0] : template.businesses;
-  const businessName = business?.name || template.business_name;
-  const businessLogoUrl = business?.logo_url || template.business_logo_url || template.company_logo_url || '';
+  const businessName = templateBusinessName(template);
+  const businessLogoUrl = templateBusinessLogoUrl(template);
 
   return {
     id: template.id,

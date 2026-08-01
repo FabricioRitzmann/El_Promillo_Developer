@@ -646,12 +646,12 @@ function templateBusiness(template: Row) {
 
 function businessNameForTemplate(template: Row, fallback = 'Business') {
   const business = templateBusiness(template);
-  return stringValue(business?.name || template.business_name || fallback);
+  return stringValue(business?.name || business?.company_name || template.business_name || fallback);
 }
 
 function businessLogoUrlForTemplate(template: Row) {
   const business = templateBusiness(template);
-  return stringValue(business?.logo_url || template.business_logo_url || template.company_logo_url || template.logo_url);
+  return stringValue(business?.logo_url || business?.company_logo_url || template.business_logo_url || template.company_logo_url || template.logo_url);
 }
 
 function assetMatchesTemplateUrl(assetValue: unknown, templateUrl: string) {

@@ -78,7 +78,7 @@ function one(rowOrRows: any) {
 
 function businessName(template: Row = {}) {
   const business = one(template.businesses) || {};
-  return stringValue(business.name || template.business_name || 'Mein Unternehmen');
+  return stringValue(business.name || business.company_name || template.business_name || 'Mein Unternehmen');
 }
 
 function cardName(template: Row = {}) {

@@ -12,6 +12,15 @@ const state = {
   business: null,
   templates: [],
   customerCards: [],
+  customerCardsExpanded: false,
+  customerCardFilters: {
+    search: '',
+    template: 'all',
+    type: 'all',
+    status: 'all',
+    wallet: 'all',
+    sort: 'created_desc'
+  },
   statisticsLoaded: false,
   currentStatistics: null,
   chartViews: {}
@@ -314,6 +323,7 @@ function renderTemplates() {
     return;
   }
 
+  const businessName = String(state.business?.name || '').trim();
   const logoUrl = businessLogoUrl(state.business || {});
 
   const rows = state.templates.map((template) => {
@@ -330,7 +340,7 @@ function renderTemplates() {
             ${logoUrl ? `<img class="card-table-icon" src="${escapeHtml(logoUrl)}" alt="">` : '<span class="card-table-icon card-table-icon-empty"></span>'}
             <div>
               <strong>${escapeHtml(template.card_name)}</strong>
-              <span>${escapeHtml(template.business_name || t('dashboard.withoutBusiness'))}</span>
+              <span>${escapeHtml(businessName || template.business_name || t('dashboard.withoutBusiness'))}</span>
             </div>
           </div>
         </td>
@@ -398,9 +408,222 @@ function formatBalance(card, template) {
   return `${(cents / 100).toFixed(2)} ${currency}`;
 }
 
-function renderCustomerCards() {
+function customerCardIdentity(card) {
+  return card.card_instance_number || card.metadata?.card_instance_number || card.customer_code || '-';
+}
+
+function normalizedText(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function dateTimeValue(value) {
+  const time = new Date(value || 0).getTime();
+
+  return Number.isFinite(time) ? time : 0;
+}
+
+function formatDashboardDateTime(value) {
+  if (!value) {
+    return '-';
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return '-';
+  }
+
+  return new Intl.DateTimeFormat(document.documentElement.lang || 'de-CH', {
+    dateStyle: 'medium',
+    timeStyle: 'short'
+  }).format(date);
+}
+
+function customerCardStatusLabel(status) {
+  const value = normalizedText(status || 'active');
+
+  if (value === 'active' || value === 'issued') {
+    return t('dashboard.active');
+  }
+
+  if (value === 'inactive') {
+    return t('dashboard.inactive');
+  }
+
+  return status || t('dashboard.active');
+}
+
+function walletPlatformLabel(platform) {
+  const value = normalizedText(platform);
+
+  if (value === 'apple') {
+    return 'Apple Wallet';
+  }
+
+  if (value === 'google') {
+    return 'Google Wallet';
+  }
+
+  if (value === 'samsung') {
+    return 'Samsung Wallet';
+  }
+
+  if (!value) {
+    return t('dashboard.walletUnknown');
+  }
+
+  return platform;
+}
+
+function filterOptions(cards, valueFor, labelFor) {
+  const options = new Map();
+
+  cards.forEach((card) => {
+    const value = String(valueFor(card) || '').trim();
+
+    if (!value) {
+      return;
+    }
+
+    options.set(value, labelFor(card, value));
+  });
+
+  return Array.from(options.entries())
+    .map(([value, label]) => ({ value, label }))
+    .sort((a, b) => a.label.localeCompare(b.label, document.documentElement.lang || 'de-CH'));
+}
+
+function renderFilterOptions(options, selectedValue, allLabel) {
+  return [
+    `<option value="all">${escapeHtml(allLabel)}</option>`,
+    ...options.map((option) => `
+      <option value="${escapeHtml(option.value)}"${option.value === selectedValue ? ' selected' : ''}>${escapeHtml(option.label)}</option>
+    `)
+  ].join('');
+}
+
+function customerCardMatchesFilters(card) {
+  const filters = state.customerCardFilters;
+  const template = card.card_templates || {};
+  const cardNumber = customerCardIdentity(card);
+  const templateType = String(template.template_type || template.card_type || '').trim();
+  const status = String(card.status || 'active').trim();
+  const wallet = String(card.wallet_platform || '').trim();
+  const walletFilterValue = wallet || '_none';
+  const featureSummary = cardFeatureRows(template, card)
+    .map((row) => `${row.label}: ${row.value}`)
+    .join(' ');
+  const searchText = normalizedText([
+    cardNumber,
+    card.customer_code,
+    template.card_name,
+    cardTypeLabel(template),
+    status,
+    walletPlatformLabel(wallet),
+    featureSummary
+  ].join(' '));
+  const search = normalizedText(filters.search);
+
+  return (!search || searchText.includes(search))
+    && (filters.template === 'all' || String(template.id || '') === filters.template)
+    && (filters.type === 'all' || templateType === filters.type)
+    && (filters.status === 'all' || status === filters.status)
+    && (filters.wallet === 'all' || walletFilterValue === filters.wallet);
+}
+
+function sortCustomerCards(cards) {
+  const sorted = [...cards];
+  const sort = state.customerCardFilters.sort;
+
+  sorted.sort((a, b) => {
+    const templateA = a.card_templates || {};
+    const templateB = b.card_templates || {};
+
+    if (sort === 'created_asc') {
+      return dateTimeValue(a.created_at) - dateTimeValue(b.created_at);
+    }
+
+    if (sort === 'last_scan_desc') {
+      return dateTimeValue(b.last_scanned_at) - dateTimeValue(a.last_scanned_at)
+        || dateTimeValue(b.created_at) - dateTimeValue(a.created_at);
+    }
+
+    if (sort === 'template_asc') {
+      return String(templateA.card_name || '').localeCompare(String(templateB.card_name || ''), document.documentElement.lang || 'de-CH')
+        || String(customerCardIdentity(a)).localeCompare(String(customerCardIdentity(b)), document.documentElement.lang || 'de-CH');
+    }
+
+    if (sort === 'code_asc') {
+      return String(customerCardIdentity(a)).localeCompare(String(customerCardIdentity(b)), document.documentElement.lang || 'de-CH');
+    }
+
+    return dateTimeValue(b.created_at) - dateTimeValue(a.created_at);
+  });
+
+  return sorted;
+}
+
+function customerCardFilterFocusState(field) {
+  return {
+    name: field.name,
+    selectionStart: field.selectionStart,
+    selectionEnd: field.selectionEnd
+  };
+}
+
+function restoreCustomerCardFilterFocus(focusState) {
+  if (!focusState?.name || !customerCardList) {
+    return;
+  }
+
+  const field = customerCardList.querySelector(`[data-customer-card-filter][name="${focusState.name}"]`);
+
+  if (!field) {
+    return;
+  }
+
+  field.focus({ preventScroll: true });
+
+  if (
+    typeof field.setSelectionRange === 'function'
+    && Number.isInteger(focusState.selectionStart)
+    && Number.isInteger(focusState.selectionEnd)
+  ) {
+    field.setSelectionRange(focusState.selectionStart, focusState.selectionEnd);
+  }
+}
+
+function updateCustomerCardFilter(field) {
+  if (!field?.name || !(field.name in state.customerCardFilters)) {
+    return;
+  }
+
+  const focusState = customerCardFilterFocusState(field);
+  state.customerCardFilters[field.name] = field.value;
+  renderCustomerCards({ focusState });
+}
+
+function resetCustomerCardFilters() {
+  state.customerCardFilters = {
+    search: '',
+    template: 'all',
+    type: 'all',
+    status: 'all',
+    wallet: 'all',
+    sort: 'created_desc'
+  };
+  renderCustomerCards();
+}
+
+function renderCustomerCards({ focusState = null } = {}) {
   if (!customerCardList) {
     return;
+  }
+
+  const existingDisclosure = customerCardList.querySelector('[data-customer-card-disclosure]');
+
+  if (existingDisclosure) {
+    state.customerCardsExpanded = existingDisclosure.open;
   }
 
   if (!state.customerCards.length) {
@@ -409,13 +632,38 @@ function renderCustomerCards() {
   }
 
   const logoUrl = businessLogoUrl(state.business || {});
-  const rows = state.customerCards.map((card) => {
+  const filters = state.customerCardFilters;
+  const templateOptions = filterOptions(
+    state.customerCards,
+    (card) => card.card_templates?.id,
+    (card) => card.card_templates?.card_name || t('dashboard.templateMissing')
+  );
+  const typeOptions = filterOptions(
+    state.customerCards,
+    (card) => card.card_templates?.template_type || card.card_templates?.card_type,
+    (card) => cardTypeLabel(card.card_templates || {})
+  );
+  const statusOptions = filterOptions(
+    state.customerCards,
+    (card) => card.status || 'active',
+    (card, value) => customerCardStatusLabel(value)
+  );
+  const walletOptions = filterOptions(
+    state.customerCards,
+    (card) => card.wallet_platform || '_none',
+    (card, value) => value === '_none' ? t('dashboard.walletUnknown') : walletPlatformLabel(value)
+  );
+  const filteredCards = sortCustomerCards(state.customerCards.filter(customerCardMatchesFilters));
+  const resultSummary = `${filteredCards.length} ${t('dashboard.of')} ${state.customerCards.length}`;
+  const rows = filteredCards.map((card) => {
     const template = card.card_templates || {};
-    const cardNumber = card.card_instance_number || card.metadata?.card_instance_number || card.customer_code;
+    const cardNumber = customerCardIdentity(card);
     const featureSummary = cardFeatureRows(template, card)
       .map((row) => `${row.label}: ${row.value}`)
       .join(' · ');
     const scannerUrl = pagePath(`scanner.html?code=${encodeURIComponent(cardNumber)}`);
+    const status = card.status || 'active';
+    const wallet = card.wallet_platform || '';
 
     return `
       <tr class="cards-table-row" data-scanner-url="${escapeHtml(scannerUrl)}">
@@ -428,11 +676,20 @@ function renderCustomerCards() {
             </div>
           </div>
         </td>
-        <td>${escapeHtml(template.card_name || t('dashboard.templateMissing'))}</td>
-        <td><span class="pill">${escapeHtml(cardTypeLabel(template))}</span></td>
-        <td>${escapeHtml(card.status || 'active')}</td>
-        <td>${escapeHtml(formatBalance(card, template))}</td>
-        <td>${escapeHtml(featureSummary || '-')}</td>
+        <td>
+          <strong>${escapeHtml(template.card_name || t('dashboard.templateMissing'))}</strong>
+          <span class="table-subtext">${escapeHtml(cardTypeLabel(template))}</span>
+        </td>
+        <td><span class="pill">${escapeHtml(customerCardStatusLabel(status))}</span></td>
+        <td>${escapeHtml(walletPlatformLabel(wallet))}</td>
+        <td>
+          <strong>${escapeHtml(formatBalance(card, template))}</strong>
+          <span class="table-subtext">${escapeHtml(featureSummary || '-')}</span>
+        </td>
+        <td>
+          <strong>${escapeHtml(formatDashboardDateTime(card.created_at))}</strong>
+          <span class="table-subtext">${escapeHtml(t('dashboard.lastScan'))}: ${escapeHtml(card.last_scanned_at ? formatDashboardDateTime(card.last_scanned_at) : t('dashboard.neverScanned'))}</span>
+        </td>
         <td class="actions-cell">
           <select
             class="action-select"
@@ -451,25 +708,92 @@ function renderCustomerCards() {
   }).join('');
 
   customerCardList.innerHTML = `
-    <div class="table-panel">
-      <table class="cards-table">
-        <thead>
-          <tr>
-            <th>${escapeHtml(t('dashboard.cardId'))}</th>
-            <th>${escapeHtml(t('dashboard.template'))}</th>
-            <th>${escapeHtml(t('dashboard.type'))}</th>
-            <th>${escapeHtml(t('dashboard.status'))}</th>
-            <th>${escapeHtml(t('dashboard.balance'))}</th>
-            <th>${escapeHtml(t('dashboard.currentState'))}</th>
-            <th>${escapeHtml(t('dashboard.actions'))}</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${rows}
-        </tbody>
-      </table>
-    </div>
+    <details class="customer-card-disclosure" data-customer-card-disclosure${state.customerCardsExpanded ? ' open' : ''}>
+      <summary class="customer-card-summary">
+        <span>
+          <strong>${escapeHtml(t('dashboard.issuedCards'))}</strong>
+          <span>${escapeHtml(t('dashboard.customerCardsCollapsedHint'))}</span>
+        </span>
+        <span class="customer-card-summary-meta">${escapeHtml(resultSummary)}</span>
+      </summary>
+      <div class="customer-card-dropdown">
+        <form class="customer-card-filter-panel" data-customer-card-filters>
+          <label>
+            ${escapeHtml(t('dashboard.customerCardSearch'))}
+            <input
+              type="search"
+              name="search"
+              value="${escapeHtml(filters.search)}"
+              placeholder="${escapeHtml(t('dashboard.customerCardSearchPlaceholder'))}"
+              autocomplete="off"
+              data-customer-card-filter
+            >
+          </label>
+          <label>
+            ${escapeHtml(t('dashboard.template'))}
+            <select name="template" data-customer-card-filter>
+              ${renderFilterOptions(templateOptions, filters.template, t('dashboard.allTemplates'))}
+            </select>
+          </label>
+          <label>
+            ${escapeHtml(t('dashboard.type'))}
+            <select name="type" data-customer-card-filter>
+              ${renderFilterOptions(typeOptions, filters.type, t('dashboard.allTypes'))}
+            </select>
+          </label>
+          <label>
+            ${escapeHtml(t('dashboard.status'))}
+            <select name="status" data-customer-card-filter>
+              ${renderFilterOptions(statusOptions, filters.status, t('dashboard.allStatuses'))}
+            </select>
+          </label>
+          <label>
+            ${escapeHtml(t('dashboard.walletPlatform'))}
+            <select name="wallet" data-customer-card-filter>
+              ${renderFilterOptions(walletOptions, filters.wallet, t('dashboard.allWallets'))}
+            </select>
+          </label>
+          <label>
+            ${escapeHtml(t('dashboard.sortBy'))}
+            <select name="sort" data-customer-card-filter>
+              <option value="created_desc"${filters.sort === 'created_desc' ? ' selected' : ''}>${escapeHtml(t('dashboard.sortNewest'))}</option>
+              <option value="created_asc"${filters.sort === 'created_asc' ? ' selected' : ''}>${escapeHtml(t('dashboard.sortOldest'))}</option>
+              <option value="last_scan_desc"${filters.sort === 'last_scan_desc' ? ' selected' : ''}>${escapeHtml(t('dashboard.sortLastScan'))}</option>
+              <option value="template_asc"${filters.sort === 'template_asc' ? ' selected' : ''}>${escapeHtml(t('dashboard.sortTemplate'))}</option>
+              <option value="code_asc"${filters.sort === 'code_asc' ? ' selected' : ''}>${escapeHtml(t('dashboard.sortCode'))}</option>
+            </select>
+          </label>
+          <button class="button secondary" type="button" data-reset-customer-card-filters>${escapeHtml(t('dashboard.resetFilters'))}</button>
+        </form>
+        <div class="customer-card-result-bar">
+          <strong>${escapeHtml(resultSummary)}</strong>
+          <span>${escapeHtml(t('dashboard.customerCardsResultHint'))}</span>
+        </div>
+        ${filteredCards.length ? `
+          <div class="table-panel">
+            <table class="cards-table customer-cards-table">
+              <thead>
+                <tr>
+                  <th>${escapeHtml(t('dashboard.cardId'))}</th>
+                  <th>${escapeHtml(t('dashboard.template'))}</th>
+                  <th>${escapeHtml(t('dashboard.status'))}</th>
+                  <th>${escapeHtml(t('dashboard.walletPlatform'))}</th>
+                  <th>${escapeHtml(t('dashboard.currentState'))}</th>
+                  <th>${escapeHtml(t('dashboard.issuedOn'))}</th>
+                  <th>${escapeHtml(t('dashboard.actions'))}</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${rows}
+              </tbody>
+            </table>
+          </div>
+        ` : `<div class="empty-state">${escapeHtml(t('dashboard.noFilteredCustomers'))}</div>`}
+      </div>
+    </details>
   `;
+
+  restoreCustomerCardFilterFocus(focusState);
 }
 
 function downloadFile(url, filename) {
@@ -1380,6 +1704,13 @@ async function initDashboard() {
   });
 
   customerCardList?.addEventListener('change', (event) => {
+    const filterField = event.target.closest('[data-customer-card-filter]');
+
+    if (filterField) {
+      updateCustomerCardFilter(filterField);
+      return;
+    }
+
     const actionSelect = event.target.closest('[data-card-action]');
 
     if (!actionSelect) {
@@ -1391,7 +1722,30 @@ async function initDashboard() {
     });
   });
 
+  customerCardList?.addEventListener('input', (event) => {
+    const filterField = event.target.closest('[data-customer-card-filter]');
+
+    if (!filterField) {
+      return;
+    }
+
+    updateCustomerCardFilter(filterField);
+  });
+
+  customerCardList?.addEventListener('toggle', (event) => {
+    if (event.target.matches('[data-customer-card-disclosure]')) {
+      state.customerCardsExpanded = event.target.open;
+    }
+  }, true);
+
   customerCardList?.addEventListener('click', async (event) => {
+    const resetButton = event.target.closest('[data-reset-customer-card-filters]');
+
+    if (resetButton) {
+      resetCustomerCardFilters();
+      return;
+    }
+
     const copyButton = event.target.closest('[data-copy-code]');
 
     if (copyButton) {
