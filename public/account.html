@@ -124,11 +124,31 @@
             <h3 data-i18n="account.logoTitle">Firmenlogo</h3>
             <p class="muted" data-i18n="account.logoHint">Dieses Logo erscheint im Header, in Kartenvorschauen, Wallet-Karten, QR/PDF-Dateien und auf der öffentlichen Claim-Seite.</p>
             <input id="companyLogoUpload" type="file" accept="image/png,image/jpeg,image/webp" hidden>
+            <fieldset id="companyLogoBackgroundMode" class="logo-background-mode">
+              <legend data-i18n="account.logoBackgroundMode">Logohintergrund</legend>
+              <label>
+                <input type="radio" name="company_logo_background_mode" value="removed" checked>
+                <span data-i18n="account.logoBackgroundRemoved">Hintergrund entfernen</span>
+              </label>
+              <label>
+                <input type="radio" name="company_logo_background_mode" value="original">
+                <span data-i18n="account.logoBackgroundOriginal">Originalhintergrund behalten</span>
+              </label>
+            </fieldset>
             <div class="button-row wrap">
               <button id="uploadCompanyLogoButton" class="secondary" type="button" data-i18n="account.logoUpload">Logo hochladen</button>
               <button id="removeCompanyLogoButton" class="secondary danger-soft" type="button" data-i18n="account.logoRemove">Logo entfernen</button>
             </div>
-            <p id="companyLogoHint" class="muted" data-i18n="account.logoFileHint">PNG, JPG, JPEG oder WEBP. Rundes Logo empfohlen. Der zusammenhängende Bildhintergrund wird automatisch entfernt und transparent gespeichert.</p>
+            <div class="logo-color-tools">
+              <button id="companyLogoColorPickerButton" class="secondary" type="button" data-i18n="account.logoPickColor">Farbe aus Logo auswählen</button>
+              <label class="logo-card-color-field">
+                <span data-i18n="account.logoCardColor">Kartenhintergrund</span>
+                <input id="companyLogoCardColor" name="company_logo_card_color" type="color" value="#fffaf2">
+              </label>
+            </div>
+            <div id="companyLogoCardPreview" class="company-logo-card-preview" aria-label="Vorschau der Kartenhintergrundfarbe"></div>
+            <p id="companyLogoPickerHint" class="muted" aria-live="polite" data-i18n="account.logoPickerHint">Pipette aktivieren und danach auf eine sichtbare Farbe im Logo tippen.</p>
+            <p id="companyLogoHint" class="muted" data-i18n="account.logoFileHint">PNG, JPG, JPEG oder WEBP. Original und freigestellte Variante werden getrennt gespeichert.</p>
           </div>
         </div>
 
@@ -146,6 +166,9 @@
             </label>
           </div>
           <p class="muted" data-i18n="account.locationHint">Diese Koordinaten werden für standortbasierte Wallet-Benachrichtigungen im Editor automatisch übernommen.</p>
+          <div class="button-row account-location-actions">
+            <button id="saveBusinessLocationButton" class="primary" type="submit" data-i18n="account.locationSave">Standortangaben speichern</button>
+          </div>
         </div>
       </form>
     </main>

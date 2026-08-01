@@ -7,6 +7,7 @@
   "scripts": {
     "start": "node server/index.js",
     "dev": "node --watch server/index.js",
+    "check:company-logo": "node --check public/js/account.js && node --check public/js/editor.js && node --check public/js/logoColorPicker.js && node scripts/verify-company-logo-variants.js",
     "auth-email:dry-run": "node scripts/update-supabase-auth-email-template.js --dry-run",
     "auth-email:apply": "node scripts/update-supabase-auth-email-template.js",
     "auth-email:unlock-only": "node scripts/update-supabase-auth-email-template.js --unlock-only",

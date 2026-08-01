@@ -152,12 +152,7 @@ function templateBusiness(template: Row) {
 
 function businessNameForTemplate(template: Row) {
   const business = templateBusiness(template);
-  return stringValue(
-    business?.name
-      || business?.company_name
-      || template.business_name
-      || 'Mein Unternehmen'
-  ) || 'Mein Unternehmen';
+  return stringValue(business?.name || template.business_name || 'Business') || 'Business';
 }
 
 function businessInitials(template: Row) {

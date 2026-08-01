@@ -1,8 +1,8 @@
 import { requireLogin } from './guards.js';
 import { appUrl, apiUrl } from './config.js';
-import { setupLanguageSelectors, t } from './i18n.js';
 import { pagePath } from './path.js';
 import { imageFileToPngUnderLimit } from './imageUploadOptimizer.js';
+import { normalizeHexColor, sampleImageColorFromPointer } from './logoColorPicker.js';
 import { byId, escapeHtml, renderBusinessHeader, showMessage, walletPreviewHtml } from './ui.js';
 import {
   CLUB_FEATURE_DEFAULTS,
@@ -27,10 +27,11 @@ const state = {
   template: null,
   notificationTemplates: [],
   optionalFeatureSelections: {},
-  walletNotificationIdempotency: null
+  walletNotificationIdempotency: null,
+  editorLogoColorPicking: false
 };
 
-const businessEditorSelect = [
+const businessEditorLegacySelect = [
   'id',
   'owner_id',
   'name',
@@ -45,6 +46,14 @@ const businessEditorSelect = [
   'company_logo_updated_at',
   'created_at',
   'updated_at'
+].join(',');
+
+const businessEditorSelect = [
+  businessEditorLegacySelect,
+  'company_logo_original_url',
+  'company_logo_processed_url',
+  'company_logo_background_mode',
+  'company_logo_card_color'
 ].join(',');
 
 const templateEditorSelect = [
@@ -94,6 +103,9 @@ const editorFeatureSummary = byId('editorFeatureSummary');
 const optionalFeaturePanel = byId('optionalFeaturePanel');
 const optionalFeatureToggles = byId('optionalFeatureToggles');
 const clubFeatureSpaceWarning = byId('clubFeatureSpaceWarning');
+const editorLogoColorPickerButton = byId('editorLogoColorPickerButton');
+const editorLogoColorPickerPanel = byId('editorLogoColorPickerPanel');
+const editorLogoColorPickerImage = byId('editorLogoColorPickerImage');
 const walletNotificationsPanel = byId('walletNotificationsPanel');
 const walletNotificationForm = byId('walletNotificationForm');
 const walletNotificationMessage = byId('walletNotificationMessage');
@@ -329,7 +341,7 @@ function templateSupportsReward(templateOrType) {
 
 function updateEditorModeUi() {
   const isEditing = Boolean(state.templateId);
-  const title = isEditing ? t('editor.editTitle') : t('editor.newTitle');
+  const title = isEditing ? 'Karte bearbeiten' : 'Neue Karte erstellen';
 
   if (editorPageTitle) {
     editorPageTitle.textContent = title;
@@ -341,12 +353,12 @@ function updateEditorModeUi() {
 
   if (editorModeText) {
     editorModeText.textContent = isEditing
-      ? t('editor.modeTextEdit')
-      : t('editor.modeTextNew');
+      ? 'Aenderungen werden am bestehenden Template gespeichert. Der QR-Code bleibt gleich.'
+      : 'Erstelle hier ein neues Karten-Template. Danach erscheint es in der Dashboard-Übersicht.';
   }
 
   if (templateSubmitButton) {
-    templateSubmitButton.textContent = isEditing ? t('editor.saveChanges') : t('editor.saveTemplate');
+    templateSubmitButton.textContent = isEditing ? 'Aenderungen speichern' : 'Template speichern';
   }
 }
 
@@ -355,10 +367,63 @@ function syncDefaultsFromBusiness() {
     return;
   }
 
-  if (state.business?.name) {
+  if (!templateForm.business_name.value && state.business?.name) {
     templateForm.business_name.value = state.business.name;
   }
 
+  if (!state.templateId && state.business?.company_logo_card_color) {
+    setTemplateField('primary_color', normalizeHexColor(state.business.company_logo_card_color, defaultWalletBackgroundColor));
+  }
+
+}
+
+function toggleEditorLogoColorPicker() {
+  const logoUrl = String(state.business?.logo_url || '').trim();
+
+  if (!logoUrl || !editorLogoColorPickerPanel || !editorLogoColorPickerImage) {
+    showMessage(editorMessage, 'Bitte zuerst im Konto ein Firmenlogo hochladen.', 'info');
+    return;
+  }
+
+  const willOpen = editorLogoColorPickerPanel.hidden;
+  editorLogoColorPickerPanel.hidden = !willOpen;
+  state.editorLogoColorPicking = willOpen;
+  editorLogoColorPickerPanel.classList.toggle('is-color-picking', willOpen);
+  editorLogoColorPickerButton?.setAttribute('aria-pressed', willOpen ? 'true' : 'false');
+
+  if (willOpen) {
+    editorLogoColorPickerImage.crossOrigin = 'anonymous';
+    editorLogoColorPickerImage.src = logoUrl;
+  }
+}
+
+function pickEditorLogoColor(event) {
+  if (!state.editorLogoColorPicking || !editorLogoColorPickerImage?.complete || !editorLogoColorPickerImage.naturalWidth) {
+    return;
+  }
+
+  const result = sampleImageColorFromPointer(editorLogoColorPickerImage, event, {
+    errorMessage: 'Die Farbpipette ist in diesem Browser nicht verfügbar.',
+    corsMessage: 'Die Logo-Farbe kann wegen der Bildfreigabe nicht gelesen werden.'
+  });
+
+  if (result.outsideImage) {
+    showMessage(editorMessage, 'Bitte direkt auf den sichtbaren Bildbereich tippen.', 'info');
+    return;
+  }
+
+  if (!result.color) {
+    showMessage(editorMessage, 'An dieser Stelle ist das Logo transparent. Es wurde keine Farbe übernommen.', 'info');
+    return;
+  }
+
+  setTemplateField('primary_color', result.color.hex);
+  state.editorLogoColorPicking = false;
+  editorLogoColorPickerPanel.classList.remove('is-color-picking');
+  editorLogoColorPickerPanel.hidden = true;
+  editorLogoColorPickerButton?.setAttribute('aria-pressed', 'false');
+  updateConditionalTemplateFields();
+  showMessage(editorMessage, `Hauptfarbe ${result.color.hex} aus dem Firmenlogo übernommen.`, 'success');
 }
 
 function loadTemplateIntoForm(template) {
@@ -368,7 +433,7 @@ function loadTemplateIntoForm(template) {
 
   syncOptionalFeatureSelectionsFromTemplate(template);
 
-  setTemplateField('business_name', state.business?.name || template.business_name || '');
+  setTemplateField('business_name', template.business_name || '');
   setTemplateField('card_name', template.card_name || '');
   setTemplateField('template_type', templateType);
   setTemplateField('description', template.description || '');
@@ -495,7 +560,7 @@ function templateDraftFromForm() {
 
   return {
     template_type: templateType,
-    business_name: String(state.business?.name || formData.get('business_name') || 'Business').trim(),
+    business_name: String(formData.get('business_name') || state.business?.name || 'Business').trim(),
     card_name: String(formData.get('card_name') || 'Neue Karte').trim(),
     card_type: legacyCardTypeForTemplateType(templateType),
     description: String(formData.get('description') || '').trim(),
@@ -1832,13 +1897,16 @@ async function handleAssetUpload(event, targetFieldName, kind) {
 }
 
 async function loadBusiness() {
-  state.business = await state.client.selectRows('businesses', {
-    select: businessEditorSelect,
-    filters: [
-      { column: 'owner_id', op: 'eq', value: state.session.user.id }
-    ],
+  const options = {
+    filters: [{ column: 'owner_id', op: 'eq', value: state.session.user.id }],
     maybeSingle: true
-  });
+  };
+
+  try {
+    state.business = await state.client.selectRows('businesses', { ...options, select: businessEditorSelect });
+  } catch (_error) {
+    state.business = await state.client.selectRows('businesses', { ...options, select: businessEditorLegacySelect });
+  }
 
   renderBusinessHeader(state.business || {});
 }
@@ -1883,7 +1951,7 @@ async function loadNotificationTemplates() {
 
 async function saveTemplate(event) {
   event.preventDefault();
-  showMessage(editorMessage, state.templateId ? t('editor.updating', 'Karte wird aktualisiert ...') : t('editor.saving', 'Template wird gespeichert ...'));
+  showMessage(editorMessage, state.templateId ? 'Karte wird aktualisiert ...' : 'Template wird gespeichert ...');
 
   const draft = templateDraftFromForm();
 
@@ -1896,12 +1964,12 @@ async function saveTemplate(event) {
   }
 
   if (!draft.business_name || !draft.card_name) {
-    showMessage(editorMessage, t('editor.requiredNames', 'Geschäftsname und Kartenname sind Pflichtfelder.'), 'error');
+    showMessage(editorMessage, 'Geschäftsname und Kartenname sind Pflichtfelder.', 'error');
     return;
   }
 
   if (!state.business?.id) {
-    showMessage(editorMessage, t('editor.businessRequired', 'Bitte zuerst auf der Konto-Seite deine Firmendaten speichern, damit diese Karte einem Business zugeordnet werden kann.'), 'error');
+    showMessage(editorMessage, 'Bitte zuerst auf der Konto-Seite deine Firmendaten speichern, damit diese Karte einem Business zugeordnet werden kann.', 'error');
     return;
   }
 
@@ -1924,7 +1992,7 @@ async function saveTemplate(event) {
     loadTemplateIntoForm(state.template);
     updateConditionalTemplateFields();
     renderWalletNotificationsPanel().catch(() => {});
-    showMessage(editorMessage, t('editor.updated', 'Karte aktualisiert. Der QR-Code bleibt gleich.'), 'success');
+    showMessage(editorMessage, 'Karte aktualisiert. Der QR-Code bleibt gleich.', 'success');
     return;
   }
 
@@ -1948,12 +2016,10 @@ async function saveTemplate(event) {
     renderWalletNotificationsPanel().catch(() => {});
   }
 
-  showMessage(editorMessage, t('editor.created', 'Template erstellt. Es erscheint jetzt in der Dashboard-Übersicht.'), 'success');
+  showMessage(editorMessage, 'Template erstellt. Es erscheint jetzt in der Dashboard-Übersicht.', 'success');
 }
 
 async function initEditor() {
-  setupLanguageSelectors(document);
-
   const context = await requireLogin({ requireUnlock: true });
 
   if (!context) {
@@ -1971,6 +2037,15 @@ async function initEditor() {
   templateForm?.addEventListener('change', updateConditionalTemplateFields);
 
   templateType?.addEventListener('change', updateConditionalTemplateFields);
+
+  editorLogoColorPickerButton?.addEventListener('click', toggleEditorLogoColorPicker);
+  editorLogoColorPickerImage?.addEventListener('pointerdown', (event) => {
+    try {
+      pickEditorLogoColor(event);
+    } catch (error) {
+      showMessage(editorMessage, error.message, 'error');
+    }
+  });
 
   stampIconUpload?.addEventListener('change', (event) => {
     handleAssetUpload(event, 'stamp_icon_url', 'stamp-icon').catch((error) => showMessage(editorMessage, error.message, 'error'));

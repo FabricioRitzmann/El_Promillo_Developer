@@ -66,8 +66,12 @@ assertIncludes(imageUploadOptimizerSource, [
 ], 'Image-Upload-Optimizer muss Bildtypen begrenzen und PNGs unter der Zielgrösse erzeugen');
 
 assertIncludes(read('public/js/account.js'), [
-  'removeBackground: true'
-], 'Firmenlogo-Uploads müssen die automatische Hintergrundentfernung aktivieren');
+  'logoFileToAppleSafePng(file, false)',
+  'logoFileToAppleSafePng(file, true)',
+  'company_logo_original_url',
+  'company_logo_processed_url',
+  'company_logo_background_mode'
+], 'Firmenlogo-Uploads müssen Original und freigestellte Variante getrennt vorbereiten');
 
 function syntheticLogo(width, height, background, foreground) {
   const data = new Uint8ClampedArray(width * height * 4);

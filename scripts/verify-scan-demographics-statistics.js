@@ -95,6 +95,20 @@ const deployScript = read('scripts/deploy-wallet-functions.sh');
   .forEach((needle) => assertIncludes(scannerJs, needle, 'Scanner JS muss VIP- und Mitgliedschaftsdaten direkt nach dem Kartenladen hervorheben'));
 
 [
+  'accessStatusModal',
+  'VIP-/Mitgliedschaft erkannt',
+  'accessStatusItems',
+  'accessStatusClose'
+].forEach((needle) => assertIncludes(scannerHtml, needle, 'Scanner HTML muss den Eintrittshinweis für VIP und Mitgliedschaft enthalten'));
+
+[
+  'scannerAccessHighlights',
+  'showAccessStatusModal',
+  'showAccessStatusModal(card)',
+  'navigator.vibrate([120, 50, 120])'
+].forEach((needle) => assertIncludes(scannerJs, needle, 'Scanner JS muss VIP- und Mitgliedschaftsdaten direkt nach dem Kartenladen hervorheben'));
+
+[
   'Besucherstatistik',
   'statsFilterForm',
   'statsKpiGrid',
