@@ -92,27 +92,6 @@ alter table public.businesses
 add column if not exists company_logo_path text,
 add column if not exists company_logo_updated_at timestamptz;
 
-alter table public.businesses
-add column if not exists company_logo_original_url text,
-add column if not exists company_logo_original_path text,
-add column if not exists company_logo_processed_url text,
-add column if not exists company_logo_processed_path text,
-add column if not exists company_logo_background_mode text not null default 'removed';
-
-update public.businesses
-set
-  company_logo_processed_url = coalesce(company_logo_processed_url, nullif(logo_url, '')),
-  company_logo_processed_path = coalesce(company_logo_processed_path, company_logo_path),
-  company_logo_background_mode = coalesce(nullif(company_logo_background_mode, ''), 'removed')
-where logo_url is not null or company_logo_path is not null;
-
-alter table public.businesses
-drop constraint if exists businesses_company_logo_background_mode_check;
-
-alter table public.businesses
-add constraint businesses_company_logo_background_mode_check
-check (company_logo_background_mode in ('removed', 'original')) not valid;
-
 create table if not exists public.card_templates (
   id uuid primary key default gen_random_uuid(),
   owner_id uuid not null references public.operator_profiles(id) on delete cascade,
@@ -4390,11 +4369,6 @@ grant select (
   website,
   logo_url,
   company_logo_path,
-  company_logo_original_url,
-  company_logo_original_path,
-  company_logo_processed_url,
-  company_logo_processed_path,
-  company_logo_background_mode,
   company_logo_updated_at,
   created_at,
   updated_at
@@ -4410,11 +4384,6 @@ grant insert (
   website,
   logo_url,
   company_logo_path,
-  company_logo_original_url,
-  company_logo_original_path,
-  company_logo_processed_url,
-  company_logo_processed_path,
-  company_logo_background_mode,
   company_logo_updated_at
 ) on public.businesses to authenticated;
 grant update (
@@ -4427,11 +4396,6 @@ grant update (
   website,
   logo_url,
   company_logo_path,
-  company_logo_original_url,
-  company_logo_original_path,
-  company_logo_processed_url,
-  company_logo_processed_path,
-  company_logo_background_mode,
   company_logo_updated_at
 ) on public.businesses to authenticated;
 revoke select, insert, update, delete on public.card_templates from authenticated;

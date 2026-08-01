@@ -124,22 +124,11 @@
             <h3 data-i18n="account.logoTitle">Firmenlogo</h3>
             <p class="muted" data-i18n="account.logoHint">Dieses Logo erscheint im Header, in Kartenvorschauen, Wallet-Karten, QR/PDF-Dateien und auf der öffentlichen Claim-Seite.</p>
             <input id="companyLogoUpload" type="file" accept="image/png,image/jpeg,image/webp" hidden>
-            <fieldset id="companyLogoBackgroundMode" class="logo-background-mode">
-              <legend data-i18n="account.logoBackgroundMode">Logohintergrund</legend>
-              <label>
-                <input type="radio" name="company_logo_background_mode" value="removed" checked>
-                <span data-i18n="account.logoBackgroundRemoved">Hintergrund entfernen</span>
-              </label>
-              <label>
-                <input type="radio" name="company_logo_background_mode" value="original">
-                <span data-i18n="account.logoBackgroundOriginal">Originalhintergrund behalten</span>
-              </label>
-            </fieldset>
             <div class="button-row wrap">
               <button id="uploadCompanyLogoButton" class="secondary" type="button" data-i18n="account.logoUpload">Logo hochladen</button>
               <button id="removeCompanyLogoButton" class="secondary danger-soft" type="button" data-i18n="account.logoRemove">Logo entfernen</button>
             </div>
-            <p id="companyLogoHint" class="muted" data-i18n="account.logoFileHint">PNG, JPG, JPEG oder WEBP. Original und freigestellte Variante werden getrennt gespeichert.</p>
+            <p id="companyLogoHint" class="muted" data-i18n="account.logoFileHint">PNG, JPG, JPEG oder WEBP. Der Bildhintergrund wird automatisch entfernt.</p>
           </div>
         </div>
 

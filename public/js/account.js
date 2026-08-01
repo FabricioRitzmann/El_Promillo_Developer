@@ -16,11 +16,10 @@ const state = {
   client: null,
   session: null,
   profile: null,
-  business: null,
-  logoVariantsSupported: true
+  business: null
 };
 
-const businessAccountLegacySelect = [
+const businessAccountSelect = [
   'id',
   'owner_id',
   'name',
@@ -37,15 +36,6 @@ const businessAccountLegacySelect = [
   'updated_at'
 ].join(',');
 
-const businessAccountSelect = [
-  businessAccountLegacySelect,
-  'company_logo_original_url',
-  'company_logo_original_path',
-  'company_logo_processed_url',
-  'company_logo_processed_path',
-  'company_logo_background_mode'
-].join(',');
-
 const accountMessage = byId('accountMessage');
 const loginDataList = byId('loginDataList');
 const businessForm = byId('accountBusinessForm');
@@ -55,7 +45,6 @@ const companyLogoPreview = byId('companyLogoPreview');
 const companyLogoUpload = byId('companyLogoUpload');
 const uploadCompanyLogoButton = byId('uploadCompanyLogoButton');
 const removeCompanyLogoButton = byId('removeCompanyLogoButton');
-const companyLogoBackgroundMode = byId('companyLogoBackgroundMode');
 const businessLogoBucket = 'business-logos';
 const maxLogoFileBytes = 2 * 1024 * 1024;
 const maxLogoSourceFileBytes = 25 * 1024 * 1024;
@@ -139,27 +128,17 @@ function fillBusinessForm() {
   businessForm.website.value = state.business?.website || '';
   businessForm.logo_url.value = state.business?.logo_url || '';
   businessForm.company_logo_path.value = state.business?.company_logo_path || '';
-  const backgroundMode = state.business?.company_logo_background_mode === 'original' ? 'original' : 'removed';
-  businessForm.querySelectorAll('input[name="company_logo_background_mode"]').forEach((input) => {
-    input.checked = input.value === backgroundMode;
-  });
   renderCompanyLogoPreview();
   renderBusinessHeader(state.business || {});
   renderMobileAccountSummary();
 }
 
 async function loadBusiness() {
-  const options = {
+  state.business = await state.client.selectRows('businesses', {
+    select: businessAccountSelect,
     filters: [{ column: 'owner_id', op: 'eq', value: state.session.user.id }],
     maybeSingle: true
-  };
-
-  try {
-    state.business = await state.client.selectRows('businesses', { ...options, select: businessAccountSelect });
-  } catch (_error) {
-    state.logoVariantsSupported = false;
-    state.business = await state.client.selectRows('businesses', { ...options, select: businessAccountLegacySelect });
-  }
+  });
 
   fillBusinessForm();
 }
@@ -178,10 +157,6 @@ function businessPayloadFromForm() {
     logo_url: String(formData.get('logo_url') || state.business?.logo_url || '').trim(),
     company_logo_path: String(formData.get('company_logo_path') || state.business?.company_logo_path || '').trim() || null
   };
-
-  if (state.logoVariantsSupported) {
-    payload.company_logo_background_mode = logoBackgroundMode();
-  }
 
   return payload;
 }
@@ -230,11 +205,11 @@ async function persistBusiness(extraPayload = {}) {
     ? await state.client.updateRows('businesses', payload, [
       { column: 'id', op: 'eq', value: state.business.id },
       { column: 'owner_id', op: 'eq', value: state.session.user.id }
-    ], { select: state.logoVariantsSupported ? businessAccountSelect : businessAccountLegacySelect })
+    ], { select: businessAccountSelect })
     : await state.client.insertRows('businesses', {
       ...payload,
       owner_id: state.session.user.id
-    }, { select: state.logoVariantsSupported ? businessAccountSelect : businessAccountLegacySelect });
+    }, { select: businessAccountSelect });
 
   state.business = rows[0];
   fillBusinessForm();
@@ -318,35 +293,12 @@ function renderCompanyLogoPreview() {
   companyLogoPreview.textContent = businessInitials(name);
 }
 
-function logoBackgroundMode() {
-  return businessForm?.querySelector('input[name="company_logo_background_mode"]:checked')?.value === 'original'
-    ? 'original'
-    : 'removed';
-}
-
-function logoVariantForMode(business, mode) {
-  if (mode === 'original') {
-    return {
-      url: String(business?.company_logo_original_url || '').trim(),
-      path: String(business?.company_logo_original_path || '').trim() || null
-    };
-  }
-
-  return {
-    url: String(business?.company_logo_processed_url || business?.logo_url || '').trim(),
-    path: String(business?.company_logo_processed_path || business?.company_logo_path || '').trim() || null
-  };
-}
-
 function setLogoProcessingState(processing) {
   uploadCompanyLogoButton && (uploadCompanyLogoButton.disabled = processing);
   removeCompanyLogoButton && (removeCompanyLogoButton.disabled = processing);
-  companyLogoBackgroundMode?.querySelectorAll('input').forEach((input) => {
-    input.disabled = processing;
-  });
 }
 
-async function logoFileToAppleSafePng(file, removeBackground) {
+async function logoFileToAppleSafePng(file) {
   return imageFileToPngUnderLimit(file, {
     maxBytes: maxLogoFileBytes,
     maxSourceBytes: maxLogoSourceFileBytes,
@@ -354,7 +306,7 @@ async function logoFileToAppleSafePng(file, removeBackground) {
     targetWidth: 1024,
     targetHeight: 1024,
     backgroundColor: 'transparent',
-    removeBackground,
+    removeBackground: true,
     maxSideCandidates: [1400, 1200, 1000, 900, 800, 700, 600, 500, 420, 360, 300, 240],
     emptyMessage: t('account.logoEmpty'),
     typeMessage: t('account.logoType'),
@@ -366,100 +318,41 @@ async function logoFileToAppleSafePng(file, removeBackground) {
 }
 
 async function uploadCompanyLogo(file) {
-  // Die Auswahl vor persistBusiness() festhalten: Ein Legacy-Schema ohne die
-  // Variantenspalten lädt das Formular sonst neu und setzt den Radio-Wert zurück.
-  const requestedMode = logoBackgroundMode();
   setLogoProcessingState(true);
   uploadCompanyLogoButton && (uploadCompanyLogoButton.textContent = t('account.logoPreparingButton'));
 
   try {
     showMessage(accountMessage, t('account.logoPreparing'));
-    const originalLogoFile = await logoFileToAppleSafePng(file, false);
-    let processedLogoFile = null;
-    let processingError = null;
-
-    try {
-      processedLogoFile = await logoFileToAppleSafePng(file, true);
-    } catch (error) {
-      processingError = error;
-    }
+    const pngLogoFile = await logoFileToAppleSafePng(file);
 
     showMessage(accountMessage, t('account.logoUploading'));
     uploadCompanyLogoButton && (uploadCompanyLogoButton.textContent = t('account.logoUploadingButton'));
 
     const business = await persistBusiness();
-    const previousPaths = [...new Set([
-      business.company_logo_path,
-      business.company_logo_original_path,
-      business.company_logo_processed_path
-    ].filter(Boolean))];
-    const uploadId = `${Date.now()}-${globalThis.crypto?.randomUUID?.() || Math.random().toString(16).slice(2)}`;
-    const originalPath = `${business.id}/${uploadId}-original.png`;
-    const processedPath = `${business.id}/${uploadId}-removed.png`;
-    const uploadedPaths = [];
-    const originalUpload = await state.client.uploadStorageObject(businessLogoBucket, originalPath, originalLogoFile);
-    uploadedPaths.push(originalPath);
-    let processedUpload = null;
-
-    if (processedLogoFile) {
-      try {
-        processedUpload = await state.client.uploadStorageObject(businessLogoBucket, processedPath, processedLogoFile);
-        uploadedPaths.push(processedPath);
-      } catch (error) {
-        processingError = error;
-      }
-    }
-
-    const activeMode = requestedMode === 'removed' && processedUpload ? 'removed' : 'original';
-    const activeUpload = activeMode === 'removed' ? processedUpload : originalUpload;
-    const activePath = activeMode === 'removed' ? processedPath : originalPath;
-    const updatePayload = {
-      logo_url: activeUpload.publicUrl,
-      company_logo_path: activePath,
-      company_logo_updated_at: new Date().toISOString()
-    };
-
-    if (state.logoVariantsSupported) {
-      Object.assign(updatePayload, {
-        company_logo_original_url: originalUpload.publicUrl,
-        company_logo_original_path: originalPath,
-        company_logo_processed_url: processedUpload?.publicUrl || null,
-        company_logo_processed_path: processedUpload ? processedPath : null,
-        company_logo_background_mode: activeMode
-      });
-    }
+    const previousPath = business.company_logo_path;
+    const objectPath = `${business.id}/${Date.now()}-logo.png`;
+    const uploadResult = await state.client.uploadStorageObject(businessLogoBucket, objectPath, pngLogoFile);
 
     try {
-      state.business = (await state.client.updateRows('businesses', updatePayload, [
+      state.business = (await state.client.updateRows('businesses', {
+        logo_url: uploadResult.publicUrl,
+        company_logo_path: objectPath,
+        company_logo_updated_at: new Date().toISOString()
+      }, [
         { column: 'id', op: 'eq', value: business.id },
         { column: 'owner_id', op: 'eq', value: state.session.user.id }
-      ], { select: state.logoVariantsSupported ? businessAccountSelect : businessAccountLegacySelect }))[0];
+      ], { select: businessAccountSelect }))[0];
     } catch (error) {
-      state.client.deleteStorageObjects(businessLogoBucket, uploadedPaths).catch(() => {});
+      state.client.deleteStorageObjects(businessLogoBucket, [objectPath]).catch(() => {});
       throw error;
     }
 
-    const currentPaths = new Set([
-      state.business.company_logo_path,
-      state.business.company_logo_original_path,
-      state.business.company_logo_processed_path
-    ].filter(Boolean));
-    const obsoletePaths = previousPaths.filter((path) => !currentPaths.has(path));
-
-    if (obsoletePaths.length) {
-      state.client.deleteStorageObjects(businessLogoBucket, obsoletePaths).catch(() => {});
+    if (previousPath && previousPath !== objectPath) {
+      state.client.deleteStorageObjects(businessLogoBucket, [previousPath]).catch(() => {});
     }
 
     fillBusinessForm();
-    if (!state.logoVariantsSupported) {
-      const activeModeInput = businessForm.querySelector(`input[name="company_logo_background_mode"][value="${activeMode}"]`);
-      activeModeInput && (activeModeInput.checked = true);
-    }
-    showMessage(
-      accountMessage,
-      processingError ? `${t('account.logoProcessedFailed')} ${processingError.message}` : t('account.logoSaved'),
-      processingError ? 'info' : 'success'
-    );
+    showMessage(accountMessage, t('account.logoSaved'), 'success');
   } finally {
     if (companyLogoUpload) {
       companyLogoUpload.value = '';
@@ -470,41 +363,6 @@ async function uploadCompanyLogo(file) {
   }
 }
 
-async function changeLogoBackgroundMode() {
-  if (!state.business?.id || !businessLogoUrl(state.business || {})) {
-    return;
-  }
-
-  if (!state.logoVariantsSupported) {
-    showMessage(accountMessage, t('account.logoMigrationRequired'), 'error');
-    return;
-  }
-
-  const mode = logoBackgroundMode();
-  const variant = logoVariantForMode(state.business, mode);
-
-  if (!variant.url) {
-    const previousMode = state.business.company_logo_background_mode === 'original' ? 'original' : 'removed';
-    const previousInput = businessForm.querySelector(`input[name="company_logo_background_mode"][value="${previousMode}"]`);
-    previousInput && (previousInput.checked = true);
-    showMessage(accountMessage, t('account.logoVariantMissing'), 'info');
-    return;
-  }
-
-  state.business = (await state.client.updateRows('businesses', {
-    company_logo_background_mode: mode,
-    logo_url: variant.url,
-    company_logo_path: variant.path,
-    company_logo_updated_at: new Date().toISOString()
-  }, [
-    { column: 'id', op: 'eq', value: state.business.id },
-    { column: 'owner_id', op: 'eq', value: state.session.user.id }
-  ], { select: businessAccountSelect }))[0];
-
-  fillBusinessForm();
-  showMessage(accountMessage, t('account.logoModeSaved'), 'success');
-}
-
 async function removeCompanyLogo() {
   if (!state.business?.id) {
     showMessage(accountMessage, t('account.logoNoBusiness'), 'info');
@@ -512,37 +370,21 @@ async function removeCompanyLogo() {
   }
 
   showMessage(accountMessage, t('account.logoRemoving'));
-  const previousPaths = [...new Set([
-    state.business.company_logo_path,
-    state.business.company_logo_original_path,
-    state.business.company_logo_processed_path
-  ].filter(Boolean))];
+  const previousPath = state.business.company_logo_path;
 
-  const removePayload = {
+  state.business = (await state.client.updateRows('businesses', {
     logo_url: '',
     company_logo_path: null,
     company_logo_updated_at: new Date().toISOString()
-  };
-
-  if (state.logoVariantsSupported) {
-    Object.assign(removePayload, {
-      company_logo_original_url: null,
-      company_logo_original_path: null,
-      company_logo_processed_url: null,
-      company_logo_processed_path: null,
-      company_logo_background_mode: 'removed'
-    });
-  }
-
-  state.business = (await state.client.updateRows('businesses', removePayload, [
+  }, [
     { column: 'id', op: 'eq', value: state.business.id },
     { column: 'owner_id', op: 'eq', value: state.session.user.id }
-  ], { select: state.logoVariantsSupported ? businessAccountSelect : businessAccountLegacySelect }))[0];
+  ], { select: businessAccountSelect }))[0];
 
   fillBusinessForm();
 
-  if (previousPaths.length) {
-    state.client.deleteStorageObjects(businessLogoBucket, previousPaths).catch(() => {});
+  if (previousPath) {
+    state.client.deleteStorageObjects(businessLogoBucket, [previousPath]).catch(() => {});
   }
 
   showMessage(accountMessage, t('account.logoRemoved'), 'success');
@@ -591,10 +433,6 @@ async function initAccount() {
 
   companyLogoUpload?.addEventListener('change', (event) => {
     uploadCompanyLogo(event.target.files?.[0]).catch((error) => showMessage(accountMessage, error.message, 'error'));
-  });
-
-  companyLogoBackgroundMode?.addEventListener('change', () => {
-    changeLogoBackgroundMode().catch((error) => showMessage(accountMessage, error.message, 'error'));
   });
 
   removeCompanyLogoButton?.addEventListener('click', () => {

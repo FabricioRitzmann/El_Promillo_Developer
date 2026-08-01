@@ -31,7 +31,7 @@ const state = {
   editorLogoColorPicking: false
 };
 
-const businessEditorLegacySelect = [
+const businessEditorSelect = [
   'id',
   'owner_id',
   'name',
@@ -46,13 +46,6 @@ const businessEditorLegacySelect = [
   'company_logo_updated_at',
   'created_at',
   'updated_at'
-].join(',');
-
-const businessEditorSelect = [
-  businessEditorLegacySelect,
-  'company_logo_original_url',
-  'company_logo_processed_url',
-  'company_logo_background_mode'
 ].join(',');
 
 const templateEditorSelect = [
@@ -1892,16 +1885,11 @@ async function handleAssetUpload(event, targetFieldName, kind) {
 }
 
 async function loadBusiness() {
-  const options = {
+  state.business = await state.client.selectRows('businesses', {
+    select: businessEditorSelect,
     filters: [{ column: 'owner_id', op: 'eq', value: state.session.user.id }],
     maybeSingle: true
-  };
-
-  try {
-    state.business = await state.client.selectRows('businesses', { ...options, select: businessEditorSelect });
-  } catch (_error) {
-    state.business = await state.client.selectRows('businesses', { ...options, select: businessEditorLegacySelect });
-  }
+  });
 
   renderBusinessHeader(state.business || {});
 }
