@@ -1722,6 +1722,12 @@ async function initDashboard() {
     });
   });
 
+  customerCardList?.addEventListener('submit', (event) => {
+    if (event.target.matches('[data-customer-card-filters]')) {
+      event.preventDefault();
+    }
+  });
+
   customerCardList?.addEventListener('input', (event) => {
     const filterField = event.target.closest('[data-customer-card-filter]');
 
