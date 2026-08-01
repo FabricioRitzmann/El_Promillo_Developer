@@ -40,7 +40,7 @@ inserted_jobs as (
     update_type,
     payload,
     status,
-    scheduled_at
+    next_attempt_at
   )
   select
     ti.owner_id,
