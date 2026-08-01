@@ -29,7 +29,6 @@ target_instances as (
   join target_templates as tt
     on tt.template_id = ci.template_id
   where ci.wallet_platform = 'apple'
-    and coalesce(ci.status, 'active') = 'active'
     and coalesce(ci.push_enabled, true) = true
 ),
 inserted_jobs as (
