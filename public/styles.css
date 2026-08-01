@@ -1564,6 +1564,14 @@ textarea {
   margin-bottom: var(--grid-gap);
 }
 
+.kpi-compact-row {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  align-items: stretch;
+}
+
 .kpi-card {
   display: grid;
   gap: 0.25rem;
@@ -1577,6 +1585,13 @@ textarea {
   min-width: 0;
 }
 
+.kpi-card-compact {
+  flex: 1 1 8.6rem;
+  max-width: 12rem;
+  min-height: 4.35rem;
+  padding: 0.72rem 0.82rem;
+}
+
 .kpi-card span {
   color: var(--muted);
   font-size: 0.82rem;
@@ -1588,9 +1603,18 @@ textarea {
   font-weight: 700;
 }
 
+.kpi-card-compact span {
+  font-size: 0.76rem;
+}
+
+.kpi-card-compact strong {
+  font-size: 1.08rem;
+}
+
 .stats-chart-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-flow: row dense;
   gap: var(--grid-gap);
   margin-bottom: var(--grid-gap);
 }
@@ -2635,6 +2659,10 @@ body:has(.modal-backdrop:not([hidden])) {
   .stats-chart-grid,
   .customer-card-filter-panel {
     grid-template-columns: 1fr;
+  }
+
+  .kpi-card-compact {
+    max-width: none;
   }
 
   .customer-card-summary {

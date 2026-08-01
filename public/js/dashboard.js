@@ -205,10 +205,10 @@ const CHART_DEFINITIONS = [
   ['scans_by_hour', 'Scans nach Uhrzeit'],
   ['scans_by_weekday', 'Scans nach Wochentag'],
   ['scans_over_time', 'Scans im Zeitverlauf'],
-  ['gender_age_matrix', 'Geschlecht + Altersgruppe'],
   ['first_vs_repeat', 'Erstbesuche vs. Wiederholungen'],
   ['template_type_distribution', 'Kartentyp-Verteilung'],
   ['club_feature_distribution', 'Clubkarten-Modul-Nutzung'],
+  ['gender_age_matrix', 'Geschlecht + Altersgruppe'],
   ['weekday_hour_heatmap', 'Besucher-Heatmap']
 ];
 const LAST_SCANS_STATISTIC_KEY = 'last_scans';
@@ -1051,9 +1051,9 @@ async function callStatisticsApi(payload) {
   }
 }
 
-function kpiCard(label, value) {
+function kpiCard(label, value, { compact = false } = {}) {
   return `
-    <div class="kpi-card">
+    <div class="kpi-card${compact ? ' kpi-card-compact' : ''}">
       <span>${escapeHtml(label)}</span>
       <strong>${escapeHtml(value ?? '-')}</strong>
     </div>
@@ -1065,7 +1065,7 @@ function renderStatsKpis(kpis = {}) {
     return;
   }
 
-  statsKpiGrid.innerHTML = [
+  const primaryKpis = [
     ['Gesamt Scans', kpis.total_scans],
     ['Eindeutige Karten', kpis.unique_cards],
     ['Erstbesuche', kpis.first_scans],
@@ -1077,12 +1077,20 @@ function renderStatsKpis(kpis = {}) {
     ['Top-Wochentag', kpis.top_weekday],
     ['Top Kartentyp', kpis.top_template_type],
     ['Top Club-Modul', kpis.top_club_feature],
-    ['Scans/Karte', kpis.average_scans_per_card],
+    ['Scans/Karte', kpis.average_scans_per_card]
+  ];
+  const compactKpis = [
     ['Clubkarten-Scans', kpis.club_scans_total],
     ['Club VIP', kpis.club_vip_scans],
-    ['Club Garderobe', kpis.club_cloakroom_scans],
-    ['Top Club-Kombination', kpis.top_club_combination]
-  ].map(([label, value]) => kpiCard(label, value)).join('');
+    ['Club Garderobe', kpis.club_cloakroom_scans]
+  ];
+
+  statsKpiGrid.innerHTML = [
+    ...primaryKpis.map(([label, value]) => kpiCard(label, value)),
+    `<div class="kpi-compact-row">
+      ${compactKpis.map(([label, value]) => kpiCard(label, value, { compact: true })).join('')}
+    </div>`
+  ].join('');
 }
 
 function normalizeChartItems(items = [], { includeZero = true } = {}) {
