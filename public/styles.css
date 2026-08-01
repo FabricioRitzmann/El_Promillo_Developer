@@ -736,6 +736,7 @@ textarea {
 }
 
 .app-tabbar {
+  --app-tab-padding-x: 0.78rem;
   position: sticky;
   top: calc(env(safe-area-inset-top, 0) + var(--topbar-height));
   z-index: var(--z-sticky-tabbar);
@@ -747,6 +748,7 @@ textarea {
   margin: 0 auto;
   overflow-x: auto;
   padding: 0.5rem var(--chrome-padding-x);
+  padding-left: max(0.5rem, calc(var(--chrome-padding-x) - var(--app-tab-padding-x)));
   border-bottom: 0;
   background: var(--chrome-bg);
   box-shadow: var(--shadow-sticky);
@@ -774,7 +776,7 @@ textarea {
   flex: 0 0 auto;
   min-width: min(var(--nav-tab-min-width), 34vw);
   min-height: 2.4rem;
-  padding: 0.52rem 0.78rem;
+  padding: 0.52rem var(--app-tab-padding-x);
   color: var(--muted);
   font-weight: 500;
   text-decoration: none;
@@ -2634,6 +2636,7 @@ body:has(.modal-backdrop:not([hidden])) {
   }
 
   .app-tabbar {
+    --app-tab-padding-x: 0.62rem;
     gap: 0.28rem;
     padding-top: 0.42rem;
     padding-bottom: 0.42rem;
@@ -2641,7 +2644,7 @@ body:has(.modal-backdrop:not([hidden])) {
 
   .app-tab {
     min-height: 2.2rem;
-    padding: 0.45rem 0.62rem;
+    padding: 0.45rem var(--app-tab-padding-x);
     font-size: 0.92rem;
   }
 
