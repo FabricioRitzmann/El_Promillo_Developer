@@ -23,7 +23,9 @@ const state = {
   },
   statisticsLoaded: false,
   currentStatistics: null,
-  chartViews: {}
+  chartViews: {},
+  hiddenStatisticKeys: new Set(),
+  hiddenStatisticsLoaded: false
 };
 
 const businessDashboardSelect = [
@@ -108,6 +110,7 @@ const statsMessage = byId('statsMessage');
 const statsKpiGrid = byId('statsKpiGrid');
 const statsCharts = byId('statsCharts');
 const lastScansTable = byId('lastScansTable');
+const hiddenStatsDock = byId('hiddenStatsDock');
 const dashboardTabs = Array.from(document.querySelectorAll('[data-dashboard-tab]'));
 const dashboardPagePanels = Array.from(document.querySelectorAll('[data-dashboard-page]'));
 const statsClubFeatureLabels = {
@@ -207,6 +210,11 @@ const CHART_DEFINITIONS = [
   ['club_feature_distribution', 'Clubkarten-Modul-Nutzung'],
   ['club_feature_combinations', 'Clubkarten-Kombinationen'],
   ['weekday_hour_heatmap', 'Besucher-Heatmap']
+];
+const LAST_SCANS_STATISTIC_KEY = 'last_scans';
+const STATISTIC_DEFINITIONS = [
+  ...CHART_DEFINITIONS,
+  [LAST_SCANS_STATISTIC_KEY, 'Letzte Scans']
 ];
 const CHART_EMPTY_TEXT = 'Für den gewählten Zeitraum sind noch keine Scans vorhanden.';
 const AGE_GROUP_ORDER = ['18_plus', '25_plus', '30_plus'];
@@ -1128,6 +1136,79 @@ function writeStoredChartView(chartKey, viewType) {
   }
 }
 
+function statisticVisibilityPreferenceKey() {
+  const userId = state.session?.user?.id || 'anonymous';
+  const businessId = state.business?.id || 'no-business';
+
+  return `visitor_stats_hidden_${userId}_${businessId}`;
+}
+
+function allowedStatisticKeys() {
+  return new Set(STATISTIC_DEFINITIONS.map(([chartKey]) => chartKey));
+}
+
+function statisticTitle(chartKey) {
+  return STATISTIC_DEFINITIONS.find(([key]) => key === chartKey)?.[1] || chartKey;
+}
+
+function readHiddenStatisticKeys() {
+  try {
+    const storedValue = window.localStorage.getItem(statisticVisibilityPreferenceKey());
+    const parsedValue = storedValue ? JSON.parse(storedValue) : [];
+    const allowedKeys = allowedStatisticKeys();
+
+    return new Set(
+      (Array.isArray(parsedValue) ? parsedValue : [])
+        .filter((chartKey) => allowedKeys.has(chartKey))
+    );
+  } catch {
+    return new Set();
+  }
+}
+
+function writeHiddenStatisticKeys() {
+  try {
+    window.localStorage.setItem(
+      statisticVisibilityPreferenceKey(),
+      JSON.stringify(Array.from(state.hiddenStatisticKeys))
+    );
+  } catch {
+    // Die Sichtbarkeit ist eine lokale Komfort-Einstellung.
+  }
+}
+
+function ensureHiddenStatisticState() {
+  if (state.hiddenStatisticsLoaded) {
+    return;
+  }
+
+  state.hiddenStatisticKeys = readHiddenStatisticKeys();
+  state.hiddenStatisticsLoaded = true;
+}
+
+function isStatisticHidden(chartKey) {
+  ensureHiddenStatisticState();
+
+  return state.hiddenStatisticKeys.has(chartKey);
+}
+
+function setStatisticHidden(chartKey, hidden) {
+  ensureHiddenStatisticState();
+
+  if (!allowedStatisticKeys().has(chartKey)) {
+    return;
+  }
+
+  if (hidden) {
+    state.hiddenStatisticKeys.add(chartKey);
+  } else {
+    state.hiddenStatisticKeys.delete(chartKey);
+  }
+
+  writeHiddenStatisticKeys();
+  renderVisitorStatistics(state.currentStatistics || {});
+}
+
 function currentChartView(chartKey) {
   const allowed = allowedChartViews(chartKey);
   const configuredView = state.chartViews[chartKey] || readStoredChartView(chartKey);
@@ -1494,12 +1575,24 @@ function StatisticsChart(chartKey, viewType, items, charts = {}) {
 function chartCard(chartKey, title, items, charts = {}) {
   const currentView = currentChartView(chartKey);
   const isWide = ['scans_over_time', 'gender_age_matrix', 'weekday_hour_heatmap'].includes(chartKey);
+  const hideLabel = t('dashboard.hideStatistic');
 
   return `
     <div class="chart-card ${isWide ? 'chart-card-wide' : ''}" data-chart-key="${escapeHtml(chartKey)}">
       <div class="chart-card-header">
         <h3>${escapeHtml(title)}</h3>
-        ${ChartViewSwitcher(chartKey, currentView)}
+        <div class="chart-card-controls">
+          ${ChartViewSwitcher(chartKey, currentView)}
+          <button
+            class="chart-collapse-button"
+            type="button"
+            data-hide-statistic="${escapeHtml(chartKey)}"
+            aria-label="${escapeHtml(`${hideLabel}: ${title}`)}"
+            title="${escapeHtml(hideLabel)}"
+          >
+            <span aria-hidden="true">v</span>
+          </button>
+        </div>
       </div>
       ${StatisticsChart(chartKey, currentView, items, charts)}
       ${currentView === 'table' ? `<button class="text-button chart-copy-button" type="button" data-copy-chart-values="${escapeHtml(chartKey)}">Werte kopieren</button>` : ''}
@@ -1513,8 +1606,50 @@ function renderStatsCharts(charts = {}) {
   }
 
   statsCharts.innerHTML = CHART_DEFINITIONS
+    .filter(([chartKey]) => !isStatisticHidden(chartKey))
     .map(([chartKey, title]) => chartCard(chartKey, title, charts[chartKey], charts))
     .join('');
+}
+
+function renderHiddenStatisticsDock() {
+  if (!hiddenStatsDock) {
+    return;
+  }
+
+  ensureHiddenStatisticState();
+
+  const hiddenStatistics = STATISTIC_DEFINITIONS
+    .filter(([chartKey]) => state.hiddenStatisticKeys.has(chartKey));
+
+  if (!hiddenStatistics.length) {
+    hiddenStatsDock.innerHTML = '';
+    return;
+  }
+
+  hiddenStatsDock.innerHTML = `
+    <section class="hidden-stats-dock" aria-label="${escapeHtml(t('dashboard.hiddenStatistics'))}">
+      <div class="hidden-stats-header">
+        <strong>${escapeHtml(t('dashboard.hiddenStatistics'))}</strong>
+        <span>${escapeHtml(`${hiddenStatistics.length} ${t('dashboard.of')} ${STATISTIC_DEFINITIONS.length}`)}</span>
+      </div>
+      <div class="hidden-stat-list">
+        ${hiddenStatistics.map(([chartKey, title]) => `
+          <button
+            class="hidden-stat-chip"
+            type="button"
+            data-show-statistic="${escapeHtml(chartKey)}"
+            aria-label="${escapeHtml(`${t('dashboard.showStatistic')}: ${title}`)}"
+          >
+            <span>
+              <strong>${escapeHtml(title)}</strong>
+              <small>${escapeHtml(t('dashboard.restoreStatisticHint'))}</small>
+            </span>
+            <span class="hidden-stat-chip-icon" aria-hidden="true">+</span>
+          </button>
+        `).join('')}
+      </div>
+    </section>
+  `;
 }
 
 function clubBadges(features = {}) {
@@ -1568,14 +1703,33 @@ function renderLastScans(rows = []) {
     return;
   }
 
-  const chartKey = 'last_scans';
+  const chartKey = LAST_SCANS_STATISTIC_KEY;
+
+  if (isStatisticHidden(chartKey)) {
+    lastScansTable.innerHTML = '';
+    return;
+  }
+
   const currentView = currentChartView(chartKey);
+  const title = statisticTitle(chartKey);
+  const hideLabel = t('dashboard.hideStatistic');
 
   lastScansTable.innerHTML = `
     <div class="chart-card chart-card-wide" data-chart-key="${escapeHtml(chartKey)}">
       <div class="chart-card-header">
-        <h3>Letzte Scans</h3>
-        ${ChartViewSwitcher(chartKey, currentView)}
+        <h3>${escapeHtml(title)}</h3>
+        <div class="chart-card-controls">
+          ${ChartViewSwitcher(chartKey, currentView)}
+          <button
+            class="chart-collapse-button"
+            type="button"
+            data-hide-statistic="${escapeHtml(chartKey)}"
+            aria-label="${escapeHtml(`${hideLabel}: ${title}`)}"
+            title="${escapeHtml(hideLabel)}"
+          >
+            <span aria-hidden="true">v</span>
+          </button>
+        </div>
       </div>
       <div class="stats-table-wrap">${renderLastScansTable(rows)}</div>
       <button class="text-button chart-copy-button" type="button" data-copy-chart-values="${escapeHtml(chartKey)}">Werte kopieren</button>
@@ -1588,6 +1742,7 @@ function renderVisitorStatistics(statistics = {}) {
   renderStatsKpis(statistics.kpis || {});
   renderStatsCharts(statistics.charts || {});
   renderLastScans(statistics.last_scans || []);
+  renderHiddenStatisticsDock();
 }
 
 function handleStatsChartViewChange(event) {
@@ -1621,6 +1776,21 @@ function handleStatsChartCopyClick(event) {
 
   copyChartValues(button.dataset.copyChartValues)
     .catch((error) => showMessage(statsMessage, error.message || 'Werte konnten nicht kopiert werden.', 'error'));
+}
+
+function handleStatisticVisibilityClick(event) {
+  const hideButton = event.target.closest('[data-hide-statistic]');
+
+  if (hideButton) {
+    setStatisticHidden(hideButton.dataset.hideStatistic, true);
+    return;
+  }
+
+  const showButton = event.target.closest('[data-show-statistic]');
+
+  if (showButton) {
+    setStatisticHidden(showButton.dataset.showStatistic, false);
+  }
 }
 
 async function loadVisitorStatistics() {
@@ -1670,6 +1840,9 @@ async function initDashboard() {
   lastScansTable?.addEventListener('change', handleStatsChartViewChange);
   statsCharts?.addEventListener('click', handleStatsChartCopyClick);
   lastScansTable?.addEventListener('click', handleStatsChartCopyClick);
+  statsCharts?.addEventListener('click', handleStatisticVisibilityClick);
+  lastScansTable?.addEventListener('click', handleStatisticVisibilityClick);
+  hiddenStatsDock?.addEventListener('click', handleStatisticVisibilityClick);
 
   templateList?.addEventListener('change', (event) => {
     const actionSelect = event.target.closest('[data-template-action]');
