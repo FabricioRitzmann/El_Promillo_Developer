@@ -760,6 +760,7 @@ function passVersionHasTemplateAssets(template: Row, passVersion: Row | null) {
 function buildPassJson(template: Row, cardInstance: Row, fields: Row = {}) {
   const config = appleConfig();
   const templateType = normalizeTemplateType(template);
+  const businessName = businessNameForTemplate(template);
   const serialNumber = stringValue(cardInstance.apple_serial_number || cardInstance.wallet_serial_number || cardInstance.id);
   const authenticationToken = stringValue(cardInstance.customer_cards?.pass_authentication_token || cardInstance.authentication_token);
   const cardCode = cardCodeFor(cardInstance);
@@ -802,7 +803,7 @@ function buildPassJson(template: Row, cardInstance: Row, fields: Row = {}) {
     primaryFields: [
       {
         key: 'cardName',
-        label: businessNameForTemplate(template),
+        label: 'Karte',
         value: stringValue(template.card_name || 'Kundenkarte')
       }
     ],
@@ -866,7 +867,8 @@ function buildPassJson(template: Row, cardInstance: Row, fields: Row = {}) {
     passTypeIdentifier: config.passTypeIdentifier,
     serialNumber,
     teamIdentifier: config.teamId,
-    organizationName: businessNameForTemplate(template, 'Wallet Cards'),
+    organizationName: businessName || 'Wallet Cards',
+    logoText: businessName,
     description: stringValue(template.description || template.card_name || 'Digitale Walletkarte'),
     backgroundColor: stringValue(template.primary_color || '#fffaf2'),
     foregroundColor: stringValue(template.text_color || '#5b3423'),
@@ -882,7 +884,6 @@ function buildPassJson(template: Row, cardInstance: Row, fields: Row = {}) {
   };
 
   if (templateType === 'event_card') {
-    passJson.logoText = businessNameForTemplate(template);
     passJson.eventTicket = generic;
   } else {
     passJson.generic = generic;
