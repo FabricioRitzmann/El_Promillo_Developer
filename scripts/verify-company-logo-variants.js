@@ -25,13 +25,12 @@ const pickerJs = read('public/js/logoColorPicker.js');
 const schema = read('supabase/schema.sql');
 const migration = read('supabase/company-logo-variants.sql');
 
-includesAll(accountHtml, ['value="removed"', 'value="original"', 'companyLogoColorPickerButton', 'companyLogoCardColor', 'companyLogoCardPreview'], 'Kontooberfläche');
+includesAll(accountHtml, ['value="removed"', 'value="original"', 'companyLogoCardColor', 'companyLogoCardPreview'], 'Kontooberfläche');
 includesAll(accountJs, [
   'logoFileToAppleSafePng(file, false)', 'logoFileToAppleSafePng(file, true)',
   'company_logo_original_url', 'company_logo_original_path',
   'company_logo_processed_url', 'company_logo_processed_path',
   'company_logo_background_mode', 'logoVariantForMode',
-  'sampleImageColorFromPointer', 'logoPickerTransparent',
   'deleteStorageObjects(businessLogoBucket, obsoletePaths)'
 ], 'Logo-Variantenlogik');
 includesAll(editorHtml, ['editorLogoColorPickerButton', 'editorLogoColorPickerPanel', 'editorLogoColorPickerImage'], 'Editor-Pipettenoberfläche');

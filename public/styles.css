@@ -527,7 +527,6 @@ textarea {
   background: transparent;
 }
 
-.account-logo-preview.is-color-picking,
 .editor-logo-color-picker.is-color-picking img {
   cursor: crosshair;
   touch-action: none;

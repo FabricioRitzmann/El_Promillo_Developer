@@ -11,15 +11,14 @@ import {
   showMessage
 } from './ui.js';
 import { imageFileToPngUnderLimit } from './imageUploadOptimizer.js';
-import { normalizeHexColor, sampleImageColorFromPointer } from './logoColorPicker.js';
+import { normalizeHexColor } from './logoColorPicker.js';
 
 const state = {
   client: null,
   session: null,
   profile: null,
   business: null,
-  logoVariantsSupported: true,
-  logoColorPicking: false
+  logoVariantsSupported: true
 };
 
 const businessAccountLegacySelect = [
@@ -59,10 +58,8 @@ const companyLogoUpload = byId('companyLogoUpload');
 const uploadCompanyLogoButton = byId('uploadCompanyLogoButton');
 const removeCompanyLogoButton = byId('removeCompanyLogoButton');
 const companyLogoBackgroundMode = byId('companyLogoBackgroundMode');
-const companyLogoColorPickerButton = byId('companyLogoColorPickerButton');
 const companyLogoCardColor = byId('companyLogoCardColor');
 const companyLogoCardPreview = byId('companyLogoCardPreview');
-const companyLogoPickerHint = byId('companyLogoPickerHint');
 const businessLogoBucket = 'business-logos';
 const maxLogoFileBytes = 2 * 1024 * 1024;
 const maxLogoSourceFileBytes = 25 * 1024 * 1024;
@@ -371,7 +368,6 @@ function renderCompanyLogoCardPreview() {
 function setLogoProcessingState(processing) {
   uploadCompanyLogoButton && (uploadCompanyLogoButton.disabled = processing);
   removeCompanyLogoButton && (removeCompanyLogoButton.disabled = processing);
-  companyLogoColorPickerButton && (companyLogoColorPickerButton.disabled = processing);
   companyLogoBackgroundMode?.querySelectorAll('input').forEach((input) => {
     input.disabled = processing;
   });
@@ -546,53 +542,6 @@ async function persistLogoCardColor() {
   ], { select: businessAccountSelect }))[0];
 }
 
-function toggleLogoColorPicker() {
-  state.logoColorPicking = !state.logoColorPicking;
-  companyLogoPreview?.classList.toggle('is-color-picking', state.logoColorPicking);
-  companyLogoColorPickerButton?.setAttribute('aria-pressed', state.logoColorPicking ? 'true' : 'false');
-
-  if (companyLogoPickerHint) {
-    companyLogoPickerHint.textContent = state.logoColorPicking
-      ? t('account.logoPickerActive')
-      : t('account.logoPickerHint');
-  }
-}
-
-async function pickLogoColor(event) {
-  if (!state.logoColorPicking) {
-    return;
-  }
-
-  const image = companyLogoPreview?.querySelector('img');
-
-  if (!image?.complete || !image.naturalWidth) {
-    showMessage(accountMessage, t('account.logoPickerUnavailable'), 'error');
-    return;
-  }
-
-  const result = sampleImageColorFromPointer(image, event, {
-    errorMessage: t('account.logoPickerUnavailable'),
-    corsMessage: t('account.logoPickerCors')
-  });
-
-  if (result.outsideImage) {
-    showMessage(accountMessage, t('account.logoPickerOutside'), 'info');
-    return;
-  }
-
-  if (!result.color) {
-    showMessage(accountMessage, t('account.logoPickerTransparent'), 'info');
-    return;
-  }
-
-  companyLogoCardColor.value = result.color.hex;
-  state.logoColorPicking = false;
-  companyLogoPreview.classList.remove('is-color-picking');
-  companyLogoColorPickerButton?.setAttribute('aria-pressed', 'false');
-  await persistLogoCardColor();
-  showMessage(accountMessage, `${t('account.logoColorSaved')} ${result.color.hex}`, 'success');
-}
-
 async function removeCompanyLogo() {
   if (!state.business?.id) {
     showMessage(accountMessage, t('account.logoNoBusiness'), 'info');
@@ -685,10 +634,6 @@ async function initAccount() {
     changeLogoBackgroundMode().catch((error) => showMessage(accountMessage, error.message, 'error'));
   });
 
-  companyLogoColorPickerButton?.addEventListener('click', toggleLogoColorPicker);
-  companyLogoPreview?.addEventListener('pointerdown', (event) => {
-    pickLogoColor(event).catch((error) => showMessage(accountMessage, error.message, 'error'));
-  });
   companyLogoCardColor?.addEventListener('input', renderCompanyLogoCardPreview);
   companyLogoCardColor?.addEventListener('change', () => {
     persistLogoCardColor().catch((error) => showMessage(accountMessage, error.message, 'error'));
