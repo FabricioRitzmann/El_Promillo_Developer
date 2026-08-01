@@ -107,7 +107,6 @@ const walletNotificationTargetFilters = byId('walletNotificationTargetFilters');
 const walletNotificationTemplateLabel = byId('walletNotificationTemplateLabel');
 const walletNotificationSendType = byId('walletNotificationSendType');
 const walletNotificationScheduledAtField = byId('walletNotificationScheduledAtField');
-const walletNotificationLocationFields = byId('walletNotificationLocationFields');
 const walletNotificationRuleSummary = byId('walletNotificationRuleSummary');
 const walletNotificationLimitWarnings = byId('walletNotificationLimitWarnings');
 const appleNotificationPreviewTitle = byId('appleNotificationPreviewTitle');
@@ -165,6 +164,7 @@ const lockedEditorTemplateTypes = new Set(['event_card']);
 const lockedEditorFeatures = new Set(['balance']);
 const defaultWalletBackgroundColor = '#fffaf2';
 const defaultWalletTextColor = '#5b3423';
+const defaultLocationRadiusM = 150;
 const walletNotificationCampaignHistorySelect = [
   'id',
   'business_id',
@@ -450,10 +450,6 @@ function loadTemplateIntoForm(template) {
   setTemplateField('payment_note', settings.paymentNote || '');
   setTemplateField('cloakroom_noon_message', settings.cloakroomNoonMessage || '');
   setTemplateField('cloakroom_location_message', settings.cloakroomLocationMessage || '');
-  setTemplateField('cloakroom_location_name', settings.cloakroomLocationName || '');
-  setTemplateField('cloakroom_location_latitude', settings.cloakroomLocationLatitude ?? '');
-  setTemplateField('cloakroom_location_longitude', settings.cloakroomLocationLongitude ?? '');
-  setTemplateField('cloakroom_location_radius_meters', settings.cloakroomLocationRadiusMeters ?? '');
   setTemplateField('event_name', settings.eventName || '');
   setTemplateField('event_date', settings.eventDate || '');
   setTemplateField('event_start_time', settings.eventStartTime || '');
@@ -474,7 +470,8 @@ function templateSettingsFromForm(formData, templateType) {
   const streakGoal = Number(formData.get('streak_goal') || 0);
   const minTopupCents = amountToCents(formData.get('min_balance_amount'));
   const maxTopupCents = amountToCents(formData.get('max_balance_amount'));
-  const locationRadiusMeters = Math.max(0, Math.round(Number(formData.get('cloakroom_location_radius_meters') || 0))) || null;
+  const businessLatitude = businessLocationValue('location_lat');
+  const businessLongitude = businessLocationValue('location_lng');
   const enabledFeatures = Object.entries(getTemplateFeatures(templateType))
     .filter(([, value]) => value === OPTIONAL_FEATURE)
     .map(([featureName]) => featureName)
@@ -508,10 +505,10 @@ function templateSettingsFromForm(formData, templateType) {
     paymentNote: String(formData.get('payment_note') || '').trim(),
     cloakroomNoonMessage: String(formData.get('cloakroom_noon_message') || '').trim(),
     cloakroomLocationMessage: String(formData.get('cloakroom_location_message') || '').trim(),
-    cloakroomLocationName: String(formData.get('cloakroom_location_name') || '').trim(),
-    cloakroomLocationLatitude: numberOrNull(formData.get('cloakroom_location_latitude')),
-    cloakroomLocationLongitude: numberOrNull(formData.get('cloakroom_location_longitude')),
-    cloakroomLocationRadiusMeters: locationRadiusMeters,
+    cloakroomLocationName: String(state.business?.address || state.business?.name || '').trim(),
+    cloakroomLocationLatitude: Number.isFinite(businessLatitude) ? businessLatitude : null,
+    cloakroomLocationLongitude: Number.isFinite(businessLongitude) ? businessLongitude : null,
+    cloakroomLocationRadiusMeters: defaultLocationRadiusM,
     eventName: String(formData.get('event_name') || '').trim(),
     eventDate: String(formData.get('event_date') || '').trim(),
     eventStartTime: String(formData.get('event_start_time') || '').trim(),
@@ -723,34 +720,16 @@ function businessLocationValue(name) {
   return value == null || value === '' ? null : Number(value);
 }
 
-function formatLocationNumber(value) {
-  const numberValue = Number(value);
-
-  if (!Number.isFinite(numberValue)) {
-    return '';
-  }
-
-  return String(Math.round(numberValue * 1000000) / 1000000);
-}
-
-function applyBusinessLocationDefaults({ overwrite = false } = {}) {
-  const latField = notificationField('location_lat');
-  const lngField = notificationField('location_lng');
-  const radiusField = notificationField('location_radius_m');
+function businessLocationPayload(sendType) {
   const businessLat = businessLocationValue('location_lat');
   const businessLng = businessLocationValue('location_lng');
+  const isLocationBased = sendType === 'location_based';
 
-  if (latField && Number.isFinite(businessLat) && (overwrite || !String(latField.value || '').trim())) {
-    latField.value = formatLocationNumber(businessLat);
-  }
-
-  if (lngField && Number.isFinite(businessLng) && (overwrite || !String(lngField.value || '').trim())) {
-    lngField.value = formatLocationNumber(businessLng);
-  }
-
-  if (radiusField && !String(radiusField.value || '').trim()) {
-    radiusField.value = '150';
-  }
+  return {
+    locationLat: isLocationBased && Number.isFinite(businessLat) ? businessLat : null,
+    locationLng: isLocationBased && Number.isFinite(businessLng) ? businessLng : null,
+    locationRadiusM: isLocationBased ? defaultLocationRadiusM : null
+  };
 }
 
 function setWalletNotificationFormDisabled(disabled) {
@@ -810,10 +789,6 @@ function applyWalletNotificationDefaults() {
   if (messageField) {
     messageField.placeholder = defaultMessage || 'Text für Apple Wallet und Google Wallet';
     setAutofilledWalletNotificationMessage(messageField, defaultMessage);
-  }
-
-  if (sendTypeField?.value === 'location_based') {
-    applyBusinessLocationDefaults();
   }
 
   updateWalletNotificationRuleSummary();
@@ -1065,8 +1040,8 @@ function resetWalletNotificationIdempotency() {
 function notificationFormPayload() {
   const formData = new FormData(walletNotificationForm);
   const sendType = String(formData.get('send_type') || 'now');
-  const locationRadius = Math.round(Number(formData.get('location_radius_m') || 0));
   const targetType = String(formData.get('target_type') || 'template');
+  const location = businessLocationPayload(sendType);
 
   const payload = {
     templateId: selectedNotificationTemplateId(),
@@ -1076,9 +1051,7 @@ function notificationFormPayload() {
     message: walletNotificationMessageFromForm(formData),
     sendType,
     scheduledAt: formData.get('scheduled_at') ? new Date(String(formData.get('scheduled_at'))).toISOString() : null,
-    locationLat: formData.get('location_lat') ? Number(formData.get('location_lat')) : null,
-    locationLng: formData.get('location_lng') ? Number(formData.get('location_lng')) : null,
-    locationRadiusM: Number.isFinite(locationRadius) && locationRadius > 0 ? locationRadius : null
+    ...location
   };
 
   payload.idempotencyKey = idempotencyKeyForWalletNotification(payload);
@@ -1088,7 +1061,6 @@ function notificationFormPayload() {
 
 function notificationPreflightPayload(formData, targetType, targetFilter) {
   const sendType = String(formData.get('send_type') || 'now');
-  const locationRadius = Math.round(Number(formData.get('location_radius_m') || 0));
 
   return {
     templateId: selectedNotificationTemplateId(),
@@ -1096,9 +1068,7 @@ function notificationPreflightPayload(formData, targetType, targetFilter) {
     targetFilter,
     sendType,
     scheduledAt: formData.get('scheduled_at') ? new Date(String(formData.get('scheduled_at'))).toISOString() : null,
-    locationLat: formData.get('location_lat') ? Number(formData.get('location_lat')) : null,
-    locationLng: formData.get('location_lng') ? Number(formData.get('location_lng')) : null,
-    locationRadiusM: Number.isFinite(locationRadius) && locationRadius > 0 ? locationRadius : null
+    ...businessLocationPayload(sendType)
   };
 }
 
@@ -1176,10 +1146,6 @@ function updateWalletNotificationPreview() {
 
   updateWalletNotificationTargetFilters();
 
-  if (sendType === 'location_based') {
-    applyBusinessLocationDefaults();
-  }
-
   if (appleNotificationPreviewTitle) {
     appleNotificationPreviewTitle.textContent = title;
   }
@@ -1200,9 +1166,6 @@ function updateWalletNotificationPreview() {
     walletNotificationScheduledAtField.hidden = sendType !== 'scheduled';
   }
 
-  if (walletNotificationLocationFields) {
-    walletNotificationLocationFields.hidden = sendType !== 'location_based';
-  }
 }
 
 function cardTimestampInFilter(card, filter) {
@@ -1680,10 +1643,6 @@ async function submitWalletNotification(event) {
     return;
   }
 
-  if (notificationField('send_type')?.value === 'location_based') {
-    applyBusinessLocationDefaults();
-  }
-
   const payload = notificationFormPayload();
 
   if (payload.targetType === 'template' && !payload.templateId) {
@@ -1694,6 +1653,11 @@ async function submitWalletNotification(event) {
   if (!payload.message) {
     showMessage(walletNotificationMessage, 'Gib zuerst die Nachricht ein, die der Kunde in der Wallet sehen soll.', 'error');
     notificationField('message')?.focus();
+    return;
+  }
+
+  if (payload.sendType === 'location_based' && (!Number.isFinite(payload.locationLat) || !Number.isFinite(payload.locationLng))) {
+    showMessage(walletNotificationMessage, 'Hinterlege zuerst gültige Standortkoordinaten in den Firmendaten.', 'error');
     return;
   }
 

@@ -186,20 +186,7 @@
               <label data-feature-setting="cloakroom">Nachricht beim nächsten Besuch in Standortnähe
                 <textarea name="cloakroom_location_message" rows="3" placeholder="z. B. Willkommen zurück. Deine Garderobe kann hier gescannt werden."></textarea>
               </label>
-              <label data-feature-setting="cloakroom">Standortname
-                <input name="cloakroom_location_name" placeholder="z. B. Hauptfiliale">
-              </label>
-              <div class="split-row" data-feature-setting="cloakroom">
-                <label>Latitude
-                  <input name="cloakroom_location_latitude" type="number" step="0.000001" min="-90" max="90" placeholder="47.376887">
-                </label>
-                <label>Longitude
-                  <input name="cloakroom_location_longitude" type="number" step="0.000001" min="-180" max="180" placeholder="8.541694">
-                </label>
-              </div>
-              <label data-feature-setting="cloakroom">Radius in Metern
-                <input name="cloakroom_location_radius_meters" type="number" min="50" step="10" placeholder="150">
-              </label>
+              <p class="muted" data-feature-setting="cloakroom">Standort und Koordinaten werden automatisch aus den Firmendaten übernommen.</p>
             </div>
 
             <div class="feature-fields" data-feature-group="checkin" hidden>
@@ -379,18 +366,7 @@
                 <input name="scheduled_at" type="datetime-local">
               </label>
             </div>
-            <div id="walletNotificationLocationFields" class="split-row" hidden>
-              <label>Latitude
-                <input name="location_lat" type="number" step="0.000001" min="-90" max="90">
-              </label>
-              <label>Longitude
-                <input name="location_lng" type="number" step="0.000001" min="-180" max="180">
-              </label>
-              <label>Radius Meter
-                <input name="location_radius_m" type="number" min="50" max="100000" step="10" value="150">
-              </label>
-              <p class="muted full-span">Latitude und Longitude werden automatisch aus dem Konto übernommen, solange diese Felder leer sind.</p>
-            </div>
+            <p class="muted">Bei standortbasiertem Versand werden Standort und Koordinaten automatisch aus den Firmendaten übernommen.</p>
             <div id="walletNotificationRuleSummary" class="message warning visible-message">
               Google Wallet erlaubt maximal 3 notification-triggering Messages pro Pass innerhalb von 24 Stunden. Apple zeigt Pushs nur als Pass-Update an, wenn das iPhone den Pass registriert hat.
             </div>

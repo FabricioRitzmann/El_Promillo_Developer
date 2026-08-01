@@ -179,11 +179,12 @@ assert(
 assert(
   editorHtml.includes('name="cloakroom_noon_message"')
     && editorHtml.includes('name="cloakroom_location_message"')
-    && editorHtml.includes('name="cloakroom_location_latitude"')
-    && editorHtml.includes('name="cloakroom_location_longitude"')
+    && !editorHtml.includes('name="cloakroom_location_latitude"')
+    && !editorHtml.includes('name="cloakroom_location_longitude"')
+    && editorHtml.includes('name="event_location"')
     && editorJs.includes('cloakroomNoonMessage')
-    && editorJs.includes('cloakroomLocationLatitude'),
-  'Editor muss Garderoben-Erinnerungen für Mittag und Standort speichern.'
+    && editorJs.includes('cloakroomLocationLatitude: Number.isFinite(businessLatitude)'),
+  'Editor muss Standardstandorte aus den Firmendaten übernehmen und nur Eventstandorte editierbar lassen.'
 );
 assert(
   !editorHtml.includes('cloakroom_dropoff_text')

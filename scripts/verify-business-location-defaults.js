@@ -17,6 +17,7 @@ function includes(source, needle, label) {
 const accountHtml = read('public/account.html');
 const accountJs = read('public/js/account.js');
 const i18nJs = read('public/js/i18n.js');
+const editorHtml = read('public/editor.html');
 const editorJs = read('public/js/editor.js');
 const schemaSql = read('supabase/schema.sql');
 
@@ -46,12 +47,26 @@ const schemaSql = read('supabase/schema.sql');
 [
   "'location_lat'",
   "'location_lng'",
-  'function applyBusinessLocationDefaults',
+  'function businessLocationPayload',
   "businessLocationValue('location_lat')",
   "businessLocationValue('location_lng')",
+  'cloakroomLocationName: String(state.business?.address',
+  'cloakroomLocationLatitude: Number.isFinite(businessLatitude)',
   "sendType === 'location_based'",
-  "notificationField('send_type')?.value === 'location_based'"
+  "payload.sendType === 'location_based'"
 ].forEach((needle) => includes(editorJs, needle, 'Editor muss Konto-Koordinaten für standortbasierte Pushs uebernehmen'));
+
+[
+  'name="cloakroom_location_name"',
+  'name="cloakroom_location_latitude"',
+  'name="cloakroom_location_longitude"',
+  'name="cloakroom_location_radius_meters"',
+  'name="location_lat"',
+  'name="location_lng"',
+  'name="location_radius_m"'
+].forEach((needle) => assert(!editorHtml.includes(needle), `Editor darf keinen manuellen Standardstandort anbieten: ${needle}`));
+
+includes(editorHtml, 'name="event_location"', 'Nur die Eventkarte muss einen eigenen Standort anbieten');
 
 [
   'location_lat numeric',
