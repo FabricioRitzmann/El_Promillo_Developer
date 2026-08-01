@@ -24,6 +24,7 @@ const state = {
   statisticsLoaded: false,
   currentStatistics: null,
   chartViews: {},
+  lastScansExpanded: false,
   hiddenStatisticKeys: new Set(),
   hiddenStatisticsLoaded: false
 };
@@ -208,7 +209,6 @@ const CHART_DEFINITIONS = [
   ['first_vs_repeat', 'Erstbesuche vs. Wiederholungen'],
   ['template_type_distribution', 'Kartentyp-Verteilung'],
   ['club_feature_distribution', 'Clubkarten-Modul-Nutzung'],
-  ['club_feature_combinations', 'Clubkarten-Kombinationen'],
   ['weekday_hour_heatmap', 'Besucher-Heatmap']
 ];
 const LAST_SCANS_STATISTIC_KEY = 'last_scans';
@@ -1199,6 +1199,10 @@ function setStatisticHidden(chartKey, hidden) {
     return;
   }
 
+  if (chartKey === LAST_SCANS_STATISTIC_KEY) {
+    state.lastScansExpanded = false;
+  }
+
   if (hidden) {
     state.hiddenStatisticKeys.add(chartKey);
   } else {
@@ -1574,7 +1578,7 @@ function StatisticsChart(chartKey, viewType, items, charts = {}) {
 
 function chartCard(chartKey, title, items, charts = {}) {
   const currentView = currentChartView(chartKey);
-  const isWide = ['scans_over_time', 'gender_age_matrix', 'weekday_hour_heatmap'].includes(chartKey);
+  const isWide = ['gender_age_matrix', 'weekday_hour_heatmap'].includes(chartKey);
   const hideLabel = t('dashboard.hideStatistic');
 
   return `
@@ -1710,16 +1714,29 @@ function renderLastScans(rows = []) {
     return;
   }
 
-  const currentView = currentChartView(chartKey);
   const title = statisticTitle(chartKey);
   const hideLabel = t('dashboard.hideStatistic');
+  const isExpanded = state.lastScansExpanded;
+  const toggleLabel = isExpanded ? t('dashboard.closeLastScans') : t('dashboard.openLastScans');
 
   lastScansTable.innerHTML = `
-    <div class="chart-card chart-card-wide" data-chart-key="${escapeHtml(chartKey)}">
-      <div class="chart-card-header">
-        <h3>${escapeHtml(title)}</h3>
+    <div class="chart-card chart-card-wide last-scans-card${isExpanded ? '' : ' is-collapsed'}" data-chart-key="${escapeHtml(chartKey)}">
+      <div class="chart-card-header last-scans-header">
+        <div class="last-scans-title-block">
+          <h3>${escapeHtml(title)}</h3>
+          <span>${escapeHtml(`${rows.length} ${t('dashboard.scanEntries')}`)}</span>
+        </div>
         <div class="chart-card-controls">
-          ${ChartViewSwitcher(chartKey, currentView)}
+          <button
+            class="last-scans-toggle"
+            type="button"
+            data-toggle-last-scans
+            aria-expanded="${isExpanded ? 'true' : 'false'}"
+            aria-label="${escapeHtml(toggleLabel)}"
+            title="${escapeHtml(toggleLabel)}"
+          >
+            <span aria-hidden="true">v</span>
+          </button>
           <button
             class="chart-collapse-button"
             type="button"
@@ -1731,8 +1748,10 @@ function renderLastScans(rows = []) {
           </button>
         </div>
       </div>
-      <div class="stats-table-wrap">${renderLastScansTable(rows)}</div>
-      <button class="text-button chart-copy-button" type="button" data-copy-chart-values="${escapeHtml(chartKey)}">Werte kopieren</button>
+      <div class="last-scans-panel"${isExpanded ? '' : ' hidden'}>
+        <div class="stats-table-wrap">${renderLastScansTable(rows)}</div>
+        <button class="text-button chart-copy-button" type="button" data-copy-chart-values="${escapeHtml(chartKey)}">Werte kopieren</button>
+      </div>
     </div>
   `;
 }
@@ -1793,6 +1812,17 @@ function handleStatisticVisibilityClick(event) {
   }
 }
 
+function handleLastScansToggleClick(event) {
+  const toggleButton = event.target.closest('[data-toggle-last-scans]');
+
+  if (!toggleButton) {
+    return;
+  }
+
+  state.lastScansExpanded = !state.lastScansExpanded;
+  renderVisitorStatistics(state.currentStatistics || {});
+}
+
 async function loadVisitorStatistics() {
   if (!statsFilterForm) {
     return;
@@ -1842,6 +1872,7 @@ async function initDashboard() {
   lastScansTable?.addEventListener('click', handleStatsChartCopyClick);
   statsCharts?.addEventListener('click', handleStatisticVisibilityClick);
   lastScansTable?.addEventListener('click', handleStatisticVisibilityClick);
+  lastScansTable?.addEventListener('click', handleLastScansToggleClick);
   hiddenStatsDock?.addEventListener('click', handleStatisticVisibilityClick);
 
   templateList?.addEventListener('change', (event) => {

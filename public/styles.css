@@ -1650,6 +1650,71 @@ textarea {
   box-shadow: var(--focus-ring);
 }
 
+.last-scans-card {
+  gap: 0;
+}
+
+.last-scans-header {
+  align-items: center;
+}
+
+.last-scans-title-block {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.last-scans-title-block span {
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 650;
+}
+
+.last-scans-toggle {
+  width: 2.35rem;
+  height: 2.35rem;
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border: 1px solid var(--border-gold);
+  border-radius: 999px;
+  background: rgba(255, 250, 242, 0.72);
+  color: var(--primary);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 800;
+  transition: transform 0.18s ease, background 0.18s ease, border-color 0.18s ease;
+}
+
+.last-scans-toggle:hover,
+.last-scans-toggle:focus-visible {
+  border-color: rgba(139, 79, 47, 0.34);
+  background: rgba(214, 184, 137, 0.28);
+  transform: translateY(-1px);
+}
+
+.last-scans-toggle:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.last-scans-toggle span {
+  display: block;
+  transition: transform 0.18s ease;
+}
+
+.last-scans-toggle[aria-expanded="true"] span {
+  transform: rotate(180deg);
+}
+
+.last-scans-panel {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 0.9rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--border-soft);
+}
+
 .hidden-stats-dock {
   display: grid;
   gap: 0.85rem;
@@ -1843,7 +1908,7 @@ textarea {
 
 .line-chart {
   width: 100%;
-  min-height: 12rem;
+  min-height: 9.5rem;
   border: 1px solid var(--border-gold);
   border-radius: var(--radius);
   background: rgba(255, 250, 242, 0.58);
