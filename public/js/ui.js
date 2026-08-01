@@ -313,7 +313,7 @@ export function walletPreviewHtml(template, card = null) {
     : '';
 
   return `
-    <div class="wallet-preview ${isEventCard ? 'wallet-preview-event' : ''}" style="--card-bg: ${escapeHtml(template.primary_color || '#fffdf9')}; --card-fg: ${escapeHtml(template.text_color || '#8b4f2f')}; --card-emblem: url('${escapeCssUrl(cardEmblemUrl)}');${eventBackgroundStyle}">
+    <div class="wallet-preview ${isEventCard ? 'wallet-preview-event' : ''}" style="--card-bg: ${escapeHtml(template.primary_color || '#fffaf2')}; --card-fg: ${escapeHtml(template.text_color || '#5b3423')}; --card-emblem: url('${escapeCssUrl(cardEmblemUrl)}');${eventBackgroundStyle}">
       <div class="wallet-top">
         <div class="wallet-brand-lockup ${isEventCard ? 'wallet-brand-lockup-event' : ''}">
           ${businessLogoMarkup(business, 'wallet-logo-placeholder')}

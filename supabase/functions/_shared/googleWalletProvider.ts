@@ -920,7 +920,7 @@ function buildClassPayload(template: Row, objectType: string, classId: string) {
       accountNameLabel: 'Kunde',
       accountIdLabel: 'Karten-ID',
       rewardsTierLabel: 'Status',
-      hexBackgroundColor: stringValue(template.primary_color || '#fffdf9')
+      hexBackgroundColor: stringValue(template.primary_color || '#fffaf2')
     };
   }
 
@@ -961,7 +961,7 @@ function buildClassPayload(template: Row, objectType: string, classId: string) {
       redemptionChannel: 'BOTH',
       provider,
       localizedProvider: localized(provider, issuerName),
-      hexBackgroundColor: stringValue(template.primary_color || '#fffdf9')
+      hexBackgroundColor: stringValue(template.primary_color || '#fffaf2')
     };
     const details = stringValue(template.description || settings.discountValue || settings.discount_value);
     const finePrint = stringValue(settings.redemptionTerms || settings.redemption_terms);
@@ -1022,7 +1022,7 @@ function buildObjectPayload(config: Row, template: Row, cardInstance: Row, objec
       id: objectId,
       classId,
       state: 'ACTIVE',
-      hexBackgroundColor: stringValue(template.primary_color || '#fffdf9'),
+      hexBackgroundColor: stringValue(template.primary_color || '#fffaf2'),
       ticketNumber,
       ticketType: localized(ticketType, 'Standard'),
       reservationInfo: {
@@ -1101,7 +1101,7 @@ function buildObjectPayload(config: Row, template: Row, cardInstance: Row, objec
     id: objectId,
     classId,
     state: 'ACTIVE',
-    hexBackgroundColor: stringValue(template.primary_color || '#fffdf9'),
+    hexBackgroundColor: stringValue(template.primary_color || '#fffaf2'),
     cardTitle: localized(template.card_name, 'Kundenkarte'),
     header: localized(businessNameForTemplate(template, template.card_name || 'Karte'), 'Karte'),
     subheader: localized(template.description || template.template_type, 'Digitale Karte'),

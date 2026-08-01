@@ -272,8 +272,8 @@ function localized(value: unknown, fallback = '') {
 }
 
 function cleanHexColor(value: unknown) {
-  const color = stringValue(value) || '#fffdf9';
-  return /^#[0-9a-fA-F]{6}$/.test(color) ? color : '#fffdf9';
+  const color = stringValue(value) || '#fffaf2';
+  return /^#[0-9a-fA-F]{6}$/.test(color) ? color : '#fffaf2';
 }
 
 function safeObjectSuffix(value: unknown) {

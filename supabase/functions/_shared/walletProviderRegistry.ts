@@ -86,10 +86,10 @@ export function walletCardModel(template: Row = {}, cardInstance: Row = {}) {
       logo: stringValue(business.logo_url || business.company_logo_url || template.business_logo_url || template.company_logo_url || template.logo_url),
       heroImage: stringValue(template.hero_image_url || settings.heroImageUrl),
       thumbnail: stringValue(template.thumbnail_url || settings.thumbnailUrl),
-      primaryColor: stringValue(template.primary_color || '#fffdf9'),
+      primaryColor: stringValue(template.primary_color || '#fffaf2'),
       secondaryColor: stringValue(settings.secondaryColor || '#d6b889'),
       textColor: stringValue(template.text_color || '#5b3423'),
-      background: stringValue(template.background || settings.background || template.primary_color || '#fffdf9'),
+      background: stringValue(template.background || settings.background || template.primary_color || '#fffaf2'),
       title: stringValue(template.card_name || template.name || 'Kundenkarte'),
       subtitle: stringValue(business.name || business.company_name || template.business_name),
       description: stringValue(template.description)

@@ -868,9 +868,9 @@ function buildPassJson(template: Row, cardInstance: Row, fields: Row = {}) {
     teamIdentifier: config.teamId,
     organizationName: businessNameForTemplate(template, 'Wallet Cards'),
     description: stringValue(template.description || template.card_name || 'Digitale Walletkarte'),
-    backgroundColor: stringValue(template.primary_color || '#fffdf9'),
-    foregroundColor: stringValue(template.text_color || '#8b4f2f'),
-    labelColor: stringValue(template.text_color || '#8b4f2f'),
+    backgroundColor: stringValue(template.primary_color || '#fffaf2'),
+    foregroundColor: stringValue(template.text_color || '#5b3423'),
+    labelColor: stringValue(template.text_color || '#5b3423'),
     barcodes: [
       {
         format: 'PKBarcodeFormatQR',

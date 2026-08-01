@@ -121,8 +121,8 @@ const assetBucket = 'wallet-assets';
 const maxAssetFileBytes = 2 * 1024 * 1024;
 const maxAssetSourceFileBytes = 25 * 1024 * 1024;
 const assetUploadFrames = {
-  'event-apple-background': { width: 1000, height: 1500, backgroundColor: '#fffdf9' },
-  'event-google-hero': { width: 1200, height: 400, backgroundColor: '#fffdf9' },
+  'event-apple-background': { width: 1000, height: 1500, backgroundColor: '#fffaf2' },
+  'event-google-hero': { width: 1200, height: 400, backgroundColor: '#fffaf2' },
   'stamp-icon': { width: 512, height: 512, backgroundColor: 'transparent' },
   'streak-icon': { width: 512, height: 512, backgroundColor: 'transparent' }
 };
@@ -157,8 +157,8 @@ const optionalFeatureInputNames = {
 };
 const visibleOptionalFeatureInputNamePrefix = 'editor_optional_feature_';
 const managedOptionalFeatureNames = Object.keys(optionalFeatureInputNames);
-const defaultWalletBackgroundColor = '#fffdf9';
-const defaultWalletTextColor = '#8b4f2f';
+const defaultWalletBackgroundColor = '#fffaf2';
+const defaultWalletTextColor = '#5b3423';
 const walletNotificationCampaignHistorySelect = [
   'id',
   'business_id',

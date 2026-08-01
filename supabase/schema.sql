@@ -114,8 +114,8 @@ create table if not exists public.card_templates (
       'club_card'
     )),
   description text,
-  primary_color text not null default '#fffdf9',
-  text_color text not null default '#8b4f2f',
+  primary_color text not null default '#fffaf2',
+  text_color text not null default '#5b3423',
   logo_url text,
   reward_text text,
   stamps_required integer not null default 10 check (stamps_required > 0),

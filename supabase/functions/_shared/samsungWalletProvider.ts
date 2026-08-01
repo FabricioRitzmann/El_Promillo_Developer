@@ -147,7 +147,7 @@ function hexColor(value: unknown, fallback: string) {
 }
 
 function samsungFontColor(value: unknown) {
-  const color = hexColor(value, '#8b4f2f').slice(1);
+  const color = hexColor(value, '#5b3423').slice(1);
   const red = parseInt(color.slice(0, 2), 16);
   const green = parseInt(color.slice(2, 4), 16);
   const blue = parseInt(color.slice(4, 6), 16);
@@ -412,7 +412,7 @@ function buildSamsungLoyaltyAttributes(template: Row = {}, instance: Row = {}) {
     appLinkLogo: imageUrl,
     appLinkName: textLimit(providerName, 32, 'El Promillo'),
     appLinkData: linkUrl,
-    bgColor: hexColor(template.primary_color, '#fffdf9'),
+    bgColor: hexColor(template.primary_color, '#fffaf2'),
     fontColor: samsungFontColor(template.text_color),
     'barcode.value': stringValue(instance.customer_code || instance.card_instance_number || instance.ref_id),
     'barcode.serialType': 'QRCODE',
@@ -446,7 +446,7 @@ function buildSamsungGenericAttributes(template: Row = {}, instance: Row = {}) {
     providerName,
     mainImg: imageUrl,
     startDate,
-    bgColor: hexColor(template.primary_color, '#fffdf9'),
+    bgColor: hexColor(template.primary_color, '#fffaf2'),
     fontColor: samsungFontColor(template.text_color),
     'barcode.value': stringValue(instance.customer_code || instance.card_instance_number || instance.ref_id),
     'barcode.serialType': 'QRCODE',

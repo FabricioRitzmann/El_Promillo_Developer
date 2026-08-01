@@ -299,8 +299,8 @@ function buildPdfContent(template: Row, claimUrl: string, pageWidth: number, pag
   const qrSize = pageWidth < 500 ? 158 : 210;
   const qrX = pageWidth - margin - qrSize;
   const qrY = cardY;
-  const primary = hexToRgb01(template.primary_color, '#fffdf9');
-  const foreground = hexToRgb01(template.text_color, '#8b4f2f');
+  const primary = hexToRgb01(template.primary_color, '#fffaf2');
+  const foreground = hexToRgb01(template.text_color, '#5b3423');
   const businessName = businessNameForTemplate(template);
   const now = new Date().toLocaleDateString('de-CH');
   const description = String(template.description || templateTypeLabel(template)).slice(0, 90);

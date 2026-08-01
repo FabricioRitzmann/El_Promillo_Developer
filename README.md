@@ -272,6 +272,8 @@ bash scripts/apply-supabase-schema.sh
 
 Wenn bestehende Templates noch alte Firmenname-/Logo-Snapshots enthalten, kann danach einmalig `supabase/sync-template-business-branding.sql` im Supabase SQL Editor ausgeführt werden. Die App bevorzugt den zentralen Business-Account bereits beim Rendern; die Sync-Datei zieht zusätzlich bestehende Template-Snapshots auf den aktuellen Firmennamen und das aktuelle Firmenlogo nach.
 
+Für den El-Promillo-Design-Refresh bestehender Templates kann `supabase/el-promillo-card-design-refresh.sql` im Supabase SQL Editor ausgeführt werden. Diese Datei setzt die Karten-Defaults auf `#fffaf2`/`#5b3423`, aktualisiert bestehende El-Promillo-Templates und legt Wallet-Update-Jobs für aktive Apple-/Google-Karten an.
+
 Die SQL-Datei erstellt:
 
 - `operator_profiles`
