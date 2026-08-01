@@ -350,6 +350,12 @@ textarea {
   padding: var(--page-padding-x);
 }
 
+.auth-layout {
+  grid-template-rows: 1fr auto;
+  align-content: stretch;
+  gap: clamp(2rem, 6vh, 4.5rem);
+}
+
 .auth-panel {
   width: min(980px, 100%);
 }
@@ -371,6 +377,43 @@ textarea {
 
 .auth-grid:has(#resetPasswordForm:not([hidden])) {
   grid-template-columns: minmax(0, 1fr);
+}
+
+.site-about-section {
+  width: min(980px, 100%);
+  display: grid;
+  justify-items: center;
+  gap: clamp(0.75rem, 2vw, 1.1rem);
+  padding: clamp(1.25rem, 3vw, 2rem) 1rem 0;
+  text-align: center;
+}
+
+.site-about-logo {
+  width: min(15rem, 52vw);
+  max-height: 16rem;
+  object-fit: contain;
+}
+
+.site-about-lockup {
+  width: min(30rem, 84vw);
+  max-height: 9rem;
+  object-fit: contain;
+}
+
+.site-about-email {
+  color: var(--text-secondary);
+  font-family: var(--font-display);
+  font-size: clamp(1.15rem, 2.2vw, 1.65rem);
+  font-weight: 700;
+  line-height: 1.1;
+  text-decoration: none;
+}
+
+.site-about-email:hover,
+.site-about-email:focus-visible {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 0.28rem;
 }
 
 .dashboard-grid,
