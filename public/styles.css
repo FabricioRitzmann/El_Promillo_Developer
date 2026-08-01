@@ -416,6 +416,11 @@ textarea {
   text-underline-offset: 0.28rem;
 }
 
+.dashboard-about-section {
+  margin: clamp(2rem, 5vw, 3.5rem) auto 0;
+  padding-bottom: clamp(0.5rem, 2vw, 1.25rem);
+}
+
 .dashboard-grid,
 .scanner-grid {
   grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
