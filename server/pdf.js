@@ -379,7 +379,7 @@ function buildWalletFields(template) {
 }
 
 function buildWalletPreview(template, claimUrl, assets, x, y, width) {
-  const height = width * 0.64;
+  const height = width * 1.5;
   const primary = hexToRgb01(template.primary_color, '#fffdf9');
   const foreground = hexToRgb01(template.text_color, '#8b4f2f');
   const businessName = businessNameForTemplate(template);
@@ -387,7 +387,7 @@ function buildWalletPreview(template, claimUrl, assets, x, y, width) {
   const fields = buildWalletFields(template);
   const cardNumber = 'Wird beim Claim erzeugt';
   const businessLogoBox = assets.businessLogo
-    ? fitImage(assets.businessLogo, x + 18, y + height - 40, 24, 24)
+    ? fitImage(assets.businessLogo, x + 18, y + height - 46, 28, 28)
     : null;
   const settings = templateSettings(template);
   const isEventCard = normalizeTemplateType(template) === 'event_card';
@@ -399,46 +399,62 @@ function buildWalletPreview(template, claimUrl, assets, x, y, width) {
     ].join('\n')
     : roundedRect(x, y, width, height, 20, primary);
 
-  const visibleAuxiliary = fields.auxiliary.slice(0, 2);
+  const secondaryFields = [
+    { label: 'Karten-ID', value: 'nach Claim' },
+    { label: 'Typ', value: templateTypeLabel(template) }
+  ];
+  const visibleAuxiliary = fields.auxiliary.slice(0, 3);
+  const secondaryLines = secondaryFields.map((row, index) => (
+    [
+      textLine(row.label, x + 20 + (index * (width / 2 - 8)), y + height - 158, 6.2, foreground),
+      textLine(String(row.value || '').slice(0, 18), x + 20 + (index * (width / 2 - 8)), y + height - 171, 8, foreground)
+    ].join('\n')
+  ));
   const auxiliaryLines = visibleAuxiliary.map((row, index) => {
-    const maxValueLength = visibleAuxiliary.length === 1 ? 36 : 22;
+    const column = index % 2;
+    const rowIndex = Math.floor(index / 2);
+    const maxValueLength = visibleAuxiliary.length === 1 ? 30 : 18;
 
     return [
-      textLine(String(row.label || '').slice(0, 18), x + 18 + (index * (width / 2 - 8)), y + 65, 6, foreground),
-      textLine(String(row.value || '').slice(0, maxValueLength), x + 18 + (index * (width / 2 - 8)), y + 54, 7.5, foreground)
+      textLine(String(row.label || '').slice(0, 18), x + 20 + (column * (width / 2 - 8)), y + height - 206 - (rowIndex * 34), 6.2, foreground),
+      textLine(String(row.value || '').slice(0, maxValueLength + 4), x + 20 + (column * (width / 2 - 8)), y + height - 219 - (rowIndex * 34), 8, foreground)
     ].join('\n');
   });
 
-  const qrSize = 28;
+  const qrSize = 64;
+  const barcodeWidth = width * 0.58;
+  const barcodeX = x + ((width - barcodeWidth) / 2);
+  const barcodeY = y + 24;
 
   return [
     background,
     assets.businessLogo
       ? imageCommand('BusinessLogo', businessLogoBox)
-      : logoMark(template, x + 18, y + height - 40, 24, [1, 1, 1], primary),
-    textLine(businessName.slice(0, 28), x + 48, y + height - 25, 10, foreground),
-    textLine(String(fields.header.label || 'Status').slice(0, 16), x + width - 86, y + height - 20, 6.5, foreground),
-    textLine(String(fields.header.value || 'Aktiv').slice(0, 16), x + width - 86, y + height - 32, 10, foreground),
-    textLine(businessName.slice(0, 24), x + 18, y + height - 68, 7, foreground),
-    textLine(cardName.slice(0, 27), x + 18, y + height - 87, 17, foreground),
+      : logoMark(template, x + 18, y + height - 46, 28, [1, 1, 1], primary),
+    textLine(businessName.slice(0, 22), x + 54, y + height - 27, 10, foreground),
+    textLine(String(fields.header.label || 'Status').slice(0, 16), x + width - 86, y + height - 24, 6.5, foreground),
+    textLine(String(fields.header.value || 'Aktiv').slice(0, 16), x + width - 86, y + height - 38, 10, foreground),
+    textLine(businessName.slice(0, 24), x + 20, y + height - 93, 7, foreground),
+    textLine(cardName.slice(0, 24), x + 20, y + height - 122, 21, foreground),
+    ...secondaryLines,
     ...auxiliaryLines,
-    roundedRect(x + 14, y + 9, width - 28, 40, 8, [1, 1, 1]),
-    drawQr(claimUrl, x + 23, y + 15, qrSize),
-    textLine(cardNumber, x + 62, y + 33, 8, [0.11, 0.13, 0.17]),
-    textLine(templateTypeLabel(template), x + 62, y + 20, 7.5, [0.35, 0.39, 0.47]),
-    line(x + 16, y + 73, x + width - 16, y + 73, [1, 1, 1], 0.6),
-    settings.eventName ? textLine(String(settings.eventName).slice(0, 30), x + 18, y + 74, 8.5, foreground) : ''
+    roundedRect(barcodeX, barcodeY, barcodeWidth, 102, 12, [1, 1, 1]),
+    drawQr(claimUrl, barcodeX + ((barcodeWidth - qrSize) / 2), barcodeY + 30, qrSize),
+    textLine('Kundencode nach Claim', barcodeX + 18, barcodeY + 16, 7.2, [0.11, 0.13, 0.17]),
+    line(x + 20, y + height - 140, x + width - 20, y + height - 140, [1, 1, 1], 0.6),
+    settings.eventName ? textLine(String(settings.eventName).slice(0, 24), x + 20, y + height - 246, 8.5, foreground) : ''
   ].filter(Boolean).join('\n');
 }
 
 function buildContent(template, claimUrl, pageWidth, pageHeight, assets = {}) {
-  const margin = pageWidth < 500 ? 34 : 52;
-  const cardWidth = pageWidth < 500 ? 176 : 270;
+  const margin = pageWidth < 500 ? 30 : 48;
+  const cardWidth = pageWidth < 500 ? 170 : 230;
   const cardX = margin;
-  const cardY = pageHeight - margin - (pageWidth < 500 ? 260 : 300);
-  const qrSize = pageWidth < 500 ? 142 : 196;
+  const cardHeight = cardWidth * 1.5;
+  const cardY = pageHeight - margin - (pageWidth < 500 ? 390 : 492);
+  const qrSize = pageWidth < 500 ? 140 : 185;
   const qrX = pageWidth - margin - qrSize;
-  const qrY = cardY + ((cardWidth * 0.64) - qrSize) / 2;
+  const qrY = cardY + ((cardHeight - qrSize) / 2) + 18;
   const primary = hexToRgb01(template.primary_color, '#fffdf9');
   const foreground = hexToRgb01(template.text_color, '#8b4f2f');
   const businessName = businessNameForTemplate(template);
@@ -461,10 +477,10 @@ function buildContent(template, claimUrl, pageWidth, pageHeight, assets = {}) {
       ? imageCommand('BrandLogo', brandLogoBox, 'GSBrand')
       : textLine('El Promillo', pageWidth - margin - 96, pageHeight - margin - 12, 16, [0.54, 0.31, 0.18]),
     line(margin, pageHeight - margin - 48, pageWidth - margin, pageHeight - margin - 48, [0.82, 0.72, 0.55], 0.8),
-    textLine(template.card_name || 'Karte', margin, pageTitleY, pageWidth < 500 ? 24 : 30, [0.22, 0.13, 0.09]),
-    textLine('Apple-Wallet-Vorschau mit Claim-QR-Code', margin, pageTitleY - 24, 12, [0.37, 0.31, 0.27]),
+    textLine(template.card_name || 'Karte', margin, pageTitleY, pageWidth < 500 ? 23 : 29, [0.22, 0.13, 0.09]),
+    textLine('Wallet-Karte mit Claim-QR-Code', margin, pageTitleY - 24, 12, [0.37, 0.31, 0.27]),
     buildWalletPreview(template, claimUrl, assets, cardX, cardY, cardWidth),
-    textLine('Apple Wallet Karte', cardX, cardY + (cardWidth * 0.64) + 18, 11, [0.37, 0.31, 0.27]),
+    textLine('Apple Wallet Karte', cardX, cardY + cardHeight + 18, 11, [0.37, 0.31, 0.27]),
     roundedRect(qrX - 16, qrY - 16, qrSize + 32, qrSize + 58, 16, [1, 1, 1]),
     drawQr(claimUrl, qrX, qrY, qrSize),
     textLine('Claim QR-Code', qrX, qrY + qrSize + 20, 11, [0.37, 0.31, 0.27]),
