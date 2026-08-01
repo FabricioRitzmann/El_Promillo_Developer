@@ -518,6 +518,11 @@ textarea {
   object-fit: contain;
 }
 
+.account-logo-preview.has-image {
+  border-color: transparent;
+  background: transparent;
+}
+
 .account-logo-controls {
   display: grid;
   gap: 0.65rem;
@@ -666,6 +671,11 @@ textarea {
   width: 100%;
   height: 100%;
   object-fit: contain;
+}
+
+.business-brand-logo.has-image {
+  border-color: transparent;
+  background: transparent;
 }
 
 .business-brand-name {
@@ -2022,12 +2032,20 @@ textarea {
   height: 2.2rem;
   display: grid;
   place-items: center;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.22);
   color: currentColor;
   font-size: 0.72rem;
   font-weight: 750;
   object-fit: contain;
+}
+
+.wallet-top img {
+  border-radius: 0;
+  background: transparent;
+}
+
+.wallet-logo-placeholder {
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.22);
 }
 
 .wallet-brand-lockup,
