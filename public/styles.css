@@ -580,33 +580,6 @@ textarea {
   accent-color: var(--primary);
 }
 
-.logo-color-tools {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: end;
-  gap: 0.65rem;
-}
-
-.logo-card-color-field {
-  width: min(15rem, 100%);
-}
-
-.company-logo-card-preview {
-  min-height: 5.4rem;
-  display: grid;
-  place-items: center;
-  overflow: hidden;
-  border: 1px solid var(--border-gold);
-  border-radius: 18px;
-  background: #fffaf2;
-}
-
-.company-logo-card-preview img {
-  width: min(48%, 12rem);
-  max-height: 4rem;
-  object-fit: contain;
-}
-
 .editor-color-field {
   display: grid;
   gap: 0.5rem;

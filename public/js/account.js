@@ -11,7 +11,6 @@ import {
   showMessage
 } from './ui.js';
 import { imageFileToPngUnderLimit } from './imageUploadOptimizer.js';
-import { normalizeHexColor } from './logoColorPicker.js';
 
 const state = {
   client: null,
@@ -44,8 +43,7 @@ const businessAccountSelect = [
   'company_logo_original_path',
   'company_logo_processed_url',
   'company_logo_processed_path',
-  'company_logo_background_mode',
-  'company_logo_card_color'
+  'company_logo_background_mode'
 ].join(',');
 
 const accountMessage = byId('accountMessage');
@@ -58,8 +56,6 @@ const companyLogoUpload = byId('companyLogoUpload');
 const uploadCompanyLogoButton = byId('uploadCompanyLogoButton');
 const removeCompanyLogoButton = byId('removeCompanyLogoButton');
 const companyLogoBackgroundMode = byId('companyLogoBackgroundMode');
-const companyLogoCardColor = byId('companyLogoCardColor');
-const companyLogoCardPreview = byId('companyLogoCardPreview');
 const businessLogoBucket = 'business-logos';
 const maxLogoFileBytes = 2 * 1024 * 1024;
 const maxLogoSourceFileBytes = 25 * 1024 * 1024;
@@ -147,9 +143,7 @@ function fillBusinessForm() {
   businessForm.querySelectorAll('input[name="company_logo_background_mode"]').forEach((input) => {
     input.checked = input.value === backgroundMode;
   });
-  companyLogoCardColor && (companyLogoCardColor.value = normalizeHexColor(state.business?.company_logo_card_color));
   renderCompanyLogoPreview();
-  renderCompanyLogoCardPreview();
   renderBusinessHeader(state.business || {});
   renderMobileAccountSummary();
 }
@@ -187,7 +181,6 @@ function businessPayloadFromForm() {
 
   if (state.logoVariantsSupported) {
     payload.company_logo_background_mode = logoBackgroundMode();
-    payload.company_logo_card_color = normalizeHexColor(formData.get('company_logo_card_color'));
   }
 
   return payload;
@@ -343,26 +336,6 @@ function logoVariantForMode(business, mode) {
     url: String(business?.company_logo_processed_url || business?.logo_url || '').trim(),
     path: String(business?.company_logo_processed_path || business?.company_logo_path || '').trim() || null
   };
-}
-
-function renderCompanyLogoCardPreview() {
-  if (!companyLogoCardPreview) {
-    return;
-  }
-
-  const logoUrl = businessLogoUrl(state.business || {});
-  companyLogoCardPreview.textContent = '';
-  companyLogoCardPreview.style.backgroundColor = normalizeHexColor(companyLogoCardColor?.value || state.business?.company_logo_card_color);
-
-  if (!logoUrl) {
-    companyLogoCardPreview.textContent = businessInitials(businessDisplayName(state.business || {}));
-    return;
-  }
-
-  const image = document.createElement('img');
-  image.src = logoUrl;
-  image.alt = businessDisplayName(state.business || {});
-  companyLogoCardPreview.append(image);
 }
 
 function setLogoProcessingState(processing) {
@@ -532,22 +505,6 @@ async function changeLogoBackgroundMode() {
   showMessage(accountMessage, t('account.logoModeSaved'), 'success');
 }
 
-async function persistLogoCardColor() {
-  const color = normalizeHexColor(companyLogoCardColor?.value);
-  renderCompanyLogoCardPreview();
-
-  if (!state.business?.id || !state.logoVariantsSupported) {
-    return;
-  }
-
-  state.business = (await state.client.updateRows('businesses', {
-    company_logo_card_color: color
-  }, [
-    { column: 'id', op: 'eq', value: state.business.id },
-    { column: 'owner_id', op: 'eq', value: state.session.user.id }
-  ], { select: businessAccountSelect }))[0];
-}
-
 async function removeCompanyLogo() {
   if (!state.business?.id) {
     showMessage(accountMessage, t('account.logoNoBusiness'), 'info');
@@ -638,11 +595,6 @@ async function initAccount() {
 
   companyLogoBackgroundMode?.addEventListener('change', () => {
     changeLogoBackgroundMode().catch((error) => showMessage(accountMessage, error.message, 'error'));
-  });
-
-  companyLogoCardColor?.addEventListener('input', renderCompanyLogoCardPreview);
-  companyLogoCardColor?.addEventListener('change', () => {
-    persistLogoCardColor().catch((error) => showMessage(accountMessage, error.message, 'error'));
   });
 
   removeCompanyLogoButton?.addEventListener('click', () => {

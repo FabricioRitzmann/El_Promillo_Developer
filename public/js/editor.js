@@ -2,7 +2,7 @@ import { requireLogin } from './guards.js';
 import { appUrl, apiUrl } from './config.js';
 import { pagePath } from './path.js';
 import { imageFileToPngUnderLimit } from './imageUploadOptimizer.js';
-import { normalizeHexColor, sampleImageColorFromPointer } from './logoColorPicker.js';
+import { sampleImageColorFromPointer } from './logoColorPicker.js';
 import { byId, escapeHtml, renderBusinessHeader, showMessage, walletPreviewHtml } from './ui.js';
 import {
   CLUB_FEATURE_DEFAULTS,
@@ -52,8 +52,7 @@ const businessEditorSelect = [
   businessEditorLegacySelect,
   'company_logo_original_url',
   'company_logo_processed_url',
-  'company_logo_background_mode',
-  'company_logo_card_color'
+  'company_logo_background_mode'
 ].join(',');
 
 const templateEditorSelect = [
@@ -369,10 +368,6 @@ function syncDefaultsFromBusiness() {
 
   if (!templateForm.business_name.value && state.business?.name) {
     templateForm.business_name.value = state.business.name;
-  }
-
-  if (!state.templateId && state.business?.company_logo_card_color) {
-    setTemplateField('primary_color', normalizeHexColor(state.business.company_logo_card_color, defaultWalletBackgroundColor));
   }
 
 }

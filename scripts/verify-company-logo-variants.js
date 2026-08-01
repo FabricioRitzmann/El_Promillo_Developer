@@ -25,7 +25,7 @@ const pickerJs = read('public/js/logoColorPicker.js');
 const schema = read('supabase/schema.sql');
 const migration = read('supabase/company-logo-variants.sql');
 
-includesAll(accountHtml, ['value="removed"', 'value="original"', 'companyLogoCardColor', 'companyLogoCardPreview'], 'Kontooberfläche');
+includesAll(accountHtml, ['value="removed"', 'value="original"'], 'Kontooberfläche');
 includesAll(accountJs, [
   'logoFileToAppleSafePng(file, false)', 'logoFileToAppleSafePng(file, true)',
   'company_logo_original_url', 'company_logo_original_path',
@@ -38,15 +38,14 @@ assert(
   'Die gewählte Hintergrundoption muss vor dem Formular-Persistieren festgehalten werden.'
 );
 includesAll(editorHtml, ['editorLogoColorPickerButton', 'editorLogoColorPickerPanel', 'editorLogoColorPickerImage'], 'Editor-Pipettenoberfläche');
-includesAll(editorJs, ['company_logo_card_color', 'toggleEditorLogoColorPicker', 'pickEditorLogoColor', "setTemplateField('primary_color', result.color.hex)", 'updateConditionalTemplateFields()'], 'Editor-Pipettenlogik');
+includesAll(editorJs, ['toggleEditorLogoColorPicker', 'pickEditorLogoColor', "setTemplateField('primary_color', result.color.hex)", 'updateConditionalTemplateFields()'], 'Editor-Pipettenlogik');
 includesAll(pickerJs, ['Math.min(width / naturalWidth, height / naturalHeight)', 'relativeX < 0', 'alpha <= alphaThreshold', 'context.getImageData(0, 0, 1, 1)', 'sampleImageColorFromPointer'], 'Pipettenkoordinaten und Transparenz');
 
 for (const source of [schema, migration]) {
   includesAll(source, [
     'company_logo_original_url', 'company_logo_processed_url',
-    'company_logo_background_mode', 'company_logo_card_color',
-    "company_logo_background_mode in ('removed', 'original')",
-    "company_logo_card_color ~ '^#[0-9A-Fa-f]{6}$'"
+    'company_logo_background_mode',
+    "company_logo_background_mode in ('removed', 'original')"
   ], 'Datenmodell');
 }
 
