@@ -17,8 +17,8 @@ with target_templates as (
   from public.card_templates as t
   left join public.businesses as b
     on b.owner_id = t.owner_id
-   and lower(trim(coalesce(b.name, b.company_name, ''))) = 'el promillo'
-  where lower(trim(coalesce(t.business_name, b.name, b.company_name, ''))) = 'el promillo'
+   and lower(trim(coalesce(b.name, ''))) = 'el promillo'
+  where lower(trim(coalesce(t.business_name, b.name, ''))) = 'el promillo'
 ),
 target_instances as (
   select
