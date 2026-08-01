@@ -157,6 +157,8 @@ const optionalFeatureInputNames = {
 };
 const visibleOptionalFeatureInputNamePrefix = 'editor_optional_feature_';
 const managedOptionalFeatureNames = Object.keys(optionalFeatureInputNames);
+const lockedEditorTemplateTypes = new Set(['event_card']);
+const lockedEditorFeatures = new Set(['balance']);
 const defaultWalletBackgroundColor = '#fffaf2';
 const defaultWalletTextColor = '#5b3423';
 const walletNotificationCampaignHistorySelect = [
@@ -191,17 +193,24 @@ function setTemplateField(name, value) {
 }
 
 function setOptionalFeatureSelection(featureName, checked) {
-  state.optionalFeatureSelections[featureName] = Boolean(checked);
+  const preservedLockedSelection = lockedEditorFeatures.has(featureName)
+    ? Boolean(state.templateId && state.template && featureEnabled(state.template, featureName))
+    : Boolean(checked);
+  state.optionalFeatureSelections[featureName] = preservedLockedSelection;
   const fieldName = optionalFeatureInputNames[featureName] || `${featureName}_enabled`;
 
   templateForm?.querySelectorAll(`[name="${fieldName}"], [data-editor-optional-feature="${featureName}"]`).forEach((field) => {
     if (field.type === 'checkbox') {
-      field.checked = Boolean(checked);
+      field.checked = preservedLockedSelection;
     }
   });
 }
 
 function readOptionalFeatureSelection(formData, featureName) {
+  if (lockedEditorFeatures.has(featureName)) {
+    return Boolean(state.templateId && state.template && featureEnabled(state.template, featureName));
+  }
+
   if (Object.prototype.hasOwnProperty.call(state.optionalFeatureSelections, featureName)) {
     return Boolean(state.optionalFeatureSelections[featureName]);
   }
@@ -1692,25 +1701,28 @@ function renderOptionalFeatureToggles(draft) {
   }
   optionalFeatureToggles.innerHTML = optionalFeatures.map((featureName) => {
     const checked = featureEnabled(draft, featureName);
+    const isLocked = lockedEditorFeatures.has(featureName);
     const label = isClubCard ? {
       vip: 'VIP-Funktion aktivieren',
-      balance: 'Guthaben-Funktion aktivieren',
+      balance: 'Guthaben-Funktion (in Vorbereitung)',
       cloakroom: 'Garderoben-Funktion aktivieren',
       redemption: 'Coupon-Funktion aktivieren',
       membership: 'Mitgliedschafts-Funktion aktivieren'
     }[featureName] || `${featureLabel(featureName)} aktivieren` : `${featureLabel(featureName)} aktivieren`;
 
     return `
-    <label class="check-row optional-feature-toggle">
+    <label class="check-row optional-feature-toggle ${isLocked ? 'is-locked' : ''}">
       <input
         type="checkbox"
         role="switch"
         name="${visibleOptionalFeatureInputNamePrefix}${featureName}"
         data-editor-optional-feature="${featureName}"
         aria-expanded="${checked ? 'true' : 'false'}"
+        ${isLocked ? 'disabled aria-disabled="true"' : ''}
         ${checked ? 'checked' : ''}
       >
       <span>${label}</span>
+      ${isLocked ? '<small class="feature-lock-label">Noch nicht verfügbar</small>' : ''}
     </label>
   `;
   }).join('');
@@ -1756,6 +1768,13 @@ function handleOptionalFeatureToggle(event) {
   const featureName = target?.dataset?.editorOptionalFeature;
 
   if (!featureName || target.type !== 'checkbox') {
+    return;
+  }
+
+  if (lockedEditorFeatures.has(featureName)) {
+    setOptionalFeatureSelection(featureName, false);
+    showMessage(editorMessage, 'Die Guthaben-Funktion ist sichtbar, aber noch nicht freigegeben.', 'info');
+    event.stopPropagation();
     return;
   }
 
@@ -1867,6 +1886,14 @@ async function saveTemplate(event) {
   showMessage(editorMessage, state.templateId ? t('editor.updating', 'Karte wird aktualisiert ...') : t('editor.saving', 'Template wird gespeichert ...'));
 
   const draft = templateDraftFromForm();
+
+  if (
+    lockedEditorTemplateTypes.has(draft.template_type)
+    && normalizeTemplateType(state.template || '') !== draft.template_type
+  ) {
+    showMessage(editorMessage, 'Die Eventkarte ist sichtbar, aber noch nicht freigegeben.', 'error');
+    return;
+  }
 
   if (!draft.business_name || !draft.card_name) {
     showMessage(editorMessage, t('editor.requiredNames', 'Geschäftsname und Kartenname sind Pflichtfelder.'), 'error');

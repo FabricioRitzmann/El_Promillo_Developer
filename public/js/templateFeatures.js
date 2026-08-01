@@ -573,6 +573,38 @@ export function templateFeatureSummary(template) {
   return summaries.length ? summaries.join(', ') : 'Basiskarte';
 }
 
+export function scannerAccessHighlights(template, card = {}) {
+  const settings = templateSettings(template);
+  const metadata = card?.metadata && typeof card.metadata === 'object' ? card.metadata : {};
+  const highlights = [];
+
+  if (featureEnabled(template, 'vip')) {
+    const vipValue = card?.vip_status || card?.vip_level || template?.vip_tier || 'VIP';
+    const vipDetails = [metadata.vip_benefits || metadata.vip_note || settings.vipNote]
+      .flatMap((value) => Array.isArray(value) ? value : [value])
+      .map((value) => String(value || '').trim())
+      .filter(Boolean);
+
+    highlights.push({ feature: 'vip', label: 'VIP-Status', value: String(vipValue), details: vipDetails, iconText: 'VIP' });
+  }
+
+  if (featureEnabled(template, 'membership')) {
+    const membershipStatus = metadata.membership_status || card?.membership_status || settings.membershipStatus || 'Aktiv';
+    const membershipNumber = metadata.membership_number || card?.membership_number || '';
+    const membershipExpiresAt = metadata.membership_expires_at || card?.membership_expires_at || settings.membershipExpiresAt || '';
+    const membershipBenefits = metadata.membership_benefits || settings.membershipBenefits || '';
+    const membershipDetails = [
+      membershipNumber ? `Mitgliedsnummer: ${membershipNumber}` : '',
+      membershipExpiresAt ? `Gültig bis: ${membershipExpiresAt}` : '',
+      ...String(membershipBenefits || '').split(/\r?\n|,/)
+    ].map((value) => String(value || '').trim()).filter(Boolean);
+
+    highlights.push({ feature: 'membership', label: 'Mitgliedschaft', value: String(membershipStatus), details: membershipDetails, iconText: 'M' });
+  }
+
+  return highlights;
+}
+
 export function cardFeatureRows(template, card = null) {
   const settings = templateSettings(template);
   const rows = [];

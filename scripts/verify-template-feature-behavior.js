@@ -3,6 +3,7 @@ import {
   cardFeatureRows,
   featureEnabled,
   normalizeScannerAction,
+  scannerAccessHighlights,
   validateScannerAction
 } from '../public/js/templateFeatures.js';
 
@@ -255,5 +256,12 @@ assert(
   }).map((row) => row.feature).join(',') === 'membership,vip,balance,membership_expiry,redemption,cloakroom',
   'Clubkarte mit allen Features muss Wallet-Felder nach der Club-Priorität sortieren.'
 );
+
+const accessHighlights = scannerAccessHighlights(clubAllTemplate, {
+  vip_status: 'Platin',
+  metadata: { membership_number: 'M-100', membership_status: 'aktiv', membership_expires_at: '2026-12-31', membership_benefits: 'Freier Eintritt, Welcome Drink' }
+});
+assert(accessHighlights.map((highlight) => `${highlight.feature}:${highlight.value}`).join(',') === 'vip:Platin,membership:aktiv', 'Scanner-Eintrittshinweis muss VIP-Stufe und Mitgliedsstatus hervorheben.');
+assert(accessHighlights[1].details.includes('Mitgliedsnummer: M-100') && accessHighlights[1].details.includes('Freier Eintritt') && accessHighlights[1].details.includes('Welcome Drink'), 'Scanner-Eintrittshinweis muss Mitgliedsnummer und Vorteile anzeigen.');
 
 console.log('Template-Feature-Verhalten für optionale Features und Scanner-Aliase ist korrekt.');

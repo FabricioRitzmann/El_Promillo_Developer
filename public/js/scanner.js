@@ -4,7 +4,7 @@ import { setupLanguageSelectors, t } from './i18n.js';
 import { pagePath } from './path.js';
 import { byId, cardTypeLabel, escapeHtml, normalizeCode, renderBusinessHeader, showMessage, walletPreviewHtml } from './ui.js';
 import { cardEmblemMeta } from './cardEmblems.js';
-import { activeFeatureLabels, featureEnabled, normalizeScannerAction, normalizeTemplateType, validateScannerAction } from './templateFeatures.js';
+import { activeFeatureLabels, featureEnabled, normalizeScannerAction, normalizeTemplateType, scannerAccessHighlights, validateScannerAction } from './templateFeatures.js';
 
 const state = {
   client: null,
@@ -114,6 +114,9 @@ const manualForm = byId('manualScanForm');
 const video = byId('scannerVideo');
 const cardPanel = byId('cardPanel');
 const scannerOnlyLogoutButton = byId('scannerOnlyLogoutButton');
+const accessStatusModal = byId('accessStatusModal');
+const accessStatusItems = byId('accessStatusItems');
+const accessStatusClose = byId('accessStatusClose');
 const demographicsModal = byId('demographicsModal');
 const demographicsForm = byId('demographicsForm');
 const demographicsTemplateType = byId('demographicsTemplateType');
@@ -375,6 +378,39 @@ function renderCard() {
   `;
 }
 
+function showAccessStatusModal(card = state.currentCard) {
+  const template = card?.card_templates || {};
+  const highlights = scannerAccessHighlights(template, card);
+
+  if (!accessStatusModal || !accessStatusItems || !highlights.length) {
+    return false;
+  }
+
+  accessStatusItems.innerHTML = highlights.map((highlight) => `
+    <article class="access-status-card access-status-card-${escapeHtml(highlight.feature)}">
+      <span class="access-status-icon" aria-hidden="true">${escapeHtml(highlight.iconText)}</span>
+      <div>
+        <p>${escapeHtml(highlight.label)}</p>
+        <strong>${escapeHtml(highlight.value)}</strong>
+        ${highlight.details.map((detail) => `<span>${escapeHtml(detail)}</span>`).join('')}
+      </div>
+    </article>
+  `).join('');
+  accessStatusModal.hidden = false;
+
+  if (navigator.vibrate) {
+    navigator.vibrate([120, 50, 120]);
+  }
+
+  return true;
+}
+
+function hideAccessStatusModal() {
+  if (accessStatusModal) {
+    accessStatusModal.hidden = true;
+  }
+}
+
 function edgeFunctionUrl(functionName) {
   return `${state.client.supabaseUrl}/functions/v1/${functionName}`;
 }
@@ -545,6 +581,7 @@ async function loadCardByCode(rawCode) {
   state.currentCardInstance = await loadCardInstanceForCard(card);
   state.originalCard = structuredClone(card);
   renderCard();
+  showAccessStatusModal(card);
   showMessage(scannerMessage, t('scanner.cardLoaded'), 'success');
 }
 
@@ -1028,6 +1065,8 @@ async function initScanner() {
   });
 
   byId('stopScanner')?.addEventListener('click', stopCamera);
+
+  accessStatusClose?.addEventListener('click', hideAccessStatusModal);
 
   scannerOnlyLogoutButton?.addEventListener('click', async () => {
     await state.client.signOut();

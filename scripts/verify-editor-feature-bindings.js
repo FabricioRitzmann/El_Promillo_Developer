@@ -119,6 +119,14 @@ assert(
     && editorJs.includes('CLUB_FEATURE_DEFAULTS'),
   'Editor muss Clubkarte als eigenes Template mit club_features-Toggles speichern.'
 );
+assert(
+  editorHtml.includes('<option value="event_card" disabled>Eventkarte (in Vorbereitung)</option>')
+    && editorJs.includes("lockedEditorTemplateTypes = new Set(['event_card'])")
+    && editorJs.includes("lockedEditorFeatures = new Set(['balance'])")
+    && editorJs.includes('Guthaben-Funktion (in Vorbereitung)')
+    && styles.includes('.optional-feature-toggle.is-locked'),
+  'Editor muss Eventkarte und Guthaben sichtbar lassen, aber bis zur Freigabe sperren.'
+);
 [
   'vip_card',
   'balance_card',

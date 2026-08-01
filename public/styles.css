@@ -1036,6 +1036,24 @@ textarea {
   box-shadow: 0 8px 20px rgba(91, 52, 35, 0.1);
 }
 
+.optional-feature-toggle.is-locked {
+  cursor: not-allowed;
+  opacity: 0.66;
+  background: rgba(142, 142, 147, 0.08);
+}
+
+.optional-feature-toggle.is-locked:hover {
+  border-color: var(--border-gold);
+  background: rgba(142, 142, 147, 0.08);
+}
+
+.feature-lock-label {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
 .editor-preview-panel {
   position: sticky;
   top: calc(var(--sticky-stack-height) + 1rem);
@@ -2442,6 +2460,50 @@ body:has(.modal-backdrop:not([hidden])) {
   display: grid;
   gap: 1rem;
 }
+
+.access-status-panel {
+  display: grid;
+  gap: 1rem;
+  border-color: rgba(214, 184, 137, 0.78);
+  box-shadow: 0 28px 80px rgba(91, 52, 35, 0.28);
+}
+
+.access-status-panel h2,
+.access-status-panel p { margin: 0; }
+
+.access-status-items { display: grid; gap: 0.75rem; }
+
+.access-status-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.85rem;
+  align-items: center;
+  padding: 1rem;
+  border: 1px solid var(--border-gold);
+  border-radius: var(--radius);
+  background: rgba(214, 184, 137, 0.16);
+}
+
+.access-status-card > div { display: grid; gap: 0.24rem; }
+
+.access-status-card p,
+.access-status-card span { color: var(--muted); font-size: 0.88rem; }
+
+.access-status-card strong { color: var(--ink); font-size: 1.28rem; }
+
+.access-status-icon {
+  width: 3.2rem;
+  height: 3.2rem;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--primary);
+  color: #fff !important;
+  font-size: 0.8rem !important;
+  font-weight: 800;
+}
+
+.access-status-card-membership .access-status-icon { background: var(--accent-gold); color: var(--ink) !important; }
 
 .demographics-club-info {
   display: grid;

@@ -63,6 +63,18 @@
 
       <section id="cardPanel" class="panel" hidden></section>
 
+      <section id="accessStatusModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="accessStatusTitle" hidden>
+        <div class="modal-panel access-status-panel">
+          <p class="eyebrow">Eintrittshinweis</p>
+          <h2 id="accessStatusTitle">VIP-/Mitgliedschaft erkannt</h2>
+          <p class="muted">Bitte die hinterlegten Vorteile beim Eintritt beachten und bei Bedarf einleiten.</p>
+          <div id="accessStatusItems" class="access-status-items"></div>
+          <div class="button-row wrap">
+            <button id="accessStatusClose" class="primary" type="button">Verstanden</button>
+          </div>
+        </div>
+      </section>
+
       <section id="demographicsModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="demographicsTitle" hidden>
         <form id="demographicsForm" class="modal-panel demographics-panel">
           <p class="eyebrow" id="demographicsTemplateType" data-i18n="scanner.firstScan">Erstscan</p>
