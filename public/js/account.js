@@ -393,6 +393,9 @@ async function logoFileToAppleSafePng(file, removeBackground) {
 }
 
 async function uploadCompanyLogo(file) {
+  // Die Auswahl vor persistBusiness() festhalten: Ein Legacy-Schema ohne die
+  // Variantenspalten lädt das Formular sonst neu und setzt den Radio-Wert zurück.
+  const requestedMode = logoBackgroundMode();
   setLogoProcessingState(true);
   uploadCompanyLogoButton && (uploadCompanyLogoButton.textContent = t('account.logoPreparingButton'));
 
@@ -434,7 +437,6 @@ async function uploadCompanyLogo(file) {
       }
     }
 
-    const requestedMode = logoBackgroundMode();
     const activeMode = requestedMode === 'removed' && processedUpload ? 'removed' : 'original';
     const activeUpload = activeMode === 'removed' ? processedUpload : originalUpload;
     const activePath = activeMode === 'removed' ? processedPath : originalPath;
@@ -476,6 +478,10 @@ async function uploadCompanyLogo(file) {
     }
 
     fillBusinessForm();
+    if (!state.logoVariantsSupported) {
+      const activeModeInput = businessForm.querySelector(`input[name="company_logo_background_mode"][value="${activeMode}"]`);
+      activeModeInput && (activeModeInput.checked = true);
+    }
     showMessage(
       accountMessage,
       processingError ? `${t('account.logoProcessedFailed')} ${processingError.message}` : t('account.logoSaved'),

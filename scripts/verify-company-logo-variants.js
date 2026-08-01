@@ -33,6 +33,10 @@ includesAll(accountJs, [
   'company_logo_background_mode', 'logoVariantForMode',
   'deleteStorageObjects(businessLogoBucket, obsoletePaths)'
 ], 'Logo-Variantenlogik');
+assert(
+  accountJs.indexOf('const requestedMode = logoBackgroundMode();') < accountJs.indexOf('const business = await persistBusiness();'),
+  'Die gewählte Hintergrundoption muss vor dem Formular-Persistieren festgehalten werden.'
+);
 includesAll(editorHtml, ['editorLogoColorPickerButton', 'editorLogoColorPickerPanel', 'editorLogoColorPickerImage'], 'Editor-Pipettenoberfläche');
 includesAll(editorJs, ['company_logo_card_color', 'toggleEditorLogoColorPicker', 'pickEditorLogoColor', "setTemplateField('primary_color', result.color.hex)", 'updateConditionalTemplateFields()'], 'Editor-Pipettenlogik');
 includesAll(pickerJs, ['Math.min(width / naturalWidth, height / naturalHeight)', 'relativeX < 0', 'alpha <= alphaThreshold', 'context.getImageData(0, 0, 1, 1)', 'sampleImageColorFromPointer'], 'Pipettenkoordinaten und Transparenz');
