@@ -34,6 +34,10 @@ begin
     perform cron.unschedule('wallet-process-scheduled-notifications');
   end if;
 
+  if exists (select 1 from cron.job where jobname = 'wallet-process-notification-rules') then
+    perform cron.unschedule('wallet-process-notification-rules');
+  end if;
+
   if exists (select 1 from cron.job where jobname = 'wallet-process-update-queue') then
     perform cron.unschedule('wallet-process-update-queue');
   end if;
@@ -42,6 +46,21 @@ begin
     perform cron.unschedule('operator-send-verification-email');
   end if;
 end $$;
+
+select cron.schedule(
+  'wallet-process-notification-rules',
+  '* * * * *',
+  $$
+  select net.http_post(
+    url := 'https://YOUR_PROJECT_REF.supabase.co/functions/v1/process-wallet-notification-rules',
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json',
+      'x-cron-secret', 'YOUR_WALLET_CRON_SECRET'
+    ),
+    body := jsonb_build_object('source', 'supabase-cron')
+  );
+  $$
+);
 
 select cron.schedule(
   'wallet-process-scheduled-notifications',
@@ -75,6 +94,7 @@ select cron.schedule(
 
 select cron.schedule(
   'operator-send-verification-email',
+  'wallet-process-notification-rules',
   '*/5 * * * *',
   $$
   select net.http_post(

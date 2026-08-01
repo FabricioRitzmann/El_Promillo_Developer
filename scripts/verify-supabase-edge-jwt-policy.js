@@ -19,6 +19,7 @@ const expectedNoJwtFunctions = new Set([
   'create-topup-payment-session',
   'confirm-topup-payment',
   'apple-wallet-webservice',
+  'process-wallet-notification-rules',
   'process-scheduled-wallet-notifications',
   'process-wallet-update-queue'
 ]);
@@ -28,6 +29,7 @@ const walletOperatorFunctions = new Set([
   'send-wallet-notification',
   'resolve-wallet-notification-recipients',
   'check-wallet-notification-limits',
+  'manage-wallet-notification-rule',
   'issue-apple-pass',
   'update-apple-pass',
   'send-apple-wallet-update',
@@ -213,7 +215,7 @@ for (const [name, guards] of Object.entries(additionalOperatorGuardedFunctions))
   assertIncludesAll(name, functionSource(name), guards);
 }
 
-for (const name of ['process-scheduled-wallet-notifications', 'process-wallet-update-queue']) {
+for (const name of ['process-wallet-notification-rules', 'process-scheduled-wallet-notifications', 'process-wallet-update-queue']) {
   const source = functionSource(name);
 
   assert(

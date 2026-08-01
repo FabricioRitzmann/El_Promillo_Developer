@@ -83,7 +83,8 @@ const googleLogActions = [
   'manual_google_wallet_message',
   'google_text_and_notify',
   'google_object_message_fallback',
-  'google_location_object_update'
+  'google_location_object_update',
+  'google_nearby_location_update'
 ];
 
 function add(results, group, status, label, detail = '') {
@@ -305,7 +306,7 @@ async function checkGoogle(results, supabase) {
     await countRows(supabase, 'wallet_push_logs', {
       filter: (query) => query
         .eq('wallet_platform', 'google')
-        .in('action', ['google_text_and_notify', 'google_object_message_fallback', 'google_location_object_update'])
+        .in('action', ['google_text_and_notify', 'google_object_message_fallback', 'google_location_object_update', 'google_nearby_location_update'])
     })
   );
 }

@@ -21,6 +21,7 @@
     <nav class="app-tabbar" aria-label="Hauptbereiche">
       <a class="app-tab" href="dashboard.html#dashboardOverview">Dashboard</a>
       <a class="app-tab" href="dashboard.html#visitorStatistics">Besucherstatistik</a>
+      <a class="app-tab" href="push-center.html">Push Center</a>
       <a class="app-tab" href="scanner.html">Scanner</a>
       <a class="app-tab app-tab-account" href="account.html" aria-label="Konto">
         <svg class="account-tab-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -207,6 +208,15 @@
               <label>Standort
                 <input name="event_location">
               </label>
+              <div class="split-row">
+                <label>Event Latitude
+                  <input name="event_location_latitude" type="number" step="0.000001" min="-90" max="90" placeholder="47.376887">
+                </label>
+                <label>Event Longitude
+                  <input name="event_location_longitude" type="number" step="0.000001" min="-180" max="180" placeholder="8.541694">
+                </label>
+              </div>
+              <p class="muted">Nur für Events ausserhalb des in den Firmendaten gespeicherten Standardstandorts.</p>
             </div>
 
             <div class="feature-fields" data-feature-group="eventBackgroundImage" hidden>
@@ -292,7 +302,10 @@
             <h2>Wallet Benachrichtigungen</h2>
             <p class="muted">Nachrichten werden als Apple-Wallet-Pass-Update oder Google-Wallet-Message verarbeitet.</p>
           </div>
-          <span id="walletNotificationTemplateLabel" class="pill">Aktuelles Template</span>
+          <div class="button-row wrap">
+            <span id="walletNotificationTemplateLabel" class="pill">Aktuelles Template</span>
+            <a id="openPushCenterLink" class="button secondary" href="push-center.html">Wiederholungen verwalten</a>
+          </div>
         </div>
 
         <div id="walletNotificationMessage" class="message" hidden></div>
@@ -358,7 +371,7 @@
               <label>Versand
                 <select id="walletNotificationSendType" name="send_type">
                   <option value="now">Sofort senden</option>
-                  <option value="scheduled">Planen</option>
+                  <option value="scheduled">Einmalig planen</option>
                   <option value="location_based">Standortbasiert vorbereiten</option>
                 </select>
               </label>

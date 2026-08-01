@@ -105,6 +105,7 @@ const walletNotificationTemplate = byId('walletNotificationTemplate');
 const walletNotificationTarget = byId('walletNotificationTarget');
 const walletNotificationTargetFilters = byId('walletNotificationTargetFilters');
 const walletNotificationTemplateLabel = byId('walletNotificationTemplateLabel');
+const openPushCenterLink = byId('openPushCenterLink');
 const walletNotificationSendType = byId('walletNotificationSendType');
 const walletNotificationScheduledAtField = byId('walletNotificationScheduledAtField');
 const walletNotificationRuleSummary = byId('walletNotificationRuleSummary');
@@ -455,6 +456,8 @@ function loadTemplateIntoForm(template) {
   setTemplateField('event_start_time', settings.eventStartTime || '');
   setTemplateField('event_end_time', settings.eventEndTime || '');
   setTemplateField('event_location', settings.eventLocation || '');
+  setTemplateField('event_location_latitude', settings.eventLocationLatitude ?? '');
+  setTemplateField('event_location_longitude', settings.eventLocationLongitude ?? '');
   setTemplateField('event_apple_background_image_url', settings.eventAppleBackgroundImageUrl || settings.eventBackgroundImageUrl || '');
   setTemplateField('event_google_hero_image_url', settings.eventGoogleHeroImageUrl || settings.eventBackgroundImageUrl || '');
   setTemplateField('coupon_title', settings.couponTitle || '');
@@ -514,6 +517,8 @@ function templateSettingsFromForm(formData, templateType) {
     eventStartTime: String(formData.get('event_start_time') || '').trim(),
     eventEndTime: String(formData.get('event_end_time') || '').trim(),
     eventLocation: String(formData.get('event_location') || '').trim(),
+    eventLocationLatitude: templateType === 'event_card' ? numberOrNull(formData.get('event_location_latitude')) : null,
+    eventLocationLongitude: templateType === 'event_card' ? numberOrNull(formData.get('event_location_longitude')) : null,
     eventAppleBackgroundImageUrl: templateType === 'event_card'
       ? String(formData.get('event_apple_background_image_url') || '').trim()
       : '',
@@ -1559,6 +1564,11 @@ async function loadWalletNotificationHistory() {
 async function renderWalletNotificationsPanel() {
   if (!walletNotificationsPanel || !walletNotificationTarget || !walletNotificationTemplate) {
     return;
+  }
+
+  if (openPushCenterLink) {
+    const selectedTemplateId = selectedNotificationTemplateId();
+    openPushCenterLink.href = pagePath(`push-center.html?new=1${selectedTemplateId ? `&template=${encodeURIComponent(selectedTemplateId)}` : ''}`);
   }
 
   if (!state.notificationTemplates.length && state.template) {

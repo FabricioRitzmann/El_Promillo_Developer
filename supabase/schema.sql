@@ -838,11 +838,79 @@ check (
   and octet_length(response_payload::text) <= 20000
 ) not valid;
 
+create table if not exists public.wallet_notification_rules (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null references public.operator_profiles(id) on delete cascade,
+  business_id uuid not null references public.businesses(id) on delete cascade,
+  template_id uuid references public.card_templates(id) on delete set null,
+  name text not null,
+  title text not null,
+  message text not null,
+  target_type text not null default 'template',
+  target_filter jsonb not null default '{}'::jsonb,
+  trigger_type text not null check (trigger_type in ('recurring', 'location_based')),
+  recurrence text not null check (recurrence in ('daily', 'weekly', 'biweekly', 'monthly', 'location_window')),
+  weekdays smallint[] not null default array[]::smallint[],
+  month_day smallint,
+  time_of_day time,
+  time_zone text not null default 'Europe/Zurich',
+  starts_on date not null default current_date,
+  ends_on date,
+  active_from_time time,
+  active_until_time time,
+  location_lat numeric,
+  location_lng numeric,
+  location_radius_m integer,
+  status text not null default 'active' check (status in ('active', 'paused', 'archived')),
+  next_run_at timestamptz,
+  location_active_until_at timestamptz,
+  location_is_active boolean not null default false,
+  last_run_at timestamptz,
+  last_status text,
+  last_result jsonb not null default '{}'::jsonb,
+  processing_started_at timestamptz,
+  created_by uuid not null references auth.users(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint wallet_notification_rules_name_length check (char_length(trim(name)) between 1 and 120),
+  constraint wallet_notification_rules_title_length check (char_length(trim(title)) between 1 and 120),
+  constraint wallet_notification_rules_message_length check (char_length(trim(message)) between 1 and 500),
+  constraint wallet_notification_rules_target_type_check check (target_type in (
+    'all_active', 'template', 'platform_apple', 'platform_google', 'stamp_count', 'streak_count',
+    'vip_level', 'balance_range', 'cloakroom_open', 'event', 'coupon_unredeemed', 'membership_status'
+  )),
+  constraint wallet_notification_rules_weekdays_check check (weekdays <@ array[1,2,3,4,5,6,7]::smallint[]),
+  constraint wallet_notification_rules_month_day_check check (month_day is null or month_day between 1 and 31),
+  constraint wallet_notification_rules_date_range_check check (ends_on is null or ends_on >= starts_on),
+  constraint wallet_notification_rules_location_check check (
+    trigger_type <> 'location_based'
+    or (
+      location_lat is not null
+      and location_lng is not null
+      and location_radius_m is not null
+      and location_lat between -90 and 90
+      and location_lng between -180 and 180
+      and location_radius_m between 50 and 100000
+      and active_from_time is not null
+      and active_until_time is not null
+      and cardinality(weekdays) > 0
+    )
+  ),
+  constraint wallet_notification_rules_schedule_check check (
+    trigger_type <> 'recurring'
+    or (
+      time_of_day is not null
+      and (recurrence = 'daily' or recurrence = 'monthly' or cardinality(weekdays) > 0)
+    )
+  )
+);
+
 create table if not exists public.wallet_notification_campaigns (
   id uuid primary key default gen_random_uuid(),
   owner_id uuid not null references public.operator_profiles(id) on delete cascade,
   business_id uuid not null references public.businesses(id) on delete cascade,
   template_id uuid references public.card_templates(id) on delete set null,
+  notification_rule_id uuid references public.wallet_notification_rules(id) on delete set null,
   title text not null,
   message text not null,
   target_type text not null,
@@ -866,6 +934,9 @@ create table if not exists public.wallet_notification_campaigns (
   constraint wallet_notification_campaigns_location_radius_check
     check (location_radius_m is null or location_radius_m between 50 and 100000)
 );
+
+alter table public.wallet_notification_campaigns
+add column if not exists notification_rule_id uuid references public.wallet_notification_rules(id) on delete set null;
 
 alter table public.wallet_notification_campaigns
 drop constraint if exists wallet_notification_campaigns_target_type_check;
@@ -1441,6 +1512,12 @@ create index if not exists samsung_wallet_events_ref_id_idx on public.samsung_wa
 create index if not exists wallet_notification_campaigns_owner_id_idx on public.wallet_notification_campaigns(owner_id);
 create index if not exists wallet_notification_campaigns_business_id_idx on public.wallet_notification_campaigns(business_id);
 create index if not exists wallet_notification_campaigns_status_idx on public.wallet_notification_campaigns(status, scheduled_at);
+create index if not exists wallet_notification_campaigns_rule_id_idx on public.wallet_notification_campaigns(notification_rule_id, created_at desc);
+create index if not exists wallet_notification_rules_owner_id_idx on public.wallet_notification_rules(owner_id);
+create index if not exists wallet_notification_rules_business_id_idx on public.wallet_notification_rules(business_id);
+create index if not exists wallet_notification_rules_due_idx on public.wallet_notification_rules(status, next_run_at);
+create index if not exists wallet_notification_rules_location_end_idx on public.wallet_notification_rules(status, location_active_until_at)
+where location_is_active = true;
 create index if not exists wallet_notification_recipients_campaign_id_idx on public.wallet_notification_recipients(campaign_id);
 create index if not exists wallet_notification_recipients_card_instance_id_idx on public.wallet_notification_recipients(card_instance_id);
 create index if not exists wallet_notification_recipients_processing_idx on public.wallet_notification_recipients(campaign_id, status, processing_started_at);
@@ -1518,6 +1595,11 @@ for each row execute function public.set_updated_at();
 drop trigger if exists set_wallet_notification_campaigns_updated_at on public.wallet_notification_campaigns;
 create trigger set_wallet_notification_campaigns_updated_at
 before update on public.wallet_notification_campaigns
+for each row execute function public.set_updated_at();
+
+drop trigger if exists set_wallet_notification_rules_updated_at on public.wallet_notification_rules;
+create trigger set_wallet_notification_rules_updated_at
+before update on public.wallet_notification_rules
 for each row execute function public.set_updated_at();
 
 drop trigger if exists set_public_edge_rate_limits_updated_at on public.public_edge_rate_limits;
@@ -4054,6 +4136,7 @@ alter table public.google_wallet_objects enable row level security;
 alter table public.samsung_wallet_instances enable row level security;
 alter table public.samsung_wallet_events enable row level security;
 alter table public.wallet_notification_campaigns enable row level security;
+alter table public.wallet_notification_rules enable row level security;
 alter table public.wallet_notification_recipients enable row level security;
 alter table public.wallet_push_logs enable row level security;
 alter table public.wallet_update_queue enable row level security;
@@ -4293,6 +4376,16 @@ on public.wallet_notification_campaigns
 for select
 to authenticated
 using (owner_id = auth.uid() and public.current_operator_unlocked());
+
+drop policy if exists "unlocked operators can read own wallet notification rules" on public.wallet_notification_rules;
+create policy "unlocked operators can read own wallet notification rules"
+on public.wallet_notification_rules
+for select
+to authenticated
+using (owner_id = auth.uid() and public.current_operator_unlocked());
+
+-- Schreibzugriffe auf Regeln laufen ausschliesslich über die validierende
+-- manage-wallet-notification-rule Edge Function.
 
 drop policy if exists "unlocked operators can update own draft wallet notification campaigns" on public.wallet_notification_campaigns;
 -- Keine direkte Browser-Update-Policy für wallet_notification_campaigns:
@@ -4706,11 +4799,45 @@ grant select (
   samsung_event,
   created_at
 ) on public.samsung_wallet_events to authenticated;
+revoke select, insert, update, delete on public.wallet_notification_rules from authenticated;
+grant select (
+  id,
+  business_id,
+  template_id,
+  name,
+  title,
+  message,
+  target_type,
+  target_filter,
+  trigger_type,
+  recurrence,
+  weekdays,
+  month_day,
+  time_of_day,
+  time_zone,
+  starts_on,
+  ends_on,
+  active_from_time,
+  active_until_time,
+  location_lat,
+  location_lng,
+  location_radius_m,
+  status,
+  next_run_at,
+  location_active_until_at,
+  location_is_active,
+  last_run_at,
+  last_status,
+  last_result,
+  created_at,
+  updated_at
+) on public.wallet_notification_rules to authenticated;
 revoke select, insert, update, delete on public.wallet_notification_campaigns from authenticated;
 grant select (
   id,
   business_id,
   template_id,
+  notification_rule_id,
   title,
   message,
   target_type,

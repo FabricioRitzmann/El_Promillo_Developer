@@ -38,5 +38,8 @@ verify_jwt = false
 [functions.process-scheduled-wallet-notifications]
 verify_jwt = false
 
+[functions.process-wallet-notification-rules]
+verify_jwt = false
+
 [functions.process-wallet-update-queue]
 verify_jwt = false

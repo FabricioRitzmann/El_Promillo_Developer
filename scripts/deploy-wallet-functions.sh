@@ -27,6 +27,8 @@ FUNCTIONS=(
   send-wallet-notification
   resolve-wallet-notification-recipients
   check-wallet-notification-limits
+  manage-wallet-notification-rule
+  process-wallet-notification-rules
   process-scheduled-wallet-notifications
   process-wallet-update-queue
   scanner-actions

@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>El Promillo - Push Center</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="business-brand-link" href="dashboard.html" aria-label="Dashboard">
+        <span class="business-brand-logo" data-business-logo>MU</span>
+        <span class="business-brand-name" data-business-name>Mein Unternehmen</span>
+      </a>
+      <span class="app-brand-mark" aria-label="El Promillo Wallet & Loyalty App">
+        <span class="app-brand-emblem" aria-hidden="true"></span>
+        <img class="app-brand-lockup" src="assets/el-promillo-title-lockup-new-cutout.png" alt="" aria-hidden="true">
+      </span>
+    </header>
+
+    <nav class="app-tabbar" aria-label="Hauptbereiche">
+      <a class="app-tab" href="dashboard.html#dashboardOverview">Dashboard</a>
+      <a class="app-tab" href="dashboard.html#visitorStatistics">Besucherstatistik</a>
+      <a class="app-tab is-active" href="push-center.html" aria-current="page">Push Center</a>
+      <a class="app-tab" href="scanner.html">Scanner</a>
+      <a class="app-tab app-tab-account" href="account.html" aria-label="Konto">
+        <svg class="account-tab-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="8" r="4"></circle>
+          <path d="M4 21a8 8 0 0 1 16 0"></path>
+        </svg>
+      </a>
+    </nav>
+
+    <main class="page-shell push-center-page">
+      <section class="page-heading">
+        <div>
+          <p class="eyebrow">Kommunikation</p>
+          <h1>Push Center</h1>
+          <p class="view-subtitle">Einmalige und wiederkehrende Wallet-Nachrichten zentral planen, bearbeiten und auswerten.</p>
+        </div>
+        <button id="newNotificationRuleButton" class="primary" type="button">Neue Automatisierung</button>
+      </section>
+
+      <div id="pushCenterMessage" class="message" hidden></div>
+
+      <section class="push-center-metrics" aria-label="Push-Kennzahlen">
+        <article class="panel push-metric-card">
+          <span>Aktive Regeln</span>
+          <strong id="activeRuleCount">0</strong>
+        </article>
+        <article class="panel push-metric-card">
+          <span>Nächste 7 Tage</span>
+          <strong id="upcomingRuleCount">0</strong>
+        </article>
+        <article class="panel push-metric-card">
+          <span>Pausiert</span>
+          <strong id="pausedRuleCount">0</strong>
+        </article>
+        <article class="panel push-metric-card">
+          <span>Sendungen 30 Tage</span>
+          <strong id="recentCampaignCount">0</strong>
+        </article>
+      </section>
+
+      <section id="notificationRuleEditor" class="panel notification-rule-editor" hidden>
+        <div class="section-title">
+          <div>
+            <p class="eyebrow">Automatisierung</p>
+            <h2 id="notificationRuleEditorTitle">Neue Push-Regel</h2>
+            <p class="muted">Änderungen wirken ab der nächsten Ausführung. Der bisherige Versandverlauf bleibt unverändert.</p>
+          </div>
+          <button id="closeNotificationRuleEditor" class="secondary" type="button">Schliessen</button>
+        </div>
+
+        <form id="notificationRuleForm" class="notification-rule-form">
+          <input name="rule_id" type="hidden">
+          <div class="notification-rule-form-grid">
+            <fieldset>
+              <legend>1. Inhalt und Zielgruppe</legend>
+              <label>Interner Name
+                <input name="name" maxlength="120" placeholder="z. B. Freitagsangebot" required>
+              </label>
+              <label>Karte
+                <select name="template_id" id="notificationRuleTemplate"></select>
+              </label>
+              <label>Zielgruppe
+                <select name="target_type">
+                  <option value="template">Alle aktiven Besitzer dieser Karte</option>
+                  <option value="all_active">Alle aktiven Wallet-Karten</option>
+                  <option value="platform_apple">Nur Apple Wallet</option>
+                  <option value="platform_google">Nur Google Wallet</option>
+                </select>
+              </label>
+              <label>Titel
+                <input name="title" maxlength="120" placeholder="Kurzer Titel" required>
+              </label>
+              <label>Nachricht
+                <textarea name="message" rows="5" maxlength="500" placeholder="Nachricht für deine Kunden" required></textarea>
+              </label>
+            </fieldset>
+
+            <fieldset>
+              <legend>2. Auslöser</legend>
+              <label>Versandart
+                <select name="trigger_type" id="notificationRuleTriggerType">
+                  <option value="recurring">Wiederkehrend senden</option>
+                  <option value="location_based">In Standortnähe anzeigen</option>
+                </select>
+              </label>
+
+              <div id="recurringRuleFields" class="rule-trigger-fields">
+                <label>Wiederholung
+                  <select name="recurrence" id="notificationRuleRecurrence">
+                    <option value="daily">Täglich</option>
+                    <option value="weekly" selected>Wöchentlich</option>
+                    <option value="biweekly">Alle zwei Wochen</option>
+                    <option value="monthly">Monatlich</option>
+                  </select>
+                </label>
+                <div id="recurringWeekdayFields">
+                  <span class="field-label">Wochentage</span>
+                  <div class="weekday-picker" aria-label="Wochentage auswählen">
+                    <label><input type="checkbox" name="recurring_weekdays" value="1"><span>Mo</span></label>
+                    <label><input type="checkbox" name="recurring_weekdays" value="2"><span>Di</span></label>
+                    <label><input type="checkbox" name="recurring_weekdays" value="3"><span>Mi</span></label>
+                    <label><input type="checkbox" name="recurring_weekdays" value="4"><span>Do</span></label>
+                    <label><input type="checkbox" name="recurring_weekdays" value="5"><span>Fr</span></label>
+                    <label><input type="checkbox" name="recurring_weekdays" value="6"><span>Sa</span></label>
+                    <label><input type="checkbox" name="recurring_weekdays" value="7"><span>So</span></label>
+                  </div>
+                </div>
+                <div class="split-row">
+                  <label>Uhrzeit
+                    <input name="time_of_day" type="time" value="17:00">
+                  </label>
+                  <label id="monthlyDayField" hidden>Tag im Monat
+                    <input name="month_day" type="number" min="1" max="31" value="1">
+                  </label>
+                </div>
+              </div>
+
+              <div id="locationRuleFields" class="rule-trigger-fields" hidden>
+                <div class="message info visible-message">
+                  <strong id="notificationRuleBusinessLocation">Firmenstandort</strong><br>
+                  Apple und Google entscheiden anhand ihrer Wallet-Regeln über die tatsächliche Anzeige in Standortnähe.
+                </div>
+                <div id="eventRuleLocationFields" class="event-rule-location-fields" hidden>
+                  <label class="check-row">
+                    <input name="use_event_location" type="checkbox">
+                    <span>Eigenen Eventstandort statt Firmenstandort verwenden</span>
+                  </label>
+                  <div id="eventRuleCoordinates" class="split-row" hidden>
+                    <label>Event Latitude
+                      <input name="event_location_lat" type="number" step="0.000001" min="-90" max="90">
+                    </label>
+                    <label>Event Longitude
+                      <input name="event_location_lng" type="number" step="0.000001" min="-180" max="180">
+                    </label>
+                  </div>
+                </div>
+                <span class="field-label">Aktive Wochentage</span>
+                <div class="weekday-picker" aria-label="Standort-Wochentage auswählen">
+                  <label><input type="checkbox" name="location_weekdays" value="1"><span>Mo</span></label>
+                  <label><input type="checkbox" name="location_weekdays" value="2"><span>Di</span></label>
+                  <label><input type="checkbox" name="location_weekdays" value="3"><span>Mi</span></label>
+                  <label><input type="checkbox" name="location_weekdays" value="4"><span>Do</span></label>
+                  <label><input type="checkbox" name="location_weekdays" value="5"><span>Fr</span></label>
+                  <label><input type="checkbox" name="location_weekdays" value="6"><span>Sa</span></label>
+                  <label><input type="checkbox" name="location_weekdays" value="7"><span>So</span></label>
+                </div>
+                <div class="split-row">
+                  <label>Aktiv ab
+                    <input name="active_from_time" type="time" value="17:00">
+                  </label>
+                  <label>Aktiv bis
+                    <input name="active_until_time" type="time" value="02:00">
+                  </label>
+                </div>
+                <p class="muted">Ein Zeitfenster über Mitternacht, beispielsweise 17:00–02:00 Uhr, wird automatisch erkannt.</p>
+              </div>
+            </fieldset>
+
+            <fieldset>
+              <legend>3. Laufzeit</legend>
+              <div class="split-row">
+                <label>Startdatum
+                  <input name="starts_on" type="date" required>
+                </label>
+                <label>Enddatum, optional
+                  <input name="ends_on" type="date">
+                </label>
+              </div>
+              <label>Zeitzone
+                <select name="time_zone">
+                  <option value="Europe/Zurich">Europe/Zurich</option>
+                </select>
+              </label>
+              <label class="check-row">
+                <input name="active" type="checkbox" checked>
+                <span>Nach dem Speichern sofort aktivieren</span>
+              </label>
+              <div id="notificationRuleSummary" class="notification-rule-summary"></div>
+            </fieldset>
+          </div>
+
+          <div class="form-actions">
+            <button id="cancelNotificationRuleButton" class="secondary" type="button">Abbrechen</button>
+            <button class="primary" type="submit">Regel speichern</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="section-block">
+        <div class="section-title">
+          <div>
+            <h2>Automatisierungen</h2>
+            <p class="muted">Alle laufenden, geplanten und pausierten Regeln auf einen Blick.</p>
+          </div>
+          <div class="push-rule-filters" role="group" aria-label="Regeln filtern">
+            <button class="secondary is-active" type="button" data-rule-filter="all">Alle</button>
+            <button class="secondary" type="button" data-rule-filter="recurring">Wiederkehrend</button>
+            <button class="secondary" type="button" data-rule-filter="location_based">Standort</button>
+            <button class="secondary" type="button" data-rule-filter="paused">Pausiert</button>
+          </div>
+        </div>
+        <div id="notificationRuleList" class="notification-rule-list"></div>
+      </section>
+
+      <section class="section-block">
+        <div class="section-title">
+          <div>
+            <h2>Versandverlauf</h2>
+            <p class="muted">Die letzten Ausführungen inklusive Status und verwendeter Nachricht.</p>
+          </div>
+        </div>
+        <div id="pushCampaignHistory" class="history-list"></div>
+      </section>
+    </main>
+
+    <script type="module" src="js/pushCenter.js"></script>
+  </body>
+</html>

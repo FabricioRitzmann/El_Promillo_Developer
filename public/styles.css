@@ -845,6 +845,10 @@ textarea {
   display: none;
 }
 
+.scanner-only-mode .desktop-only-link {
+  display: none;
+}
+
 .scanner-only-mode .app-tab-account {
   display: inline-flex;
 }
@@ -2919,7 +2923,343 @@ body:has(.modal-backdrop:not([hidden])) {
   overflow-wrap: anywhere;
 }
 
+.push-center-page {
+  display: grid;
+  gap: var(--section-gap);
+}
+
+.push-center-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--grid-gap);
+}
+
+.push-metric-card {
+  display: grid;
+  gap: 0.35rem;
+  min-height: 7rem;
+  align-content: center;
+}
+
+.push-metric-card span {
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 650;
+}
+
+.push-metric-card strong {
+  color: var(--ink);
+  font-size: clamp(1.8rem, 4vw, 2.45rem);
+  line-height: 1;
+}
+
+.notification-rule-editor {
+  display: grid;
+  gap: 1.25rem;
+  scroll-margin-top: calc(var(--sticky-stack-height) + 1rem);
+}
+
+.notification-rule-editor[hidden] {
+  display: none !important;
+}
+
+.notification-rule-form,
+.notification-rule-form-grid,
+.notification-rule-form fieldset,
+.rule-trigger-fields {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.notification-rule-form-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: start;
+}
+
+.notification-rule-form fieldset {
+  margin: 0;
+  padding: 1rem;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius);
+  background: var(--surface-soft);
+}
+
+.notification-rule-form legend {
+  padding: 0 0.45rem;
+  color: var(--ink);
+  font-weight: 750;
+}
+
+.field-label {
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 650;
+}
+
+.weekday-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.weekday-picker label {
+  cursor: pointer;
+}
+
+.weekday-picker input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.weekday-picker span {
+  display: grid;
+  place-items: center;
+  min-width: 2.65rem;
+  min-height: 2.4rem;
+  padding: 0.35rem 0.55rem;
+  border: 1px solid var(--border-gold);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  font-weight: 700;
+  transition: 0.18s ease;
+}
+
+.weekday-picker input:checked + span {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: #fffaf2;
+  box-shadow: 0 5px 12px rgba(91, 52, 35, 0.18);
+}
+
+.weekday-picker input:focus-visible + span {
+  box-shadow: var(--focus-ring);
+}
+
+.notification-rule-summary {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.9rem;
+  border: 1px solid var(--border-gold);
+  border-radius: var(--radius-sm);
+  background: rgba(214, 184, 137, 0.15);
+}
+
+.notification-rule-summary span:last-child {
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.notification-rule-form .form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.7rem;
+}
+
+.push-rule-filters {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.45rem;
+}
+
+.push-rule-filters .is-active {
+  background: var(--primary);
+  color: #fffaf2;
+  border-color: var(--primary);
+}
+
+.notification-rule-list {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.notification-rule-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1rem;
+  align-items: stretch;
+}
+
+.notification-rule-card.is-paused {
+  opacity: 0.76;
+}
+
+.notification-rule-card-main,
+.notification-rule-card-heading,
+.notification-rule-card-heading > div {
+  display: grid;
+  gap: 0.65rem;
+  min-width: 0;
+}
+
+.notification-rule-card-heading {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+}
+
+.notification-rule-card-heading h3,
+.notification-rule-card-heading p,
+.push-history-item p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.notification-rule-card-heading h3 {
+  font-size: 1.2rem;
+}
+
+.notification-rule-card-heading p,
+.push-history-item p {
+  color: var(--muted);
+}
+
+.notification-rule-details {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(120px, 1fr));
+  gap: 0.65rem;
+  margin-top: 0.45rem;
+}
+
+.notification-rule-details span {
+  display: grid;
+  gap: 0.18rem;
+  padding: 0.7rem;
+  border-radius: var(--radius-sm);
+  background: var(--surface-soft);
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.notification-rule-details strong {
+  color: var(--ink);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.notification-rule-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  gap: 0.5rem;
+  min-width: 8.5rem;
+}
+
+.rule-status-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.rule-status-toggle input {
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
+.ghost.danger {
+  border: 0;
+  background: transparent;
+  color: var(--danger);
+  box-shadow: none;
+}
+
+.ghost.danger:hover {
+  background: rgba(255, 59, 48, 0.08);
+}
+
+.status-active,
+.status-sent {
+  background: rgba(52, 168, 83, 0.14);
+  color: #277a3e;
+}
+
+.status-paused,
+.status-scheduled {
+  background: rgba(214, 184, 137, 0.24);
+  color: var(--ink);
+}
+
+.status-failed,
+.status-partially_failed,
+.status-cancelled {
+  background: rgba(255, 59, 48, 0.12);
+  color: var(--danger);
+}
+
+.push-history-item {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 1rem;
+}
+
+.push-history-item > div:first-child {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.push-history-meta {
+  display: grid;
+  justify-items: end;
+  gap: 0.45rem;
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+@media (max-width: 980px) {
+  .push-center-metrics,
+  .notification-rule-form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .notification-rule-form fieldset:last-child {
+    grid-column: 1 / -1;
+  }
+
+  .notification-rule-details {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 620px) {
+  .push-center-metrics,
+  .notification-rule-form-grid,
+  .notification-rule-card,
+  .notification-rule-card-heading,
+  .notification-rule-details,
+  .push-history-item {
+    grid-template-columns: 1fr;
+  }
+
+  .notification-rule-form fieldset:last-child {
+    grid-column: auto;
+  }
+
+  .push-rule-filters,
+  .notification-rule-form .form-actions {
+    justify-content: stretch;
+  }
+
+  .push-rule-filters button,
+  .notification-rule-form .form-actions button {
+    flex: 1 1 auto;
+  }
+
+  .notification-rule-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    min-width: 0;
+  }
+
+  .push-history-meta {
+    justify-items: start;
+  }
+
   .message-layout {
     padding: 0.85rem;
   }

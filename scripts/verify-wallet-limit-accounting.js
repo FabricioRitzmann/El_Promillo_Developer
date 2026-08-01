@@ -35,6 +35,7 @@ assertIncludes(walletService, [
   "'google_object_message_fallback'",
   "'manual_google_object_update'",
   "'google_location_object_update'",
+  "'google_nearby_location_update'",
   "const NOTIFICATION_LIMIT_STATUSES = ['sent', 'queued', 'prepared']"
 ], 'Limit-Zähler-Aktionen');
 
@@ -50,7 +51,8 @@ const visibleActionsBlock = walletService.match(/const VISIBLE_NOTIFICATION_ACTI
 const limitActionsBlock = walletService.match(/const NOTIFICATION_LIMIT_ACTIONS = \[[\s\S]*?\];/)?.[0] || '';
 assert(
   !visibleActionsBlock.includes('google_object_message_fallback')
-    && !visibleActionsBlock.includes('google_location_object_update'),
+    && !visibleActionsBlock.includes('google_location_object_update')
+    && !visibleActionsBlock.includes('google_nearby_location_update'),
   'Google-Fallbacks dürfen nicht als sichtbare notification_count_24h-Pushs zählen.'
 );
 assert(

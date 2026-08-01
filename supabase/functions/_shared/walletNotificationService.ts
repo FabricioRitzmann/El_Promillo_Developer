@@ -8,7 +8,7 @@ import { walletMessageUrlForCard } from './walletMessageLinks.ts';
 type Row = Record<string, any>;
 const MANUAL_WALLET_LOG_SELECT = 'id,owner_id,business_id,card_instance_id,wallet_platform,status,action,request_payload,response_payload,error_message,created_at';
 const OPERATOR_PROFILE_SELECT = 'id,email,display_name,unlock,created_at,updated_at';
-const BUSINESS_SELECT = 'id,owner_id,name,description,address,phone,website,logo_url,company_logo_path,company_logo_updated_at,created_at,updated_at';
+const BUSINESS_SELECT = 'id,owner_id,name,description,address,location_lat,location_lng,phone,website,logo_url,company_logo_path,company_logo_updated_at,created_at,updated_at';
 const CARD_TEMPLATE_SELECT = [
   'id',
   'owner_id',
@@ -38,6 +38,7 @@ const WALLET_CAMPAIGN_SELECT = [
   'owner_id',
   'business_id',
   'template_id',
+  'notification_rule_id',
   'title',
   'message',
   'target_type',
@@ -188,7 +189,8 @@ const NOTIFICATION_LIMIT_ACTIONS = [
   'google_text_and_notify',
   'google_object_message_fallback',
   'manual_google_object_update',
-  'google_location_object_update'
+  'google_location_object_update',
+  'google_nearby_location_update'
 ];
 const NOTIFICATION_LIMIT_STATUSES = ['sent', 'queued', 'prepared'];
 const VISIBLE_NOTIFICATION_ACTIONS = [
@@ -2186,8 +2188,8 @@ function walletLogAction(recipient: Row, providerResult: Row) {
     return 'google_object_message_fallback';
   }
 
-  if (providerResult.fallback === 'location_based_object_update_only') {
-    return 'google_location_object_update';
+  if (providerResult.fallback === 'google_nearby_location_configured') {
+    return 'google_nearby_location_update';
   }
 
   return 'google_text_and_notify';
@@ -2366,6 +2368,7 @@ export const walletNotificationService = {
     const targetFilter = targetFilterObject(input.targetFilter || input.target_filter || {});
     const sendType = stringValue(input.sendType || input.send_type || 'now');
     const templateId = stringValue(input.templateId || input.template_id);
+    const notificationRuleId = stringValue(input.notificationRuleId || input.notification_rule_id);
     const scheduledAt = dateIso(input.scheduledAt || input.scheduled_at);
     const idempotencyKey = stringValue(input.idempotencyKey || input.idempotency_key);
     const locationLat = input.locationLat ?? input.location_lat ?? null;
@@ -2434,6 +2437,7 @@ export const walletNotificationService = {
         owner_id: context.ownerId,
         business_id: context.business.id,
         template_id: template?.id || null,
+        notification_rule_id: notificationRuleId || null,
         title,
         message,
         target_type: targetType,
@@ -2854,7 +2858,7 @@ export const walletNotificationService = {
 	    if (sendType === 'location_based') {
 	      warnings.push(limitWarning(
 	        'LOCATION_BASED_BEST_EFFORT',
-	        'Standortbasierte Wallet-Nachrichten sind best-effort: Apple nutzt relevante Orte am Pass, Google wird als Kartenupdate-Fallback verarbeitet.',
+	        'Standortbasierte Wallet-Hinweise sind best-effort: Apple und Google entscheiden selbst über Radius, Aufenthaltsdauer und tatsächliche Anzeige.',
 	        reachable.length
 	      ));
 
@@ -2868,8 +2872,8 @@ export const walletNotificationService = {
 
 	      if (googleCards.length) {
 	        warnings.push(limitWarning(
-	          'GOOGLE_LOCATION_PUSH_NOT_SUPPORTED',
-	          `${googleCards.length} Google-Wallet-Karte(n) erhalten im MVP ein Kartenupdate als Fallback statt eines echten Standort-Pushs.`,
+	          'GOOGLE_LOCATION_DISPLAY_PLATFORM_CONTROLLED',
+	          `${googleCards.length} Google-Wallet-Karte(n) erhalten merchantLocations; Google steuert Radius, Verweildauer und Hinweistext.`,
 	          googleCards.length
 	        ));
 	      }
@@ -3345,7 +3349,13 @@ export const walletNotificationService = {
       const fallbackResult = await googleWalletProvider.updateObject(
         objectType,
         objectId,
-        googleWalletProvider.statusPatch(template, cardInstance, objectType, cardInfoMessageRows)
+        {
+          ...googleWalletProvider.statusPatch(template, cardInstance, objectType, cardInfoMessageRows),
+          merchantLocations: [{
+            latitude: Number(campaign.location_lat),
+            longitude: Number(campaign.location_lng)
+          }]
+        }
       );
 
       if (fallbackResult.ok) {
@@ -3356,12 +3366,12 @@ export const walletNotificationService = {
         ok: fallbackResult.ok,
         status: fallbackResult.ok ? 'sent' : 'failed',
         provider: 'google',
-        action: 'google_location_object_update',
+        action: 'google_nearby_location_update',
         template_type: normalizeTemplateType(template),
-        fallback: fallbackResult.ok ? 'location_based_object_update_only' : null,
-        warning_code: fallbackResult.ok ? 'GOOGLE_LOCATION_PUSH_NOT_SUPPORTED' : null,
+        fallback: fallbackResult.ok ? 'google_nearby_location_configured' : null,
+        warning_code: fallbackResult.ok ? 'GOOGLE_LOCATION_DISPLAY_PLATFORM_CONTROLLED' : null,
         warning_message: fallbackResult.ok
-          ? 'Google Wallet unterstützt für diese MVP-Integration keinen echten Standort-Push; die Karte wurde als Fallback aktualisiert.'
+          ? 'Google Wallet Nearby ist konfiguriert; Google entscheidet über Radius, Aufenthaltsdauer und tatsächliche Anzeige.'
           : null,
         error_code: fallbackResult.ok ? null : 'GOOGLE_LOCATION_FALLBACK_FAILED',
         error_message: fallbackResult.ok ? null : 'Google Wallet Standort-Fallback konnte nicht gespeichert werden.',
@@ -3562,6 +3572,83 @@ export const walletNotificationService = {
 
   async failWalletOperationIdempotencyReservation(context: Row | null, reservation: Row | null, error: any, fallbackCode = 'WALLET_OPERATION_ERROR') {
     return failManualWalletLogReservation(context, reservation, error, fallbackCode);
+  },
+
+  async setLocationRuleActive(context: Row, rule: Row, active: boolean) {
+    const targetFilter = targetFilterObject(rule.target_filter || {});
+    validateTargetFilter(rule.target_type, targetFilter);
+    const instances = await loadWalletCardInstances(context, {
+      businessId: rule.business_id,
+      templateId: rule.template_id,
+      pushEnabledOnly: true,
+      includeGoogleObjects: true
+    });
+    const eligible = instances
+      .filter((instance: Row) => featureEnabled(instance.card_templates, 'notifications'))
+      .filter((instance: Row) => cardMatchesTarget(instance, rule.target_type, targetFilter));
+    const results = [];
+
+    for (const cardInstance of eligible) {
+      const template = cardInstance.card_templates;
+
+      try {
+        if (cardInstance.wallet_platform === 'apple') {
+          await appleWalletProvider.updatePassFields(context.supabaseAdmin, cardInstance, template, {
+            locations: active
+              ? [{
+                latitude: Number(rule.location_lat),
+                longitude: Number(rule.location_lng),
+                relevantText: stringValue(rule.message)
+              }]
+              : []
+          }, {
+            reason: active ? 'notification_rule_location_active' : 'notification_rule_location_inactive',
+            enqueue: false
+          });
+          const push = await appleWalletProvider.sendPushUpdate(context.supabaseAdmin, cardInstance);
+          results.push({ card_instance_id: cardInstance.id, platform: 'apple', ok: Boolean(push.ok), status: push.status });
+          continue;
+        }
+
+        if (cardInstance.wallet_platform === 'google') {
+          const googleObject = Array.isArray(cardInstance.google_wallet_objects)
+            ? cardInstance.google_wallet_objects[0]
+            : cardInstance.google_wallet_objects;
+          const objectType = googleWalletProvider.normalizeObjectType(
+            googleObject?.object_type || googleWalletProvider.objectTypeForTemplate(template)
+          );
+          const objectId = stringValue(googleObject?.object_id || cardInstance.google_object_id || cardInstance.wallet_object_id);
+
+          if (!objectType || !objectId) {
+            results.push({ card_instance_id: cardInstance.id, platform: 'google', ok: false, status: 'mapping_missing' });
+            continue;
+          }
+
+          const update = await googleWalletProvider.updateObject(objectType, objectId, {
+            merchantLocations: active
+              ? [{ latitude: Number(rule.location_lat), longitude: Number(rule.location_lng) }]
+              : []
+          });
+          results.push({ card_instance_id: cardInstance.id, platform: 'google', ok: Boolean(update.ok), status: update.ok ? 'updated' : 'failed' });
+        }
+      } catch (error) {
+        results.push({
+          card_instance_id: cardInstance.id,
+          platform: cardInstance.wallet_platform,
+          ok: false,
+          status: 'failed',
+          error_message: error?.message || 'Standort-Relevanz konnte nicht aktualisiert werden.'
+        });
+      }
+    }
+
+    return {
+      active,
+      matching_count: eligible.length,
+      successful_count: results.filter((result: Row) => result.ok).length,
+      failed_count: results.filter((result: Row) => !result.ok).length,
+      results
+    };
   },
 
   async processScheduledWalletNotifications(context: Row) {
