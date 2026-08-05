@@ -152,9 +152,9 @@ assertIncludes(dashboardSource, [
 ], 'Dashboard muss Kundenkarten mit expliziter sicherer Spaltenliste laden');
 
 assertIncludes(scannerSource, [
-  'customerCardScannerSelect',
-  'select: customerCardScannerSelect'
-], 'Scanner muss Kundenkarten mit expliziter sicherer Spaltenliste laden');
+  "callScannerRequest({ action: 'inspect', code })",
+  "action: 'inspect'"
+], 'Scanner muss Karten und Karteninstanzen über die abgesicherte Scanner-API laden');
 
 assertExcludes(dashboardSource, [
   "select: '*,card_templates(*)'",
@@ -163,7 +163,9 @@ assertExcludes(dashboardSource, [
 
 assertExcludes(scannerSource, [
   "select: '*,card_templates(*)'",
-  'pass_authentication_token'
-], 'Scanner darf keine rohe Kundenkarte inklusive Apple-Auth-Token laden');
+  'pass_authentication_token',
+  "selectRows('card_instances'",
+  "selectRows(\"card_instances\""
+], 'Scanner darf keine rohe Kundenkarte oder card_instances direkt im Browser laden');
 
 console.log('Editor-Historie und Kundenkartenabfragen laden nur minimierte sichere Felder in den Browser.');

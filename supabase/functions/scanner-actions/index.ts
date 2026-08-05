@@ -442,6 +442,7 @@ async function loadCardInstanceForScan(supabaseAdmin: any, card: Row) {
       'business_id',
       'template_id',
       'card_instance_number',
+      'wallet_platform',
       'demographics_collected',
       'customer_gender',
       'customer_age_group',
@@ -449,7 +450,11 @@ async function loadCardInstanceForScan(supabaseAdmin: any, card: Row) {
       'demographics_collected_by',
       'first_scanned_at',
       'last_scanned_at',
-      'scan_count'
+      'scan_count',
+      'resolved_emblem_key',
+      'resolved_emblem_url',
+      'emblem_updated_at',
+      'updated_at'
     ].join(','))
     .eq('customer_card_id', card.id)
     .maybeSingle();
@@ -1425,6 +1430,32 @@ Deno.serve(async (request) => {
 
     const now = new Date().toISOString();
     const action = stringValue(body.action);
+    const cardInstanceBeforeScan = await loadCardInstanceForScan(supabaseAdmin, card);
+
+    if (action === 'inspect') {
+      return json({
+        ok: true,
+        action: 'inspect',
+        card: publicOperatorCard(card),
+        card_instance: {
+          id: cardInstanceBeforeScan.id,
+          card_instance_number: cardInstanceBeforeScan.card_instance_number,
+          wallet_platform: cardInstanceBeforeScan.wallet_platform,
+          demographics_collected: cardInstanceBeforeScan.demographics_collected,
+          customer_gender: cardInstanceBeforeScan.customer_gender,
+          customer_age_group: cardInstanceBeforeScan.customer_age_group,
+          demographics_collected_at: cardInstanceBeforeScan.demographics_collected_at,
+          first_scanned_at: cardInstanceBeforeScan.first_scanned_at,
+          last_scanned_at: cardInstanceBeforeScan.last_scanned_at,
+          scan_count: cardInstanceBeforeScan.scan_count,
+          resolved_emblem_key: cardInstanceBeforeScan.resolved_emblem_key,
+          resolved_emblem_url: cardInstanceBeforeScan.resolved_emblem_url,
+          emblem_updated_at: cardInstanceBeforeScan.emblem_updated_at,
+          updated_at: cardInstanceBeforeScan.updated_at
+        }
+      });
+    }
+
     let preflightAction = action;
 
     if (action !== 'manual_update') {
@@ -1437,7 +1468,6 @@ Deno.serve(async (request) => {
       preflightAction = validation.action;
     }
 
-    const cardInstanceBeforeScan = await loadCardInstanceForScan(supabaseAdmin, card);
     const demographics = normalizeDemographics(body.demographics || body);
 
     if (!cardInstanceBeforeScan.demographics_collected && !demographics) {
