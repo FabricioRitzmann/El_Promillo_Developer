@@ -1751,16 +1751,17 @@ app.get('/api/templates/:templateId/qr.pdf', async (req, res) => {
     const baseUrl = config.app.baseUrl || `http://${host}:${port}`;
     const claimUrl = claimUrlForTemplate(template, baseUrl);
     const format = String(req.query.format || 'a4').toLowerCase();
+    const normalizedFormat = ['a4', 'a5', 'a6'].includes(format) ? format : 'a4';
     const publicTemplate = publicCardTemplateResponse(template);
     const assets = await loadTemplatePdfAssets(publicTemplate);
-    const pdfBuffer = buildTemplateQrPdf({ template: publicTemplate, claimUrl, format, assets });
+    const pdfBuffer = buildTemplateQrPdf({ template: publicTemplate, claimUrl, format: normalizedFormat, assets });
     const safeName = String(template.card_name || 'karte')
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/(^-|-$)/g, '') || 'karte';
 
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="qr-${safeName}-${format === 'a5' ? 'a5' : 'a4'}.pdf"`);
+    res.setHeader('Content-Disposition', `attachment; filename="qr-${safeName}-${normalizedFormat}.pdf"`);
     res.setHeader('Cache-Control', 'no-store');
     res.send(pdfBuffer);
   } catch (error) {

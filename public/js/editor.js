@@ -91,6 +91,7 @@ const editorQrImage = byId('editorQrImage');
 const editorClaimUrl = byId('editorClaimUrl');
 const editorPdfA4 = byId('editorPdfA4');
 const editorPdfA5 = byId('editorPdfA5');
+const editorPdfA6 = byId('editorPdfA6');
 const editorFeatureSummary = byId('editorFeatureSummary');
 const optionalFeaturePanel = byId('optionalFeaturePanel');
 const optionalFeatureToggles = byId('optionalFeatureToggles');
@@ -601,6 +602,7 @@ function renderEditorQrPanel() {
   const qrUrl = apiUrl(`/api/qrcode?text=${encodeURIComponent(claimUrl)}`);
   const pdfA4Url = apiUrl(`/api/templates/${encodeURIComponent(state.templateId)}/qr.pdf?format=a4`);
   const pdfA5Url = apiUrl(`/api/templates/${encodeURIComponent(state.templateId)}/qr.pdf?format=a5`);
+  const pdfA6Url = apiUrl(`/api/templates/${encodeURIComponent(state.templateId)}/qr.pdf?format=a6`);
 
   editorQrPanel.hidden = false;
   editorQrHint.hidden = true;
@@ -619,6 +621,10 @@ function renderEditorQrPanel() {
 
   if (editorPdfA5) {
     editorPdfA5.href = pdfA5Url;
+  }
+
+  if (editorPdfA6) {
+    editorPdfA6.href = pdfA6Url;
   }
 
   if (editorFeatureSummary) {

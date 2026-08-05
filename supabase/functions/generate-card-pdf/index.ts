@@ -1,4 +1,4 @@
-// Supabase Edge Function: QR-/Karten-PDFs für A4/A5.
+// Supabase Edge Function: QR-/Karten-PDFs für A4/A5/A6.
 //
 // Erzeugt eine druckbare PDF mit El-Promillo-Branding, Kartenname/Funktion,
 // Claim-QR und Google-Wallet-Play-Store-QR.
@@ -17,7 +17,8 @@ const corsHeaders = {
 
 const pageSizes: Record<string, [number, number]> = {
   a4: [841.89, 595.28],
-  a5: [595.28, 419.53]
+  a5: [595.28, 419.53],
+  a6: [419.53, 297.64]
 };
 
 const designSize = {
@@ -447,8 +448,13 @@ function byteLength(value: string) {
   return new TextEncoder().encode(value).length;
 }
 
+function normalizePdfFormat(format: unknown) {
+  const value = String(format || 'a4').toLowerCase();
+  return ['a4', 'a5', 'a6'].includes(value) ? value : 'a4';
+}
+
 function buildTemplateQrPdf(template: Row, claimUrl: string, format: string) {
-  const normalizedFormat = String(format || 'a4').toLowerCase() === 'a5' ? 'a5' : 'a4';
+  const normalizedFormat = normalizePdfFormat(format);
   const [pageWidth, pageHeight] = pageSizes[normalizedFormat];
   const content = buildPdfContent(template, claimUrl, pageWidth, pageHeight);
   const streamLength = byteLength(content);
@@ -630,7 +636,7 @@ Deno.serve(async (request) => {
     }
 
     const claimUrl = claimUrlForTemplate(template, appBaseUrl);
-    const normalizedFormat = String(format).toLowerCase() === 'a5' ? 'a5' : 'a4';
+    const normalizedFormat = normalizePdfFormat(format);
     const pdf = buildTemplateQrPdf(template, claimUrl, normalizedFormat);
     const fileName = `qr-${safeFileName(template.card_name)}-${normalizedFormat}.pdf`;
 

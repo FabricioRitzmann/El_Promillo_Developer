@@ -4,7 +4,8 @@ import { cardFeatureRows, templateFeatureSummary, templateTypeLabel } from '../p
 
 const pageSizes = {
   a4: [841.89, 595.28],
-  a5: [595.28, 419.53]
+  a5: [595.28, 419.53],
+  a6: [419.53, 297.64]
 };
 
 const designSize = {
@@ -427,8 +428,13 @@ function object(content) {
   return `${content}\n`;
 }
 
+function normalizePdfFormat(format) {
+  const value = String(format || 'a4').toLowerCase();
+  return ['a4', 'a5', 'a6'].includes(value) ? value : 'a4';
+}
+
 export function buildTemplateQrPdf({ template, claimUrl, format = 'a4' }) {
-  const normalizedFormat = String(format || 'a4').toLowerCase() === 'a5' ? 'a5' : 'a4';
+  const normalizedFormat = normalizePdfFormat(format);
   const [pageWidth, pageHeight] = pageSizes[normalizedFormat];
   const content = buildContent(template, claimUrl, pageWidth, pageHeight);
   const stream = Buffer.from(content, 'utf8');

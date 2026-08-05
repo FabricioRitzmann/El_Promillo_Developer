@@ -329,6 +329,7 @@ function renderTemplates() {
     const qrUrl = apiUrl(`/api/qrcode?text=${encodeURIComponent(claimUrl)}`);
     const pdfA4Url = apiUrl(`/api/templates/${encodeURIComponent(template.id)}/qr.pdf?format=a4`);
     const pdfA5Url = apiUrl(`/api/templates/${encodeURIComponent(template.id)}/qr.pdf?format=a5`);
+    const pdfA6Url = apiUrl(`/api/templates/${encodeURIComponent(template.id)}/qr.pdf?format=a6`);
 
     return `
       <tr class="cards-table-row" data-editor-url="${escapeHtml(editorUrl)}">
@@ -358,6 +359,7 @@ function renderTemplates() {
             data-qr-filename="qr-${escapeHtml(template.card_name)}.svg"
             data-pdf-a4-url="${escapeHtml(pdfA4Url)}"
             data-pdf-a5-url="${escapeHtml(pdfA5Url)}"
+            data-pdf-a6-url="${escapeHtml(pdfA6Url)}"
             aria-label="Aktionen für ${escapeHtml(template.card_name)}"
           >
             <option value="">Aktionen</option>
@@ -366,6 +368,7 @@ function renderTemplates() {
             <option value="qr-download">QR herunterladen</option>
             <option value="pdf-a4">PDF A4 öffnen</option>
             <option value="pdf-a5">PDF A5 öffnen</option>
+            <option value="pdf-a6">PDF A6 öffnen</option>
           </select>
         </td>
       </tr>
@@ -523,6 +526,11 @@ async function handleTemplateAction(select) {
 
   if (action === 'pdf-a5') {
     window.location.href = select.dataset.pdfA5Url;
+    return;
+  }
+
+  if (action === 'pdf-a6') {
+    window.location.href = select.dataset.pdfA6Url;
   }
 }
 
