@@ -1,6 +1,7 @@
 import QRCode from 'qrcode';
 import zlib from 'node:zlib';
 import { cardFeatureRows, templateFeatureSummary, templateTypeLabel } from '../public/js/templateFeatures.js';
+import { pdfBrandLogo } from './pdfBrandLogoData.js';
 
 const pageSizes = {
   a4: [841.89, 595.28],
@@ -61,6 +62,15 @@ function line(x1, y1, x2, y2, color, width = 1) {
     `${width.toFixed(2)} w`,
     `${x1.toFixed(2)} ${y1.toFixed(2)} m`,
     `${x2.toFixed(2)} ${y2.toFixed(2)} l S`
+  ].join('\n');
+}
+
+function imageXObject(name, x, y, width, height) {
+  return [
+    'q',
+    `${width.toFixed(2)} 0 0 ${height.toFixed(2)} ${x.toFixed(2)} ${y.toFixed(2)} cm`,
+    `/${name} Do`,
+    'Q'
   ].join('\n');
 }
 
@@ -358,13 +368,11 @@ function cardFunctionText(template) {
 }
 
 function brandLockup(x, y) {
+  const height = 78;
+  const width = height * (pdfBrandLogo.width / pdfBrandLogo.height);
+
   return [
-    roundedRect(x, y, 54, 62, 10, [0.92, 0.80, 0.58], [0.72, 0.47, 0.22], 1.4),
-    roundedRect(x + 5, y + 5, 44, 52, 8, [1, 0.98, 0.93], [0.84, 0.66, 0.39], 1),
-    textLine('EP', x + 12, y + 24, 22, [0.36, 0.20, 0.13], 'F2'),
-    textLine('El Promillo', x + 66, y + 32, 38, [0.29, 0.15, 0.09], 'F3'),
-    line(x + 74, y + 22, x + 236, y + 22, [0.82, 0.63, 0.36], 1.4),
-    textLine('Wallet & Loyalty Cards', x + 96, y + 8, 9, [0.36, 0.20, 0.13], 'F1')
+    imageXObject('ImBrandLogo', x, y - 8, width, height)
   ].join('\n');
 }
 
@@ -428,6 +436,12 @@ function object(content) {
   return `${content}\n`;
 }
 
+function brandLogoObject(objectId) {
+  const stream = `${pdfBrandLogo.hex}>`;
+
+  return object(`${objectId} 0 obj\n<< /Type /XObject /Subtype /Image /Width ${pdfBrandLogo.width} /Height ${pdfBrandLogo.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter [/ASCIIHexDecode /DCTDecode] /Length ${stream.length} >>\nstream\n${stream}\nendstream\nendobj`);
+}
+
 function normalizePdfFormat(format) {
   const value = String(format || 'a4').toLowerCase();
   return ['a4', 'a5', 'a6'].includes(value) ? value : 'a4';
@@ -441,11 +455,12 @@ export function buildTemplateQrPdf({ template, claimUrl, format = 'a4' }) {
   const objects = [
     object('1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj'),
     object('2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj'),
-    object(`3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth.toFixed(2)} ${pageHeight.toFixed(2)}] /Resources << /Font << /F1 4 0 R /F2 5 0 R /F3 6 0 R >> >> /Contents 7 0 R >>\nendobj`),
+    object(`3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth.toFixed(2)} ${pageHeight.toFixed(2)}] /Resources << /Font << /F1 4 0 R /F2 5 0 R /F3 6 0 R >> /XObject << /ImBrandLogo 8 0 R >> >> /Contents 7 0 R >>\nendobj`),
     object('4 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj'),
     object('5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>\nendobj'),
     object('6 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Times-BoldItalic >>\nendobj'),
-    object(`7 0 obj\n<< /Length ${stream.length} >>\nstream\n${content}\nendstream\nendobj`)
+    object(`7 0 obj\n<< /Length ${stream.length} >>\nstream\n${content}\nendstream\nendobj`),
+    brandLogoObject(8)
   ];
   const header = '%PDF-1.4\n';
   let body = header;
