@@ -1,11 +1,18 @@
 import QRCode from 'qrcode';
 import zlib from 'node:zlib';
-import { activeFeatureLabels, cardFeatureRows, templateFeatureSummary, templateTypeLabel } from '../public/js/templateFeatures.js';
+import { cardFeatureRows, templateFeatureSummary, templateTypeLabel } from '../public/js/templateFeatures.js';
 
 const pageSizes = {
-  a4: [595.28, 841.89],
-  a5: [419.53, 595.28]
+  a4: [841.89, 595.28],
+  a5: [595.28, 419.53]
 };
+
+const designSize = {
+  width: 841.89,
+  height: 595.28
+};
+
+const googleWalletPlayStoreUrl = 'https://play.google.com/store/apps/details?id=com.google.android.apps.walletnfcrel';
 
 function pdfText(value) {
   return String(value ?? '')
@@ -29,10 +36,10 @@ function hexToRgb01(hexColor, fallback = '#111827') {
   ];
 }
 
-function textLine(text, x, y, size = 11, color = [0.1, 0.1, 0.1]) {
+function textLine(text, x, y, size = 11, color = [0.1, 0.1, 0.1], font = 'F1') {
   return [
     'BT',
-    `/F1 ${size} Tf`,
+    `/${font} ${size} Tf`,
     `${color.map((value) => value.toFixed(3)).join(' ')} rg`,
     `${x.toFixed(2)} ${y.toFixed(2)} Td`,
     `(${pdfText(text)}) Tj`,
@@ -45,6 +52,76 @@ function rect(x, y, width, height, color, operator = 'f') {
     `${color.map((value) => value.toFixed(3)).join(' ')} rg`,
     `${x.toFixed(2)} ${y.toFixed(2)} ${width.toFixed(2)} ${height.toFixed(2)} re ${operator}`
   ].join('\n');
+}
+
+function line(x1, y1, x2, y2, color, width = 1) {
+  return [
+    `${color.map((value) => value.toFixed(3)).join(' ')} RG`,
+    `${width.toFixed(2)} w`,
+    `${x1.toFixed(2)} ${y1.toFixed(2)} m`,
+    `${x2.toFixed(2)} ${y2.toFixed(2)} l S`
+  ].join('\n');
+}
+
+function roundedRect(x, y, width, height, radius, fill, stroke, strokeWidth = 1) {
+  const right = x + width;
+  const top = y + height;
+  const control = radius * 0.5522847498;
+  const commands = [
+    `${fill.map((value) => value.toFixed(3)).join(' ')} rg`,
+    ...(stroke ? [
+      `${stroke.map((value) => value.toFixed(3)).join(' ')} RG`,
+      `${strokeWidth.toFixed(2)} w`
+    ] : []),
+    `${(x + radius).toFixed(2)} ${y.toFixed(2)} m`,
+    `${(right - radius).toFixed(2)} ${y.toFixed(2)} l`,
+    `${(right - radius + control).toFixed(2)} ${y.toFixed(2)} ${right.toFixed(2)} ${(y + radius - control).toFixed(2)} ${right.toFixed(2)} ${(y + radius).toFixed(2)} c`,
+    `${right.toFixed(2)} ${(top - radius).toFixed(2)} l`,
+    `${right.toFixed(2)} ${(top - radius + control).toFixed(2)} ${(right - radius + control).toFixed(2)} ${top.toFixed(2)} ${(right - radius).toFixed(2)} ${top.toFixed(2)} c`,
+    `${(x + radius).toFixed(2)} ${top.toFixed(2)} l`,
+    `${(x + radius - control).toFixed(2)} ${top.toFixed(2)} ${x.toFixed(2)} ${(top - radius + control).toFixed(2)} ${x.toFixed(2)} ${(top - radius).toFixed(2)} c`,
+    `${x.toFixed(2)} ${(y + radius).toFixed(2)} l`,
+    `${x.toFixed(2)} ${(y + radius - control).toFixed(2)} ${(x + radius - control).toFixed(2)} ${y.toFixed(2)} ${(x + radius).toFixed(2)} ${y.toFixed(2)} c`,
+    stroke ? 'B' : 'f'
+  ];
+
+  return commands.join('\n');
+}
+
+function clippedText(text, maxChars) {
+  const normalized = pdfText(text).trim();
+
+  return normalized.length > maxChars ? `${normalized.slice(0, Math.max(0, maxChars - 3))}...` : normalized;
+}
+
+function wrappedText(text, x, y, maxWidth, size = 11, color = [0.1, 0.1, 0.1], leading = 14, maxLines = 3, font = 'F1') {
+  const words = pdfText(text).split(/\s+/).filter(Boolean);
+  const maxChars = Math.max(12, Math.floor(maxWidth / (size * 0.52)));
+  const lines = [];
+  let currentLine = '';
+
+  for (const word of words) {
+    const nextLine = [currentLine, word].filter(Boolean).join(' ');
+
+    if (nextLine.length <= maxChars) {
+      currentLine = nextLine;
+      continue;
+    }
+
+    if (currentLine) {
+      lines.push(currentLine);
+    }
+
+    currentLine = word;
+  }
+
+  if (currentLine) {
+    lines.push(currentLine);
+  }
+
+  return lines.slice(0, maxLines).map((lineText, index) => (
+    textLine(lineText, x, y - (index * leading), size, color, font)
+  )).join('\n');
 }
 
 function templateBusiness(template) {
@@ -267,53 +344,82 @@ function drawQr(content, x, y, size) {
   return commands.join('\n');
 }
 
-function buildContent(template, claimUrl, pageWidth, pageHeight) {
-  const margin = pageWidth < 500 ? 34 : 52;
-  const cardWidth = pageWidth < 500 ? 158 : 210;
-  const cardHeight = cardWidth * 0.64;
-  const cardX = margin;
-  const cardY = pageHeight - margin - 210;
-  const qrSize = pageWidth < 500 ? 158 : 210;
-  const qrX = pageWidth - margin - qrSize;
-  const qrY = cardY;
-  const primary = hexToRgb01(template.primary_color, '#fffaf2');
-  const foreground = hexToRgb01(template.text_color, '#5b3423');
-  const businessName = businessNameForTemplate(template);
-  const now = new Date().toLocaleDateString('de-CH');
-  const description = String(template.description || templateTypeLabel(template)).slice(0, 90);
-  const featureRows = cardFeatureRows(template).slice(0, 3);
-  const activeFeatures = activeFeatureLabels(template, { includeBaseFallback: false });
-  const featureLines = featureRows.map((row, index) => (
-    textLine(`${row.label}: ${row.value}`.slice(0, 36), cardX + 18, cardY + cardHeight - 106 - (index * 14), 8, foreground)
-  ));
-  const activeFeatureLines = activeFeatures.slice(0, 6).map((label, index) => (
-    textLine(`- ${label}`.slice(0, 32), qrX, qrY - 72 - (index * 14), 9, [0.25, 0.29, 0.36])
-  ));
+function cardFunctionText(template) {
+  const type = templateTypeLabel(template);
+  cardFeatureRows(template);
+  const summary = templateFeatureSummary(template);
+
+  if (summary === 'Basiskarte' || summary.toLowerCase().startsWith(type.toLowerCase())) {
+    return summary === 'Basiskarte' ? type : summary;
+  }
+
+  return `${type} - ${summary}`;
+}
+
+function brandLockup(x, y) {
+  return [
+    roundedRect(x, y, 54, 62, 10, [0.92, 0.80, 0.58], [0.72, 0.47, 0.22], 1.4),
+    roundedRect(x + 5, y + 5, 44, 52, 8, [1, 0.98, 0.93], [0.84, 0.66, 0.39], 1),
+    textLine('EP', x + 12, y + 24, 22, [0.36, 0.20, 0.13], 'F2'),
+    textLine('El Promillo', x + 66, y + 32, 38, [0.29, 0.15, 0.09], 'F3'),
+    line(x + 74, y + 22, x + 236, y + 22, [0.82, 0.63, 0.36], 1.4),
+    textLine('Wallet & Loyalty Cards', x + 96, y + 8, 9, [0.36, 0.20, 0.13], 'F1')
+  ].join('\n');
+}
+
+function qrTile(x, y, width, height, title, subtitle, qrContent, titleColor) {
+  const qrSize = 112;
+  const qrX = x + width - qrSize - 18;
+  const qrY = y + ((height - qrSize) / 2) - 2;
 
   return [
-    logoMark(template, margin, pageHeight - margin - 16, 28, primary, foreground),
-    textLine(businessName, margin + 38, pageHeight - margin, 20),
-    textLine(template.card_name || 'Karte', margin, pageHeight - margin - 26, 28),
-    textLine('Scannen und Karte zum Wallet hinzufügen', margin, pageHeight - margin - 58, 13, [0.25, 0.29, 0.36]),
-    rect(cardX, cardY, cardWidth, cardHeight, primary),
-    logoMark(template, cardX + 18, cardY + cardHeight - 36, 18, [1, 1, 1], primary),
-    textLine(businessName, cardX + 42, cardY + cardHeight - 28, 11, foreground),
-    textLine(template.card_name || 'Karte', cardX + 18, cardY + cardHeight - 58, 19, foreground),
-    textLine(description, cardX + 18, cardY + cardHeight - 82, 9, foreground),
-    ...featureLines,
-    textLine(templateTypeLabel(template), cardX + 18, cardY + 32, 9, foreground),
-    textLine(templateFeatureSummary(template).slice(0, 36), cardX + cardWidth - 90, cardY + 32, 9, foreground),
-    textLine('Karten-ID wird beim Hinzufügen erzeugt', cardX + 18, cardY + 16, 7, foreground),
-    rect(qrX - 10, qrY - 10, qrSize + 20, qrSize + 20, [0.95, 0.96, 0.98]),
-    drawQr(claimUrl, qrX, qrY, qrSize),
-    textLine('Claim-Link', qrX, qrY - 26, 10, [0.25, 0.29, 0.36]),
-    textLine(claimUrl.slice(0, 74), qrX, qrY - 42, 8, [0.25, 0.29, 0.36]),
-    ...(activeFeatureLines.length ? [
-      textLine('Aktivierte Funktionen', qrX, qrY - 58, 10, [0.25, 0.29, 0.36]),
-      ...activeFeatureLines
-    ] : []),
-    textLine(`Template-ID: ${template.id}`, margin, margin + 36, 9, [0.35, 0.39, 0.47]),
-    textLine(`Erstellt: ${now}`, margin, margin + 20, 9, [0.35, 0.39, 0.47])
+    roundedRect(x, y, width, height, 18, [1, 1, 1], [0.92, 0.86, 0.78], 1),
+    textLine(title, x + 18, y + height - 31, 13, titleColor, 'F2'),
+    wrappedText(subtitle, x + 18, y + height - 49, qrX - x - 34, 9.2, [0.55, 0.38, 0.28], 12, 2),
+    line(x + 18, y + 44, qrX - 12, y + 44, [0.82, 0.63, 0.36], 2),
+    roundedRect(qrX - 8, qrY - 8, qrSize + 16, qrSize + 16, 15, [1, 1, 1], [0.93, 0.88, 0.82], 1),
+    drawQr(qrContent, qrX, qrY, qrSize)
+  ].join('\n');
+}
+
+function buildContent(template, claimUrl, pageWidth, pageHeight) {
+  const scale = Math.min(pageWidth / designSize.width, pageHeight / designSize.height);
+  const offsetX = (pageWidth - (designSize.width * scale)) / 2;
+  const offsetY = (pageHeight - (designSize.height * scale)) / 2;
+  const margin = 48;
+  const leftX = margin;
+  const leftY = 120;
+  const leftWidth = 438;
+  const leftHeight = 328;
+  const rightX = leftX + leftWidth + 28;
+  const now = new Date().toLocaleDateString('de-CH');
+  const cardName = clippedText(template.card_name || 'Karte', 34);
+  const functionText = clippedText(cardFunctionText(template), 72);
+  const bodyText = 'Zum Hinzufuegen der Karte den Claim-QR scannen. Android- und Samsung-Nutzer koennen Google Wallet bei Bedarf ueber den zweiten QR herunterladen.';
+
+  const design = [
+    rect(0, 0, designSize.width, designSize.height, [1, 0.992, 0.976]),
+    rect(0, designSize.height - 86, designSize.width, 86, [0.984, 0.945, 0.882]),
+    rect(0, 0, designSize.width, 64, [1, 0.969, 0.925]),
+    brandLockup(margin, designSize.height - 78),
+    roundedRect(leftX, leftY, leftWidth, leftHeight, 24, [1, 0.976, 0.933], [0.92, 0.86, 0.78], 1.2),
+    line(leftX + 28, leftY + leftHeight - 76, leftX + leftWidth - 28, leftY + leftHeight - 76, [0.82, 0.63, 0.36], 1.6),
+    textLine('DIGITALE WALLET-KARTE', leftX + 30, leftY + leftHeight - 42, 10.5, [0.72, 0.43, 0.22], 'F2'),
+    textLine(cardName, leftX + 30, leftY + leftHeight - 116, 41, [0.29, 0.15, 0.09], 'F3'),
+    wrappedText(functionText, leftX + 32, leftY + leftHeight - 156, leftWidth - 64, 20, [0.55, 0.31, 0.18], 24, 2, 'F2'),
+    wrappedText(bodyText, leftX + 32, leftY + leftHeight - 214, leftWidth - 64, 12.5, [0.55, 0.38, 0.28], 18, 4),
+    qrTile(rightX, 324, 296, 148, 'Karte hinzufuegen', 'Claim-QR scannen', claimUrl, [0.55, 0.31, 0.18]),
+    qrTile(rightX, 148, 296, 148, 'Google Wallet laden', 'Fuer Samsung und Android', googleWalletPlayStoreUrl, [0.72, 0.43, 0.22]),
+    textLine('el-promillo.ch  |  Wallet & Loyalty Cards', designSize.width - margin - 150, 36, 8.6, [0.55, 0.38, 0.28]),
+    textLine(`Template-ID: ${template.id}`, margin, 34, 8, [0.55, 0.38, 0.28]),
+    textLine(`Erstellt: ${now}`, margin, 20, 8, [0.55, 0.38, 0.28])
+  ].join('\n');
+
+  return [
+    'q',
+    `${scale.toFixed(4)} 0 0 ${scale.toFixed(4)} ${offsetX.toFixed(2)} ${offsetY.toFixed(2)} cm`,
+    design,
+    'Q'
   ].join('\n');
 }
 
@@ -329,9 +435,11 @@ export function buildTemplateQrPdf({ template, claimUrl, format = 'a4' }) {
   const objects = [
     object('1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj'),
     object('2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj'),
-    object(`3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth.toFixed(2)} ${pageHeight.toFixed(2)}] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>\nendobj`),
+    object(`3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth.toFixed(2)} ${pageHeight.toFixed(2)}] /Resources << /Font << /F1 4 0 R /F2 5 0 R /F3 6 0 R >> >> /Contents 7 0 R >>\nendobj`),
     object('4 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj'),
-    object(`5 0 obj\n<< /Length ${stream.length} >>\nstream\n${content}\nendstream\nendobj`)
+    object('5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>\nendobj'),
+    object('6 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Times-BoldItalic >>\nendobj'),
+    object(`7 0 obj\n<< /Length ${stream.length} >>\nstream\n${content}\nendstream\nendobj`)
   ];
   const header = '%PDF-1.4\n';
   let body = header;
