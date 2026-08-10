@@ -281,14 +281,35 @@ async function createLocalPersonalizedGuestProfile(template, registration) {
   }
   const crm = Object.fromEntries(Object.entries(standard).filter(([key]) => configuredStandard.has(key)).map(([key, value]) => [key, String(value || '').trim() || null]));
   if (crm.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(crm.email)) throw createStructuredError(400, 'CRM_EMAIL_INVALID', 'E-Mail-Adresse ist ungültig.', 'Prüfe die E-Mail-Adresse.');
+  if (crm.birth_date && !/^\d{4}-\d{2}-\d{2}$/.test(crm.birth_date)) throw createStructuredError(400, 'CRM_BIRTH_DATE_INVALID', 'Geburtsdatum ist ungültig.', 'Verwende ein gültiges Datum.');
   const socials = socialsInput.map((entry) => ({ platform: String(entry.platform || '').toLowerCase(), url: safePublicCrmUrl(entry.url) })).filter((entry) => configuredSocials.has(entry.platform) && entry.url).slice(0, 20);
   if (socialsInput.some((entry) => entry.url && !safePublicCrmUrl(entry.url))) throw createStructuredError(400, 'CRM_SOCIAL_URL_INVALID', 'Social-Link ist ungültig.', 'Nur HTTPS-URLs sind erlaubt.');
   const customIds = fields.map((field) => String(field.key || '').match(/^custom:([0-9a-f-]{36})$/i)?.[1]).filter(Boolean);
-  const definitions = customIds.length ? await supabaseAdmin.from('crm_field_definitions').select('id').eq('business_id', template.business_id).eq('active', true).eq('public_registration_allowed', true).in('id', customIds) : { data: [], error: null };
+  const definitions = customIds.length ? await supabaseAdmin.from('crm_field_definitions').select('id,name,field_type,required,options').eq('business_id', template.business_id).eq('active', true).eq('public_registration_allowed', true).in('id', customIds) : { data: [], error: null };
   if (definitions.error) throw definitions.error;
   if ((definitions.data || []).length !== new Set(customIds).size) throw createStructuredError(403, 'CRM_CUSTOM_FIELD_NOT_ALLOWED', 'CRM-Feld ist nicht öffentlich freigegeben.', 'Template-Konfiguration aktualisieren.');
+  for (const definition of definitions.data || []) {
+    const value = customInput[definition.id];
+    if (definition.required && (value == null || String(value).trim() === '' || (Array.isArray(value) && !value.length))) throw createStructuredError(400, 'CRM_CUSTOM_REQUIRED', `${definition.name} ist ein Pflichtfeld.`, 'Bitte Pflichtfelder ausfüllen.');
+    if (definition.field_type === 'URL' && value && !safePublicCrmUrl(value)) throw createStructuredError(400, 'CRM_CUSTOM_URL_INVALID', `${definition.name}: URL ist ungültig.`, 'Nur HTTPS-URLs sind erlaubt.');
+    if (definition.field_type === 'NUMBER' && value != null && String(value).trim() !== '' && !Number.isFinite(Number(value))) throw createStructuredError(400, 'CRM_CUSTOM_NUMBER_INVALID', `${definition.name}: Zahl ist ungültig.`, 'Gib einen gültigen Zahlenwert ein.');
+    if (definition.field_type === 'DATE' && value && !/^\d{4}-\d{2}-\d{2}$/.test(String(value))) throw createStructuredError(400, 'CRM_CUSTOM_DATE_INVALID', `${definition.name}: Datum ist ungültig.`, 'Verwende ein gültiges Datum.');
+    if (definition.field_type === 'BOOLEAN' && value != null && typeof value !== 'boolean') throw createStructuredError(400, 'CRM_CUSTOM_BOOLEAN_INVALID', `${definition.name}: Wahr/Falsch-Wert ist ungültig.`, 'Verwende einen gültigen Wahr/Falsch-Wert.');
+    if (['SELECT', 'MULTISELECT'].includes(definition.field_type)) {
+      const allowed = new Set(Array.isArray(definition.options) ? definition.options.map(String) : []);
+      const selected = Array.isArray(value) ? value.map(String) : value ? [String(value)] : [];
+      if (selected.some((entry) => !allowed.has(entry))) throw createStructuredError(400, 'CRM_CUSTOM_OPTION_INVALID', `${definition.name}: Auswahl ist ungültig.`, 'Wähle nur konfigurierte Optionen.');
+    }
+  }
+  const duplicateQuery = crm.email
+    ? await supabaseAdmin.from('guest_crm_profiles').select('guest_profile_id').eq('business_id', template.business_id).ilike('email', crm.email).limit(1)
+    : crm.phone
+      ? await supabaseAdmin.from('guest_crm_profiles').select('guest_profile_id').eq('business_id', template.business_id).eq('phone', crm.phone).limit(1)
+      : { data: [], error: null };
+  if (duplicateQuery.error) throw duplicateQuery.error;
+  const possibleDuplicate = Boolean(duplicateQuery.data?.length);
   const displayName = crm.display_name || [crm.first_name, crm.last_name].filter(Boolean).join(' ') || null;
-  const profile = await supabaseAdmin.from('guest_profiles').insert({ owner_id: template.owner_id, business_id: template.business_id, display_name: displayName, metadata: { created_from: 'public_crm_registration' } }).select('id').single();
+  const profile = await supabaseAdmin.from('guest_profiles').insert({ owner_id: template.owner_id, business_id: template.business_id, display_name: displayName, metadata: { created_from: 'public_crm_registration', possible_duplicate: possibleDuplicate } }).select('id').single();
   if (profile.error) throw profile.error;
   const guestId = profile.data.id;
   const crmResult = await supabaseAdmin.from('guest_crm_profiles').insert({ guest_profile_id: guestId, owner_id: template.owner_id, business_id: template.business_id, ...crm });
@@ -301,7 +322,8 @@ async function createLocalPersonalizedGuestProfile(template, registration) {
     const result = await supabaseAdmin.from('crm_field_values').insert(definitions.data.map((definition) => ({ guest_profile_id: guestId, field_definition_id: definition.id, owner_id: template.owner_id, business_id: template.business_id, value: customInput[definition.id] ?? null })));
     if (result.error) throw result.error;
   }
-  await supabaseAdmin.from('guest_crm_audit_events').insert({ guest_profile_id: guestId, owner_id: template.owner_id, business_id: template.business_id, event_type: 'CREATED', changed_fields: Object.keys(crm), source: 'public_registration' });
+  const auditResult = await supabaseAdmin.from('guest_crm_audit_events').insert({ guest_profile_id: guestId, owner_id: template.owner_id, business_id: template.business_id, event_type: 'CREATED', changed_fields: [...Object.keys(crm), ...(socials.length ? ['socials'] : []), ...((definitions.data || []).length ? ['custom_fields'] : [])], source: 'public_registration' });
+  if (auditResult.error) throw auditResult.error;
   return guestId;
 }
 

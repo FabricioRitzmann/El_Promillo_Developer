@@ -10,6 +10,7 @@ const includes = (label, source, values) => values.forEach((value) => assert(sou
 const schema = read('supabase/schema.sql');
 const edge = read('supabase/functions/guest-crm/index.ts');
 const claimEdge = read('supabase/functions/claim-card/index.ts');
+const localServer = read('server/index.js');
 const publicResponses = read('supabase/functions/_shared/publicResponses.ts');
 const account = `${read('public/account.html')}\n${read('public/js/account.js')}`;
 const editor = `${read('public/editor.html')}\n${read('public/js/editor.js')}`;
@@ -41,6 +42,7 @@ includes('Suche und Filter', edge, ['first_name.ilike', 'card_instance_number.il
 includes('Duplikate ohne Auto-Merge', claimEdge, ['possible_duplicate', "metadata: { created_from: 'public_crm_registration'", ".eq('business_id', template.business_id)"]);
 assert(!claimEdge.includes('.update({ guest_profile_id'), 'Öffentliche Registrierung darf bestehende Profile nicht aggressiv zusammenführen.');
 includes('Strukturierte CRM-Feldvalidierung', claimEdge, ['CRM_CUSTOM_URL_INVALID', 'CRM_CUSTOM_NUMBER_INVALID', 'CRM_CUSTOM_DATE_INVALID', 'CRM_CUSTOM_BOOLEAN_INVALID', 'CRM_CUSTOM_OPTION_INVALID']);
+includes('Gehärteter lokaler Claim-Fallback', localServer, ['CRM_CUSTOM_URL_INVALID', 'CRM_CUSTOM_NUMBER_INVALID', 'CRM_CUSTOM_DATE_INVALID', 'CRM_CUSTOM_BOOLEAN_INVALID', 'CRM_CUSTOM_OPTION_INVALID', 'possible_duplicate', 'if (auditResult.error) throw auditResult.error']);
 
 includes('Öffentliche Feldfreigabe', `${claimEdge}\n${publicResponses}\n${claim}`, [
   'crm_registration_enabled', 'crm_registration_fields', 'personalizedGuestDataEnabled', 'crmRegistrationFields',
