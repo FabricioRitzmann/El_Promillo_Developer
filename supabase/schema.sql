@@ -1247,6 +1247,7 @@ insert into public.guest_profiles (
   id,
   owner_id,
   business_id,
+  external_customer_id,
   gender,
   age_group,
   first_seen_at,
@@ -1259,6 +1260,9 @@ select
   map.guest_profile_id,
   min(c.owner_id::text)::uuid,
   min(c.business_id::text)::uuid,
+  case
+    when count(distinct ci.customer_id) <= 1 then max(ci.customer_id::text)::uuid
+  end,
   case when count(distinct ci.customer_gender) <= 1 then max(ci.customer_gender) end,
   case when count(distinct ci.customer_age_group) <= 1 then max(ci.customer_age_group) end,
   min(coalesce(ci.first_scanned_at, c.created_at)),
@@ -1278,19 +1282,11 @@ from guest_profile_backfill_map map
 where c.id = map.customer_card_id
   and c.guest_profile_id is null;
 
-update public.card_instances ci
-set customer_id = c.guest_profile_id
-from public.customer_cards c
-where ci.customer_card_id = c.id
-  and c.guest_profile_id is not null
-  and ci.customer_id is distinct from c.guest_profile_id;
-
 drop table if exists pg_temp.guest_profile_backfill_map;
 
 insert into public.card_instances (
   id,
   customer_card_id,
-  customer_id,
   owner_id,
   business_id,
   template_id,
@@ -1312,7 +1308,6 @@ insert into public.card_instances (
 select
   c.id,
   c.id,
-  c.guest_profile_id,
   c.owner_id,
   c.business_id,
   c.template_id,
@@ -2500,7 +2495,7 @@ begin
   end if;
 
   if new.customer_card_id is not null then
-    select owner_id, business_id, template_id, guest_profile_id
+    select owner_id, business_id, template_id
     into customer_card_row
     from public.customer_cards
     where id = new.customer_card_id;
@@ -2521,10 +2516,8 @@ begin
       raise exception 'CARD_INSTANCE_TEMPLATE_MISMATCH: Karteninstanz passt nicht zum Kundenkarten-Template.';
     end if;
 
-    -- customer_id ist das bestehende, bereits von Wallet-Limits genutzte Feld
-    -- fuer eine gemeinsame Person. Es spiegelt deshalb die zentrale Guest-ID,
-    -- ohne eine zweite Card-ID einzufuehren.
-    new.customer_id := customer_card_row.guest_profile_id;
+    -- customer_id bleibt die bestehende Relation zu customer_profiles. Die
+    -- neue Gastzuordnung liegt separat auf customer_cards.guest_profile_id.
   end if;
 
   if not public.template_feature_allowed(

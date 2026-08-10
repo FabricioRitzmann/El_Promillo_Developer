@@ -20,7 +20,10 @@ assert(schema.includes('guest_profile_id uuid references public.guest_profiles(i
 assert(schema.includes('guest_profile_id uuid references public.guest_profiles(id) on delete set null'), 'scan_events muss die historische Gastrelation speichern.');
 assert(schema.includes('guest_profile_backfill_map'), 'Idempotenter Legacy-Backfill fehlt.');
 assert(schema.includes("when ci.customer_id is not null then 'customer:' || ci.customer_id::text"), 'Bestehende customer_id-Gruppen werden nicht erhalten.');
+assert(schema.includes('when count(distinct ci.customer_id) <= 1 then max(ci.customer_id::text)::uuid'), 'Bestehende Customer-Relation wird nicht im Gastprofil referenziert.');
 assert(schema.includes('groups.business_id = cards.business_id'), 'Backfill ist nicht sichtbar pro Business getrennt.');
+assert(!schema.includes('new.customer_id := customer_card_row.guest_profile_id'), 'Guest-ID darf den Foreign Key auf customer_profiles nicht ueberschreiben.');
+assert(!schema.includes('set customer_id = c.guest_profile_id'), 'Backfill darf bestehende customer_profiles-Relationen nicht ueberschreiben.');
 assert(schema.includes('create or replace function public.ensure_customer_card_guest_profile()'), 'Automatische Profilzuordnung fuer neue Karten fehlt.');
 assert(schema.includes('GUEST_CARD_TENANT_MISMATCH'), 'Cross-Tenant-Kartenzuordnung wird nicht explizit blockiert.');
 assert(schema.includes('create or replace function public.attach_guest_profile_to_scan_event()'), 'Scan-Guest-Trigger fehlt.');

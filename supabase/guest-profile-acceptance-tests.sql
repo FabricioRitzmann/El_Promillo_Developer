@@ -207,15 +207,14 @@ begin
   if exists (
     select 1
     from public.card_instances instance
-    join public.customer_cards card on card.id = instance.customer_card_id
     where instance.id in (
       'a4000000-0000-4000-8000-000000000001',
       'a4000000-0000-4000-8000-000000000002',
       'b4000000-0000-4000-8000-000000000001'
     )
-      and instance.customer_id is distinct from card.guest_profile_id
+      and instance.customer_id is not null
   ) then
-    raise exception 'TEST_FAILED: card_instances.customer_id spiegelt die Guest-ID nicht.';
+    raise exception 'TEST_FAILED: Guest-IDs duerfen customer_profiles-Relationen nicht ueberschreiben.';
   end if;
 end;
 $$;

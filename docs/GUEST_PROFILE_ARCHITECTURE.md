@@ -1,8 +1,7 @@
 # Zentrale Guest-Profile-Architektur (Prompt 1)
 
-Status: Developer-Implementierung. Diese Aenderung darf vor dem ausdruecklichen
-Produktions-Go nicht zum Remote `production`, nach `el-promillo.ch` oder in die
-produktive Supabase-Instanz deployed werden.
+Status: fuer den kontrollierten Rollout auf das gemeinsame Supabase-Projekt und
+anschliessend auf `production` / `el-promillo.ch` freigegeben.
 
 ## Architekturentscheidungen
 
@@ -10,9 +9,8 @@ produktive Supabase-Instanz deployed werden.
 - Eine Karte und ein Gastprofil bleiben getrennte Entitaeten.
 - `customer_cards.guest_profile_id` bildet die Relation Karte -> Gast ab. Mehrere
   Karten desselben Businesses koennen dasselbe Profil verwenden.
-- Das vorhandene `card_instances.customer_id` spiegelt bei verknuepften Karten
-  die Guest-ID. Dadurch funktionieren bestehende kundenbezogene Wallet-Limits
-  ueber mehrere Karten, ohne eine zweite Card-ID einzufuehren.
+- Das vorhandene `card_instances.customer_id` bleibt unveraendert die Relation
+  zu `customer_profiles`. Es wird niemals mit einer Guest-ID ueberschrieben.
 - Die bestehende Tabelle `scan_events` speichert `guest_profile_id` direkt als
   historischen Bezug. Es gibt keine zweite Scan-Historie.
 - `guest_profiles.business_id` ist verpflichtend. Betreiber und Business sind
@@ -45,8 +43,9 @@ Der Backfill ist wiederholbar und loescht keine Daten:
    innerhalb derselben Kombination aus Betreiber und Business erhalten.
 3. Karten ohne vorhandene `customer_id` erhalten jeweils ein eigenes Profil.
    Personen werden nicht anhand von Demografie, Wallet-ID oder Namen erraten.
-4. `customer_cards.guest_profile_id` und `card_instances.customer_id` werden
-   synchronisiert.
+4. `customer_cards.guest_profile_id` wird gesetzt. Eine vorhandene
+   `card_instances.customer_id` wird als `external_customer_id` referenziert,
+   aber nicht veraendert.
 5. Vorhandene `scan_events` werden anhand ihrer `customer_card_id` verknuepft.
 
 Damit bleiben bestehende Apple-, Google-, PDF- und vorbereitete Samsung-Karten
