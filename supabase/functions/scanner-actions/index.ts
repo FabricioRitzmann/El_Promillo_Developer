@@ -14,7 +14,7 @@ import { resolveCardEmblem, supabaseCardEmblemUrl } from '../_shared/cardEmblems
 type Row = Record<string, any>;
 type JsonBody = Record<string, unknown>;
 const demographicGenders = new Set(['male', 'female']);
-const demographicAgeGroups = new Set(['18_plus', '25_plus', '30_plus']);
+const demographicAgeGroups = new Set(['18_24', '25_29', '30_39', '40_49', '50_59', '60_69', '70_plus']);
 const walletEmblemColumnNames = new Set(['resolved_emblem_key', 'resolved_emblem_url', 'emblem_updated_at']);
 
 const corsHeaders = {
@@ -342,7 +342,7 @@ function normalizeDemographics(input: unknown) {
       400,
       'INVALID_DEMOGRAPHICS_AGE_GROUP',
       'Altersgruppe ist ungültig.',
-      'Erlaubt sind 18_plus, 25_plus oder 30_plus.'
+      'Erlaubt sind 18_24, 25_29, 30_39, 40_49, 50_59, 60_69 oder 70_plus.'
     );
   }
 

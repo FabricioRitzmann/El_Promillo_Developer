@@ -117,9 +117,16 @@ const statsGenderLabels = {
   female: 'Weiblich'
 };
 const statsAgeLabels = {
-  '18_plus': '18+',
-  '25_plus': '25+',
-  '30_plus': '30+'
+  '18_24': '18–24',
+  '25_29': '25–29',
+  '30_39': '30–39',
+  '40_49': '40–49',
+  '50_59': '50–59',
+  '60_69': '60–69',
+  '70_plus': '70+',
+  '18_plus': 'Legacy 18+',
+  '25_plus': 'Legacy 25+',
+  '30_plus': 'Legacy 30+'
 };
 const CHART_VIEW_LABELS = {
   bar: 'Balken',
@@ -208,7 +215,7 @@ const STATISTIC_DEFINITIONS = [
   [LAST_SCANS_STATISTIC_KEY, 'Letzte Scans']
 ];
 const CHART_EMPTY_TEXT = 'Für den gewählten Zeitraum sind noch keine Scans vorhanden.';
-const AGE_GROUP_ORDER = ['18_plus', '25_plus', '30_plus'];
+const AGE_GROUP_ORDER = ['18_24', '25_29', '30_39', '40_49', '50_59', '60_69', '70_plus', '18_plus', '25_plus', '30_plus'];
 const GENDER_ORDER = ['male', 'female'];
 const CHART_COLORS = ['#8b4f2f', '#d6b889', '#b97845', '#6f3c23', '#e7d3af', '#8a6148', '#c9955f', '#ab8f78'];
 

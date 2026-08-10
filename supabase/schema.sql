@@ -304,7 +304,7 @@ create table if not exists public.guest_profiles (
   constraint guest_profiles_gender_check
     check (gender is null or gender in ('male', 'female')),
   constraint guest_profiles_age_group_check
-    check (age_group is null or age_group in ('18_plus', '25_plus', '30_plus')),
+    check (age_group is null or age_group in ('18_24', '25_29', '30_39', '40_49', '50_59', '60_69', '70_plus', '18_plus', '25_plus', '30_plus')),
   constraint guest_profiles_seen_order_check
     check (first_seen_at is null or last_seen_at is null or first_seen_at <= last_seen_at),
   constraint guest_profiles_metadata_shape_check
@@ -321,6 +321,13 @@ add column if not exists last_seen_at timestamptz,
 add column if not exists metadata jsonb not null default '{}'::jsonb,
 add column if not exists created_at timestamptz not null default now(),
 add column if not exists updated_at timestamptz not null default now();
+
+alter table public.guest_profiles
+drop constraint if exists guest_profiles_age_group_check;
+
+alter table public.guest_profiles
+add constraint guest_profiles_age_group_check
+check (age_group is null or age_group in ('18_24', '25_29', '30_39', '40_49', '50_59', '60_69', '70_plus', '18_plus', '25_plus', '30_plus')) not valid;
 
 -- Additive Rollenabbildung fuer Mitarbeitende eines Businesses. Der bestehende
 -- Business-Owner bleibt implizit Admin und braucht keinen Membership-Datensatz.
@@ -793,7 +800,7 @@ drop constraint if exists card_instances_customer_age_group_check;
 
 alter table public.card_instances
 add constraint card_instances_customer_age_group_check
-check (customer_age_group is null or customer_age_group in ('18_plus', '25_plus', '30_plus')) not valid;
+check (customer_age_group is null or customer_age_group in ('18_24', '25_29', '30_39', '40_49', '50_59', '60_69', '70_plus', '18_plus', '25_plus', '30_plus')) not valid;
 
 alter table public.card_instances
 drop constraint if exists card_instances_resolved_emblem_key_check;
@@ -1730,7 +1737,7 @@ drop constraint if exists scan_events_customer_age_group_check;
 
 alter table public.scan_events
 add constraint scan_events_customer_age_group_check
-check (customer_age_group is null or customer_age_group in ('18_plus', '25_plus', '30_plus')) not valid;
+check (customer_age_group is null or customer_age_group in ('18_24', '25_29', '30_39', '40_49', '50_59', '60_69', '70_plus', '18_plus', '25_plus', '30_plus')) not valid;
 
 alter table public.scan_events
 drop constraint if exists scan_events_active_club_features_shape_check;
@@ -1770,7 +1777,7 @@ drop constraint if exists club_card_actions_customer_age_group_check;
 
 alter table public.club_card_actions
 add constraint club_card_actions_customer_age_group_check
-check (customer_age_group is null or customer_age_group in ('18_plus', '25_plus', '30_plus')) not valid;
+check (customer_age_group is null or customer_age_group in ('18_24', '25_29', '30_39', '40_49', '50_59', '60_69', '70_plus', '18_plus', '25_plus', '30_plus')) not valid;
 
 create index if not exists businesses_owner_id_idx on public.businesses(owner_id);
 create index if not exists guest_profiles_owner_id_idx on public.guest_profiles(owner_id);

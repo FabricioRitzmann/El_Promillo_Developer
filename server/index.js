@@ -21,7 +21,7 @@ const app = express();
 const CLAIM_WALLET_OBJECT_ID_MAX_LENGTH = 180;
 const CLAIM_WALLET_OBJECT_ID_PATTERN = /^[A-Za-z0-9._:-]+$/;
 const demographicGenders = new Set(['male', 'female']);
-const demographicAgeGroups = new Set(['18_plus', '25_plus', '30_plus']);
+const demographicAgeGroups = new Set(['18_24', '25_29', '30_39', '40_49', '50_59', '60_69', '70_plus']);
 const walletEmblemColumnNames = new Set(['resolved_emblem_key', 'resolved_emblem_url', 'emblem_updated_at']);
 const clubFeatureNames = ['vip', 'balance', 'cloakroom', 'coupon', 'membership'];
 const localPublicRateLimitBuckets = new Map();
@@ -737,7 +737,7 @@ function normalizeDemographics(input) {
       400,
       'INVALID_DEMOGRAPHICS_AGE_GROUP',
       'Altersgruppe ist ungültig.',
-      'Erlaubt sind 18_plus, 25_plus oder 30_plus.'
+      'Erlaubt sind 18_24, 25_29, 30_39, 40_49, 50_59, 60_69 oder 70_plus.'
     );
   }
 
@@ -1615,10 +1615,13 @@ function chartFromCounts(counts, labels = {}) {
 }
 
 function fixedChart(keys, counts, labels = {}) {
+  const total = keys.reduce((sum, key) => sum + (counts.get(key) || 0), 0);
+
   return keys.map((key) => ({
     key,
     label: labels[key] || String(key),
-    value: counts.get(key) || 0
+    value: counts.get(key) || 0,
+    percentage: total ? Math.round(((counts.get(key) || 0) / total) * 1000) / 10 : 0
   }));
 }
 
@@ -1656,7 +1659,12 @@ function topKey(counts, labels = {}) {
 
 function buildBusinessScanStatistics(rows) {
   const genderLabels = { male: 'Männlich', female: 'Weiblich' };
-  const ageLabels = { '18_plus': '18+', '25_plus': '25+', '30_plus': '30+' };
+  const ageOrder = ['18_24', '25_29', '30_39', '40_49', '50_59', '60_69', '70_plus', '18_plus', '25_plus', '30_plus'];
+  const ageLabels = {
+    '18_24': '18–24', '25_29': '25–29', '30_39': '30–39', '40_49': '40–49',
+    '50_59': '50–59', '60_69': '60–69', '70_plus': '70+',
+    '18_plus': 'Legacy 18+', '25_plus': 'Legacy 25+', '30_plus': 'Legacy 30+'
+  };
   const weekdayLabels = {
     1: 'Montag',
     2: 'Dienstag',
@@ -1741,18 +1749,16 @@ function buildBusinessScanStatistics(rows) {
     },
     charts: {
       gender_distribution: chartFromCounts(genderCounts, genderLabels),
-      age_group_distribution: fixedChart(['18_plus', '25_plus', '30_plus'], ageCounts, ageLabels),
+      age_group_distribution: fixedChart(ageOrder, ageCounts, ageLabels),
       scans_by_hour: fixedChart(Array.from({ length: 24 }, (_, index) => index), hourCounts, hourLabels),
       scans_by_weekday: fixedChart([1, 2, 3, 4, 5, 6, 7], weekdayCounts, weekdayLabels),
       scans_over_time: chartFromCounts(overTimeCounts).sort((a, b) => String(a.key).localeCompare(String(b.key))),
-      gender_age_matrix: chartFromCounts(genderAgeCounts, {
-        male_18_plus: 'Männlich 18+',
-        male_25_plus: 'Männlich 25+',
-        male_30_plus: 'Männlich 30+',
-        female_18_plus: 'Weiblich 18+',
-        female_25_plus: 'Weiblich 25+',
-        female_30_plus: 'Weiblich 30+'
-      }),
+      gender_age_matrix: chartFromCounts(genderAgeCounts, Object.fromEntries(
+        ['male', 'female'].flatMap((gender) => ageOrder.map((ageGroup) => [
+          `${gender}_${ageGroup}`,
+          `${gender === 'male' ? 'Männlich' : 'Weiblich'} ${ageLabels[ageGroup]}`
+        ]))
+      )),
       first_vs_repeat: [
         { key: 'first_scan', label: 'Erstbesuche', value: firstScans },
         { key: 'repeat_scan', label: 'Wiederholungsbesuche', value: repeatScans }

@@ -30,9 +30,11 @@ anschliessend auf `production` / `el-promillo.ch` freigegeben.
 - internes `metadata`
 - `created_at`, `updated_at`
 
-Die bisherigen Demografie-Werte (`male`, `female` sowie `18_plus`, `25_plus`,
-`30_plus`) bleiben fuer Prompt 1 unveraendert. Die spaetere Altersgruppenmigration
-aus Prompt 5 darf erst nach Abschluss der vorangehenden Prompts erfolgen.
+Seit Prompt 5 verwenden neue Erfassungen die eindeutigen Altersgruppen `18_24`,
+`25_29`, `30_39`, `40_49`, `50_59`, `60_69` und `70_plus`. Die früheren Werte
+`18_plus`, `25_plus` und `30_plus` bleiben verlustfrei als ausdrücklich
+gekennzeichnete Legacy-Kategorien erhalten; Details stehen in
+`docs/AGE_GROUP_MIGRATION.md`.
 
 ## Backfill
 
