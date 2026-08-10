@@ -7,6 +7,24 @@ import { cardEmblemMeta } from './cardEmblems.js';
 import { activeFeatureLabels, featureEnabled, normalizeScannerAction, normalizeTemplateType, scannerAccessHighlights, validateScannerAction } from './templateFeatures.js';
 import { applyBusinessAppTheme, applyCachedAppTheme } from './theme.js';
 
+const scannerOperationModes = new Set(['entry', 'cloakroom', 'cashier', 'admin']);
+const scannerOperationStorageKey = 'el_promillo_scanner_operation_mode:v1';
+const scannerOperationMeta = {
+  entry: { label: 'Einlass', hint: 'Einlass priorisiert Eintritt, Check-in und Mitgliedschaft.' },
+  cloakroom: { label: 'Garderobe', hint: 'Garderobe zeigt Abgabe oder Abholung als direkte Aktion.' },
+  cashier: { label: 'Kasse', hint: 'Kasse priorisiert Guthaben, Stempel und Einlösungen.' },
+  admin: { label: 'Verwaltung', hint: 'Verwaltung priorisiert Status, CRM und manuelle Korrekturen.' }
+};
+
+function storedScannerOperationMode() {
+  try {
+    const value = localStorage.getItem(scannerOperationStorageKey);
+    return scannerOperationModes.has(value) ? value : 'entry';
+  } catch (_error) {
+    return 'entry';
+  }
+}
+
 const state = {
   client: null,
   session: null,
@@ -31,7 +49,8 @@ const state = {
   restrictionConfirmationReady: false,
   notificationQueue: [],
   pendingDemographicsAction: null,
-  pendingDemographicsPayload: null
+  pendingDemographicsPayload: null,
+  operationMode: storedScannerOperationMode()
 };
 
 const JSQR_CDN_URL = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js';
@@ -52,6 +71,8 @@ const manualForm = byId('manualScanForm');
 const video = byId('scannerVideo');
 const cardPanel = byId('cardPanel');
 const scannerOnlyLogoutButton = byId('scannerOnlyLogoutButton');
+const scannerOperationHint = byId('scannerOperationHint');
+const scannerOperationInputs = Array.from(document.querySelectorAll('input[name="scanner_operation_mode"]'));
 const restrictionWarningModal = byId('restrictionWarningModal');
 const restrictionWarningItems = byId('restrictionWarningItems');
 const restrictionWarningConfirm = byId('restrictionWarningConfirm');
@@ -96,6 +117,54 @@ const clubFeatureBadgeLabels = {
 
 let scannerResetTimer = null;
 let jsQrLoaderPromise = null;
+
+function operationGroupsForAction(action) {
+  const groups = {
+    visit: ['entry'], checkin: ['entry'], 'event-checkout': ['entry'], 'event-ticket-use': ['entry'],
+    'membership-check': ['entry', 'admin'], 'vip-benefit-redeem': ['entry', 'cashier'],
+    'cloakroom-toggle': ['cloakroom'],
+    'balance-redeem': ['cashier'], 'balance-adjust': ['cashier', 'admin'], redeem: ['cashier'],
+    'stamp-plus': ['cashier'], 'stamp-minus': ['cashier'], 'stamp-redeem': ['cashier'],
+    'streak-plus': ['cashier'], 'streak-reset': ['cashier', 'admin'], 'streak-complete': ['cashier'],
+    'vip-update': ['admin'], 'membership-status-update': ['admin'], 'membership-extend': ['admin'],
+    save: ['admin'], 'download-apple-pass': ['admin'], crm: ['admin']
+  };
+  return groups[action] || ['admin'];
+}
+
+function decorateScannerAction(markup) {
+  const action = String(markup).match(/data-action="([^"]+)"/)?.[1] || '';
+  return String(markup).replace('<button ', `<button data-operation-groups="${operationGroupsForAction(action).join(' ')}" `);
+}
+
+function syncScannerOperationMode() {
+  const mode = scannerOperationModes.has(state.operationMode) ? state.operationMode : 'entry';
+  const meta = scannerOperationMeta[mode];
+  scannerOperationInputs.forEach((input) => { input.checked = input.value === mode; });
+  if (scannerOperationHint) scannerOperationHint.textContent = meta.hint;
+  if (!cardPanel || cardPanel.hidden) return;
+  cardPanel.dataset.operationMode = mode;
+  const title = cardPanel.querySelector('[data-operation-title]');
+  if (title) title.textContent = `${meta.label}: passende Aktionen`;
+  let priorityCount = 0;
+  cardPanel.querySelectorAll('[data-priority-actions] [data-operation-groups]').forEach((element) => {
+    const matches = String(element.dataset.operationGroups || '').split(' ').includes(mode);
+    element.hidden = !matches;
+    if (matches) priorityCount += 1;
+  });
+  cardPanel.querySelectorAll('[data-secondary-actions] [data-operation-groups]').forEach((element) => {
+    element.hidden = String(element.dataset.operationGroups || '').split(' ').includes(mode);
+  });
+  const empty = cardPanel.querySelector('[data-operation-empty]');
+  if (empty) empty.hidden = priorityCount > 0;
+}
+
+function selectScannerOperationMode(mode) {
+  if (!scannerOperationModes.has(mode)) return;
+  state.operationMode = mode;
+  try { localStorage.setItem(scannerOperationStorageKey, mode); } catch (_error) { /* optionale Präferenz */ }
+  syncScannerOperationMode();
+}
 
 async function loadBusinessHeader() {
   state.business = await state.client.selectRows('businesses', {
@@ -472,6 +541,16 @@ function renderCard() {
     detailItems.push('<div><dt>Hinweis</dt><dd>Für diese Clubkarte sind noch keine Zusatzfunktionen aktiviert.</dd></div>');
   }
 
+  const decoratedQuickActions = quickActions.map(decorateScannerAction);
+  const crmAction = state.business?.guest_crm_enabled && state.guestProfile?.id
+    ? `<a class="button secondary" data-operation-groups="admin" href="${escapeHtml(pagePath(`crm.html?guest=${encodeURIComponent(state.guestProfile.id)}`))}">CRM-Profil</a>`
+    : '';
+  const managementActions = `
+    ${crmAction}
+    <button data-operation-groups="admin" type="button" class="primary" data-action="save">Speichern</button>
+    ${appleWalletButton ? appleWalletButton.replace('<button ', '<button data-operation-groups="admin" ') : ''}
+  `;
+
   cardPanel.hidden = false;
   cardPanel.innerHTML = `
     ${walletPreviewHtml(previewTemplate, previewCard)}
@@ -483,20 +562,26 @@ function renderCard() {
       <span class="pill">${escapeHtml(cardTypeLabel(previewTemplate))}</span>
     </div>
     ${restrictionStatusHtml()}
-    ${guestInformationHtml()}
-    <dl class="detail-grid">
-      ${detailItems.join('')}
-    </dl>
-    <div class="edit-grid">
-      ${editFields.join('')}
-    </div>
-    <div class="button-row wrap">
-      ${quickActions.join('')}
-      ${state.business?.guest_crm_enabled && state.guestProfile?.id ? `<a class="button secondary" href="${escapeHtml(pagePath(`crm.html?guest=${encodeURIComponent(state.guestProfile.id)}`))}">CRM-Profil</a>` : ''}
-      <button type="button" class="primary" data-action="save">Speichern</button>
-      ${appleWalletButton}
-    </div>
+    <section class="scanner-priority-panel">
+      <div><p class="eyebrow">Schnellzugriff</p><h3 data-operation-title>Passende Aktionen</h3></div>
+      <div class="button-row wrap scanner-priority-actions" data-priority-actions>${decoratedQuickActions.join('')}${managementActions}</div>
+      <p class="muted" data-operation-empty hidden>Für diese Karte ist in diesem Arbeitsmodus keine direkte Aktion verfügbar. Öffne bei Bedarf „Weitere Kartenfunktionen“.</p>
+    </section>
+    <details class="scanner-collapsible scanner-secondary-functions">
+      <summary>Weitere Kartenfunktionen</summary>
+      <div class="button-row wrap" data-secondary-actions>${decoratedQuickActions.join('')}${managementActions}</div>
+    </details>
+    <details class="scanner-collapsible">
+      <summary>Kartendetails & manuelle Bearbeitung</summary>
+      <dl class="detail-grid">${detailItems.join('')}</dl>
+      <div class="edit-grid">${editFields.join('')}</div>
+    </details>
+    <details class="scanner-collapsible">
+      <summary>Gastinformationen & Notizen</summary>
+      ${guestInformationHtml()}
+    </details>
   `;
+  syncScannerOperationMode();
 }
 
 function showAccessStatusModal(card = state.currentCard) {
@@ -1451,6 +1536,13 @@ async function initScanner() {
     await state.client.signOut();
     window.location.replace(pagePath('index.html'));
   });
+
+  scannerOperationInputs.forEach((input) => {
+    input.addEventListener('change', () => {
+      if (input.checked) selectScannerOperationMode(input.value);
+    });
+  });
+  syncScannerOperationMode();
 
   manualForm?.addEventListener('submit', (event) => {
     event.preventDefault();

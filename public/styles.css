@@ -2566,6 +2566,112 @@ button.danger:hover,
   align-items: start;
 }
 
+.scanner-operation-picker {
+  display: grid;
+  gap: 1rem;
+  padding: clamp(1rem, 2.5vw, 1.35rem);
+  border: 1px solid var(--border-gold);
+  border-radius: var(--radius-lg);
+  background: var(--surface-elevated);
+  box-shadow: var(--shadow-soft);
+}
+
+.scanner-operation-picker h2,
+.scanner-operation-picker p {
+  margin-block: 0;
+}
+
+.scanner-operation-options {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.scanner-operation-option {
+  position: relative;
+  cursor: pointer;
+}
+
+.scanner-operation-option input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.scanner-operation-option span {
+  min-height: 4.35rem;
+  display: grid;
+  align-content: center;
+  gap: 0.2rem;
+  padding: 0.75rem;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  background: var(--surface-muted);
+  transition: border-color 160ms ease, background 160ms ease;
+}
+
+.scanner-operation-option small {
+  color: var(--text-secondary);
+}
+
+.scanner-operation-option input:checked + span {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface-elevated));
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.scanner-operation-option input:focus-visible + span {
+  outline: 3px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  outline-offset: 2px;
+}
+
+.scanner-priority-panel {
+  display: grid;
+  gap: 0.8rem;
+  padding: 1rem;
+  border: 1px solid color-mix(in srgb, var(--accent) 50%, var(--border-soft));
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--accent) 7%, var(--surface-elevated));
+}
+
+.scanner-priority-panel h3,
+.scanner-priority-panel p {
+  margin-block: 0;
+}
+
+.scanner-priority-actions .secondary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--primary-foreground);
+}
+
+.scanner-collapsible {
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  background: var(--surface-muted);
+  overflow: clip;
+}
+
+.scanner-collapsible > summary {
+  cursor: pointer;
+  padding: 0.9rem 1rem;
+  font-weight: 700;
+}
+
+.scanner-collapsible[open] > summary {
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.scanner-collapsible > :not(summary) {
+  margin: 1rem;
+}
+
+@media (max-width: 760px) {
+  .scanner-operation-options {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 .modal-backdrop {
   position: fixed;
   inset: 0;

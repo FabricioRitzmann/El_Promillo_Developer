@@ -42,6 +42,20 @@
 
       <div id="scannerMessage" class="message" hidden></div>
 
+      <section class="scanner-operation-picker" aria-labelledby="scannerOperationTitle">
+        <div>
+          <p class="eyebrow">Arbeitsmodus</p>
+          <h2 id="scannerOperationTitle">Was möchtest du beim Scannen tun?</h2>
+          <p id="scannerOperationHint" class="muted">Einlass priorisiert Eintritt, Check-in und Mitgliedschaft.</p>
+        </div>
+        <div class="scanner-operation-options" role="radiogroup" aria-label="Scanner-Arbeitsmodus">
+          <label class="scanner-operation-option"><input type="radio" name="scanner_operation_mode" value="entry" checked><span><strong>Einlass</strong><small>Eintritt & Check-in</small></span></label>
+          <label class="scanner-operation-option"><input type="radio" name="scanner_operation_mode" value="cloakroom"><span><strong>Garderobe</strong><small>Abgabe & Abholung</small></span></label>
+          <label class="scanner-operation-option"><input type="radio" name="scanner_operation_mode" value="cashier"><span><strong>Kasse</strong><small>Guthaben & Einlösen</small></span></label>
+          <label class="scanner-operation-option"><input type="radio" name="scanner_operation_mode" value="admin"><span><strong>Verwaltung</strong><small>Daten & Status</small></span></label>
+        </div>
+      </section>
+
       <section class="scanner-grid">
         <div class="panel">
           <h2 data-i18n="scanner.camera">Kamera</h2>
