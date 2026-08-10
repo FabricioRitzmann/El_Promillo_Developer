@@ -76,10 +76,15 @@ assertIncludesAll('Edge Token Resolution', `${publicTemplate}\n${claimCard}\n${s
   'CLAIM_LINK_REQUIRED'
 ]);
 
-assertIncludesAll('PDF und Samsung Token Link', `${pdf}\n${samsungProvider}`, [
+assertIncludesAll('PDF Token Link', pdf, [
   'public_claim_token',
   '/claim.html?token=',
   '/claim.html?template='
+]);
+
+assertIncludesAll('Samsung zentraler Token-Link', samsungProvider, [
+  'publicTemplateCreationUrl(template)',
+  'publicTemplateShareLabel(template)'
 ]);
 
 assert(

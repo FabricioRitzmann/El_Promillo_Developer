@@ -7,6 +7,7 @@
 
 import { featureEnabled, normalizeTemplateType, templateSettings } from './templateFeatures.ts';
 import { supabaseCardEmblemUrl } from './cardEmblems.ts';
+import { publicTemplateCreationUrl, publicTemplateShareLabel } from './publicTemplateLinks.ts';
 
 type Row = Record<string, any>;
 
@@ -752,6 +753,17 @@ function statusPatchPayload(template: Row, cardInstance: Row, objectType = objec
     textModulesData: modules
   };
   const primaryStatusRow = cardFeatureRows(template, cardInstance)[0];
+  const shareUrl = publicTemplateCreationUrl(template);
+
+  if (shareUrl) {
+    patch.linksModuleData = {
+      uris: [{
+        id: 'public_template_share',
+        uri: shareUrl,
+        description: publicTemplateShareLabel(template)
+      }]
+    };
+  }
 
   if (objectType === 'loyaltyObject' && primaryStatusRow) {
     patch.accountId = cardCodeFor(cardInstance);
@@ -1038,7 +1050,8 @@ function buildObjectPayload(config: Row, template: Row, cardInstance: Row, objec
         value: cardCode,
         alternateText: cardCode
       },
-      textModulesData: statusPatch.textModulesData
+      textModulesData: statusPatch.textModulesData,
+      linksModuleData: statusPatch.linksModuleData
     };
 
     if (eventBackgroundImage) {
@@ -1071,7 +1084,8 @@ function buildObjectPayload(config: Row, template: Row, cardInstance: Row, objec
         value: cardCode,
         alternateText: cardCode
       },
-      textModulesData: statusPatch.textModulesData
+      textModulesData: statusPatch.textModulesData,
+      linksModuleData: statusPatch.linksModuleData
     };
     const validTimeInterval = offerValidTimeInterval(settings, metadata);
 
@@ -1095,7 +1109,8 @@ function buildObjectPayload(config: Row, template: Row, cardInstance: Row, objec
         value: cardCode,
         alternateText: cardCode
       },
-      textModulesData: statusPatch.textModulesData
+      textModulesData: statusPatch.textModulesData,
+      linksModuleData: statusPatch.linksModuleData
     };
 
     return applyObjectEmblemImages(loyaltyObject, cardInstance);
@@ -1115,7 +1130,8 @@ function buildObjectPayload(config: Row, template: Row, cardInstance: Row, objec
       value: cardCode,
       alternateText: cardCode
     },
-    textModulesData: statusPatch.textModulesData
+    textModulesData: statusPatch.textModulesData,
+    linksModuleData: statusPatch.linksModuleData
   };
 
   if (businessLogo) {
@@ -1146,7 +1162,7 @@ function classLogoPatchPayload(payload: Row) {
 }
 
 function objectLogoPatchPayload(payload: Row) {
-  return pickPayloadFields(payload, ['logo', 'heroImage', 'imageModulesData']);
+  return pickPayloadFields(payload, ['logo', 'heroImage', 'imageModulesData', 'linksModuleData']);
 }
 
 export const googleWalletProvider = {

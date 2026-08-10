@@ -16,6 +16,7 @@ let publicConfig = null;
 let currentClaimResult = null;
 let detectedDeviceWallet = 'choice';
 let currentClaimToken = '';
+let currentClaimSource = 'direct_qr';
 
 function configureWalletButtons() {
   detectedDeviceWallet = detectWalletDevice().wallet;
@@ -26,6 +27,7 @@ async function loadTemplate() {
   const params = new URLSearchParams(window.location.search);
   const templateId = params.get('template');
   const claimToken = params.get('token') || params.get('claim_token');
+  currentClaimSource = params.get('source') === 'wallet_share' ? 'wallet_share' : 'direct_qr';
   const templateKey = templateId || claimToken;
   currentClaimToken = claimToken || '';
 
@@ -458,7 +460,8 @@ async function claimCardViaEdge(walletPlatform, walletObjectId) {
         templateId: template.id,
         claimToken: currentClaimToken || undefined,
         walletPlatform,
-        walletObjectId
+        walletObjectId,
+        claimSource: currentClaimSource
       })
     });
   } catch (error) {
@@ -494,7 +497,8 @@ async function claimCardViaLocalApi(walletPlatform, walletObjectId) {
       templateId: template.id,
       claimToken: currentClaimToken || undefined,
       walletPlatform,
-      walletObjectId
+      walletObjectId,
+      claimSource: currentClaimSource
     })
   });
 

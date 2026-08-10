@@ -38,6 +38,7 @@ const updateAppleTemplateSelect = [
   'settings',
   'club_features',
   'club_settings',
+  'public_claim_token',
   'is_active'
 ].join(',');
 

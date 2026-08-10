@@ -5,6 +5,7 @@
 
 import forge from 'https://esm.sh/node-forge@1.3.1?target=deno';
 import { normalizeTemplateType } from './templateFeatures.ts';
+import { publicTemplateCreationUrl, publicTemplateShareLabel } from './publicTemplateLinks.ts';
 
 type Row = Record<string, any>;
 
@@ -244,21 +245,6 @@ function logoImageUrl(template: Row = {}) {
   return override || candidate || publicAssetUrl(SAMSUNG_FALLBACK_LOGO_PATH);
 }
 
-function appLinkUrl(template: Row = {}) {
-  const baseUrl = appPublicBaseUrl();
-
-  if (!baseUrl) {
-    return '';
-  }
-
-  const claimToken = stringValue(template.public_claim_token);
-  const claimPath = /^[a-f0-9]{36}$/.test(claimToken)
-    ? `/claim.html?token=${encodeURIComponent(claimToken)}`
-    : `/claim.html?template=${encodeURIComponent(stringValue(template.id))}`;
-
-  return `${baseUrl}${claimPath}`;
-}
-
 function samsungCardType(value: unknown) {
   const text = stringValue(value).toLowerCase();
 
@@ -394,9 +380,9 @@ function buildSamsungLoyaltyAttributes(template: Row = {}, instance: Row = {}) {
   const providerName = textLimit(business.name || template.business_name || 'El Promillo', 32, 'El Promillo');
   const title = textLimit(template.card_name || template.name || 'Kundenkarte', 32, 'Kundenkarte');
   const imageUrl = logoImageUrl(template);
-  const linkUrl = appLinkUrl(template);
+  const linkUrl = publicTemplateCreationUrl(template);
 
-  if (!imageUrl || !linkUrl) {
+  if (!imageUrl) {
     return providerStructuredError(
       501,
       'SAMSUNG_WALLET_PUBLIC_ASSET_URL_MISSING',
@@ -413,9 +399,11 @@ function buildSamsungLoyaltyAttributes(template: Row = {}, instance: Row = {}) {
     logoImage: imageUrl,
     'logoImage.darkUrl': imageUrl,
     'logoImage.lightUrl': imageUrl,
-    appLinkLogo: imageUrl,
-    appLinkName: textLimit(providerName, 32, 'El Promillo'),
-    appLinkData: linkUrl,
+    ...(linkUrl ? {
+      appLinkLogo: imageUrl,
+      appLinkName: textLimit(publicTemplateShareLabel(template), 32, 'Karte teilen'),
+      appLinkData: linkUrl
+    } : {}),
     bgColor: hexColor(template.primary_color, '#fffaf2'),
     fontColor: samsungFontColor(template.text_color),
     'barcode.value': stringValue(instance.customer_code || instance.card_instance_number || instance.ref_id),

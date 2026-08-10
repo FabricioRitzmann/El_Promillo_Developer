@@ -15,6 +15,7 @@ import {
   getTemplateFeatures,
   legacyCardTypeForTemplateType,
   normalizeTemplateType,
+  publicShareLinkEnabled,
   templateFeatureSummary,
   templateSettings
 } from './templateFeatures.js';
@@ -434,6 +435,7 @@ function loadTemplateIntoForm(template) {
   setTemplateField('text_color', template.text_color || defaultWalletTextColor);
   setTemplateField('reward_text', template.reward_text || '');
   setTemplateField('notifications_enabled', settings.notificationsEnabled !== false);
+  setTemplateField('public_share_link_enabled', publicShareLinkEnabled(template));
   setTemplateField('notification_message', settings.notificationMessage || '');
   setTemplateField('custom_fields_text', settings.customFieldsText || '');
   setTemplateField('visit_counter_enabled', settings.visitCounterEnabled === true);
@@ -500,6 +502,7 @@ function templateSettingsFromForm(formData, templateType) {
     enabledFeatures,
     club_features: templateType === 'club_card' ? clubFeatureState : { ...CLUB_FEATURE_DEFAULTS },
     notificationsEnabled: formData.get('notifications_enabled') === 'on',
+    publicShareLinkEnabled: formData.get('public_share_link_enabled') === 'on',
     notificationMessage: String(formData.get('notification_message') || '').trim(),
     customFieldsText: String(formData.get('custom_fields_text') || '').trim(),
     visitCounterEnabled: formData.get('visit_counter_enabled') === 'on',
@@ -2025,7 +2028,15 @@ async function initEditor() {
   templateForm?.addEventListener('input', updateConditionalTemplateFields);
   templateForm?.addEventListener('change', updateConditionalTemplateFields);
 
-  templateType?.addEventListener('change', updateConditionalTemplateFields);
+  templateType?.addEventListener('change', () => {
+    const shareToggle = templateForm?.elements.public_share_link_enabled;
+
+    if (shareToggle) {
+      shareToggle.checked = normalizeTemplateType(templateType.value) === 'club_card';
+    }
+
+    updateConditionalTemplateFields();
+  });
 
   editorLogoColorPickerButton?.addEventListener('click', toggleEditorLogoColorPicker);
   editorLogoColorPickerImage?.addEventListener('pointerdown', (event) => {

@@ -409,6 +409,19 @@ export function templateSettings(template) {
     : {};
 }
 
+export function publicShareLinkEnabled(template) {
+  if (template?.is_active === false) {
+    return false;
+  }
+
+  const settings = templateSettings(template);
+  const configuredValue = settings.publicShareLinkEnabled ?? settings.public_share_link_enabled;
+
+  return typeof configuredValue === 'boolean'
+    ? configuredValue
+    : normalizeTemplateType(template) === 'club_card';
+}
+
 export function clubFeatures(template) {
   const settings = templateSettings(template);
   const source = template?.club_features && typeof template.club_features === 'object'

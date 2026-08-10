@@ -85,6 +85,10 @@ function claimToken(value: unknown) {
   return /^[a-f0-9]{36}$/.test(token) ? token : '';
 }
 
+function claimSource(value: unknown) {
+  return stringValue(value) === 'wallet_share' ? 'wallet_share' : 'direct_qr';
+}
+
 function templateBusiness(template: Row) {
   return Array.isArray(template.businesses) ? template.businesses[0] : template.businesses;
 }
@@ -277,7 +281,7 @@ async function insertClaimCardInstance(supabaseAdmin: any, payload: Row) {
   return data;
 }
 
-async function reuseExistingClaimCard(supabaseAdmin: any, template: Row, existingCard: Row, platform: string, walletObjectId: string, eventType = 'claim_reused') {
+async function reuseExistingClaimCard(supabaseAdmin: any, template: Row, existingCard: Row, platform: string, walletObjectId: string, source: string, eventType = 'claim_reused') {
   if (existingCard.template_id !== template.id) {
     throw createStructuredError(
       409,
@@ -297,7 +301,7 @@ async function reuseExistingClaimCard(supabaseAdmin: any, template: Row, existin
       card_instance_number: existingCard.card_instance_number,
       wallet_platform: platform,
       wallet_object_id: walletObjectId,
-      source: 'claim_card_edge_function',
+      source,
       template_type: normalizeTemplateType(template)
     }
   });
@@ -308,12 +312,13 @@ async function reuseExistingClaimCard(supabaseAdmin: any, template: Row, existin
 async function createCardInstance(supabaseAdmin: any, template: Row, body: Row) {
   const platform = walletPlatform(body.walletPlatform || body.wallet_platform);
   const walletObjectId = stringValue(body.walletObjectId || body.wallet_object_id);
+  const source = claimSource(body.claimSource || body.claim_source);
   validateWalletObjectId(walletObjectId);
 
   const existingCard = await findExistingWalletCard(supabaseAdmin, platform, walletObjectId);
 
   if (existingCard) {
-    return await reuseExistingClaimCard(supabaseAdmin, template, existingCard, platform, walletObjectId);
+    return await reuseExistingClaimCard(supabaseAdmin, template, existingCard, platform, walletObjectId, source);
   }
 
   const cardInstanceNumber = generateCardInstanceNumber();
@@ -327,7 +332,7 @@ async function createCardInstance(supabaseAdmin: any, template: Row, body: Row) 
     card_instance_number: cardInstanceNumber,
     balance_cents: 0,
     cloakroom_active: false,
-    claim_source: 'claim_card_edge_function',
+    claim_source: source,
     template_type: normalizeTemplateType(template),
     ...(platform === 'google' ? { google_wallet_claim_key: walletObjectId } : {})
   };
@@ -352,9 +357,10 @@ async function createCardInstance(supabaseAdmin: any, template: Row, body: Row) 
       balance_cents: 0,
       currency,
       cloakroom_active: false,
+      claim_source: source,
       metadata
     })
-    .select('id, owner_id, business_id, template_id, card_instance_number, customer_code, status, stamp_count, streak_count, vip_status, pass_serial_number, wallet_platform, wallet_object_id, wallet_serial_number, balance_cents, currency, cloakroom_active, metadata, created_at')
+    .select('id, owner_id, business_id, template_id, card_instance_number, customer_code, status, stamp_count, streak_count, vip_status, pass_serial_number, wallet_platform, wallet_object_id, wallet_serial_number, balance_cents, currency, cloakroom_active, claim_source, metadata, created_at')
     .single();
 
   if (cardError) {
@@ -362,7 +368,7 @@ async function createCardInstance(supabaseAdmin: any, template: Row, body: Row) 
       const recoveredCard = await findExistingWalletCard(supabaseAdmin, platform, walletObjectId);
 
       if (recoveredCard) {
-        return await reuseExistingClaimCard(supabaseAdmin, template, recoveredCard, platform, walletObjectId, 'claim_reused_after_unique_conflict');
+        return await reuseExistingClaimCard(supabaseAdmin, template, recoveredCard, platform, walletObjectId, source, 'claim_reused_after_unique_conflict');
       }
     }
 
@@ -405,7 +411,7 @@ async function createCardInstance(supabaseAdmin: any, template: Row, body: Row) 
       card_instance_number: card.card_instance_number,
       wallet_platform: platform,
       wallet_object_id: walletObjectId,
-      source: 'claim_card_edge_function',
+      source,
       template_type: normalizeTemplateType(template)
     }
   });

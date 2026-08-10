@@ -8,6 +8,7 @@ import JSZip from 'https://esm.sh/jszip@3.10.1?target=deno';
 import forge from 'https://esm.sh/node-forge@1.3.1?target=deno';
 import { featureEnabled, normalizeTemplateType, templateSettings } from './templateFeatures.ts';
 import { supabaseCardEmblemUrl } from './cardEmblems.ts';
+import { publicTemplateCreationUrl, publicTemplateShareLabel } from './publicTemplateLinks.ts';
 
 type Row = Record<string, any>;
 
@@ -857,7 +858,18 @@ function buildPassJson(template: Row, cardInstance: Row, fields: Row = {}) {
         key: 'description',
         label: 'Beschreibung',
         value: stringValue(template.description)
-      }
+      },
+      (() => {
+        const shareUrl = publicTemplateCreationUrl(template);
+        const shareLabel = publicTemplateShareLabel(template);
+
+        return {
+          key: 'publicTemplateShare',
+          label: shareLabel,
+          value: shareUrl,
+          attributedValue: shareUrl ? '<a href="' + htmlEscape(shareUrl) + '">' + htmlEscape(shareLabel) + '</a>' : ''
+        };
+      })()
     ]
       .concat(featureRows.map((row) => ({
         key: `${row.key}Back`,

@@ -94,7 +94,7 @@ assertIncludes(provider, [
   "appPublicAssetUrl('/assets/el-promillo-google-watermark.png')",
   'payload.heroImage = watermarkImage',
   "'el_promillo_watermark'",
-  "return pickPayloadFields(payload, ['logo', 'heroImage', 'imageModulesData'])"
+  "return pickPayloadFields(payload, ['logo', 'heroImage', 'imageModulesData', 'linksModuleData'])"
 ], 'Google Event Ticket Hero Image');
 
 assertIncludes(provider, [

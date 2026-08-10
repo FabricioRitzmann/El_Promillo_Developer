@@ -27,6 +27,7 @@ const samsungUpdateTemplateSelect = [
   'settings',
   'club_features',
   'club_settings',
+  'public_claim_token',
   'is_active',
   'created_at',
   'updated_at'

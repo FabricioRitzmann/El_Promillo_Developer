@@ -247,6 +247,10 @@ function claimToken(value) {
   return /^[a-f0-9]{36}$/.test(token) ? token : '';
 }
 
+function publicClaimSource(value) {
+  return String(value || '').trim() === 'wallet_share' ? 'wallet_share' : 'direct_qr';
+}
+
 function isUuid(value) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || '').trim());
 }
@@ -2309,6 +2313,7 @@ app.post('/api/cards/claim', async (req, res) => {
 
     const walletPlatform = req.body?.walletPlatform === 'google' ? 'google' : 'apple';
     const walletObjectId = String(req.body?.walletObjectId || req.body?.wallet_object_id || '').trim();
+    const claimSource = publicClaimSource(req.body?.claimSource || req.body?.claim_source);
     validateWalletObjectId(walletObjectId);
 
     const { data: template, error: templateError } = await (token
@@ -2334,7 +2339,7 @@ app.post('/api/cards/claim', async (req, res) => {
     const existingCard = await findExistingClaimCard(walletPlatform, walletObjectId);
 
     if (existingCard) {
-      const reusedCard = await reuseExistingClaimCard(existingCard, template, walletPlatform, walletObjectId, 'public_claim_page');
+      const reusedCard = await reuseExistingClaimCard(existingCard, template, walletPlatform, walletObjectId, claimSource);
 
       res.json({
         reused: true,
@@ -2364,11 +2369,12 @@ app.post('/api/cards/claim', async (req, res) => {
       balance_cents: 0,
       currency: template.settings?.currency || 'CHF',
       cloakroom_active: false,
+      claim_source: claimSource,
       metadata: {
         card_instance_number: cardInstanceNumber,
         balance_cents: 0,
         cloakroom_active: false,
-        claim_source: 'local_claim_api',
+        claim_source: claimSource,
         ...(walletPlatform === 'google' ? { google_wallet_claim_key: walletObjectId } : {})
       }
     };
@@ -2381,7 +2387,7 @@ app.post('/api/cards/claim', async (req, res) => {
     const { data: card, error: insertError } = await supabaseAdmin
       .from('customer_cards')
       .insert(cardToInsert)
-      .select('id, owner_id, business_id, template_id, card_instance_number, customer_code, status, stamp_count, streak_count, vip_status, pass_serial_number, wallet_platform, wallet_object_id, wallet_serial_number, balance_cents, currency, cloakroom_active, metadata, created_at')
+      .select('id, owner_id, business_id, template_id, card_instance_number, customer_code, status, stamp_count, streak_count, vip_status, pass_serial_number, wallet_platform, wallet_object_id, wallet_serial_number, balance_cents, currency, cloakroom_active, claim_source, metadata, created_at')
       .single();
 
     if (insertError) {
@@ -2389,7 +2395,7 @@ app.post('/api/cards/claim', async (req, res) => {
         const recoveredCard = await findExistingClaimCard(walletPlatform, walletObjectId);
 
         if (recoveredCard) {
-          const reusedCard = await reuseExistingClaimCard(recoveredCard, template, walletPlatform, walletObjectId, 'public_claim_page', 'claim_reused_after_unique_conflict');
+          const reusedCard = await reuseExistingClaimCard(recoveredCard, template, walletPlatform, walletObjectId, claimSource, 'claim_reused_after_unique_conflict');
 
           res.json({
             reused: true,

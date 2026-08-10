@@ -524,6 +524,8 @@ create table if not exists public.customer_cards (
   cloakroom_completed_at timestamptz,
   last_scanned_at timestamptz,
   metadata jsonb not null default '{}'::jsonb,
+  claim_source text not null default 'legacy'
+    check (claim_source in ('legacy', 'direct_qr', 'wallet_share', 'operator')),
   last_claimed_at timestamptz not null default now(),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
@@ -537,6 +539,24 @@ add column if not exists card_instance_number text;
 
 alter table public.customer_cards
 add column if not exists guest_profile_id uuid references public.guest_profiles(id) on delete restrict;
+
+alter table public.customer_cards
+add column if not exists claim_source text default 'legacy';
+
+update public.customer_cards
+set claim_source = 'legacy'
+where claim_source is null or claim_source not in ('legacy', 'direct_qr', 'wallet_share', 'operator');
+
+alter table public.customer_cards
+alter column claim_source set default 'legacy',
+alter column claim_source set not null;
+
+alter table public.customer_cards
+drop constraint if exists customer_cards_claim_source_check;
+
+alter table public.customer_cards
+add constraint customer_cards_claim_source_check
+check (claim_source in ('legacy', 'direct_qr', 'wallet_share', 'operator'));
 
 update public.customer_cards
 set card_instance_number = coalesce(
