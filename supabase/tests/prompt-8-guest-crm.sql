@@ -28,5 +28,9 @@ select jsonb_build_object(
     select count(*) from public.customer_cards card
     left join public.guest_crm_profiles crm on crm.guest_profile_id = card.guest_profile_id
     where crm.guest_profile_id is null
-  ) >= 0
+  ) >= 0,
+  'production_customer_number_browser_grant', not exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'customer_cards' and column_name = 'customer_number'
+  ) or has_column_privilege('authenticated', 'public.customer_cards', 'customer_number', 'SELECT')
 ) as prompt_8_acceptance;

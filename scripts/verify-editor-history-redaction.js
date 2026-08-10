@@ -65,6 +65,7 @@ assertIncludes(schemaSource, [
   'grant update (\n  business_id,\n  business_name,\n  card_name,\n  card_type,\n  template_type,\n  description,\n  primary_color,\n  text_color,\n  logo_url,\n  reward_text,\n  stamps_required,\n  streak_goal,\n  vip_tier,\n  settings,\n  club_features,\n  club_settings,\n  is_active\n) on public.card_templates to authenticated',
   'revoke select, insert, update, delete on public.customer_cards from authenticated',
   'grant select (\n  id,\n  owner_id,\n  business_id,\n  template_id,\n  card_instance_number,\n  customer_code,\n  status,\n  stamp_count,\n  streak_count,\n  vip_status,\n  pass_serial_number,\n  wallet_platform,\n  wallet_object_id,\n  wallet_serial_number,\n  balance_cents,\n  currency,\n  cloakroom_active,\n  cloakroom_started_at,\n  cloakroom_completed_at,\n  last_scanned_at,\n  metadata,\n  last_claimed_at,\n  created_at,\n  updated_at\n) on public.customer_cards to authenticated',
+  "execute 'grant select (customer_number) on public.customer_cards to authenticated'",
   'drop policy if exists "unlocked operators can update own customer cards" on public.customer_cards',
   'Keine direkte Browser-Update-Policy für customer_cards',
   'drop policy if exists "unlocked operators can update own card instances" on public.card_instances',

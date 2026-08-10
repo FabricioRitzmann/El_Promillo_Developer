@@ -6437,6 +6437,22 @@ grant select (
   created_at,
   updated_at
 ) on public.customer_cards to authenticated;
+-- Production führt zusätzlich eine öffentliche, nicht sensible Kundennummer.
+-- Der gemeinsame Schema-Stand bleibt auch für Installationen ohne diese optionale
+-- Spalte ausführbar und erweitert den Browser-Grant nur, wenn sie existiert.
+do $$
+begin
+  if exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'customer_cards'
+      and column_name = 'customer_number'
+  ) then
+    execute 'grant select (customer_number) on public.customer_cards to authenticated';
+  end if;
+end
+$$;
 revoke select, insert, update, delete on public.card_instances from authenticated;
 grant select (
   id,
