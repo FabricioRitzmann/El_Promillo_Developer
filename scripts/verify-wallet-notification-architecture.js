@@ -734,7 +734,7 @@ assertAll('supabase/functions/claim-card/index.ts', 'Claim Card Security', [
   "const walletSerialNumber = platform === 'apple' ? passSerialNumber : walletObjectId",
   'wallet_serial_number: walletSerialNumber',
   "wallet_object_id: walletObjectId",
-  'claim_card_edge_function'
+  'claim_source: source'
 ]);
 
 [
