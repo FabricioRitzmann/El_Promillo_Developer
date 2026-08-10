@@ -859,6 +859,10 @@ async function getGuestProfileForScan(card) {
   }
 
   if (!data) {
+    if (!card.business_id) {
+      return null;
+    }
+
     throw createStructuredError(
       409,
       'SCANNER_GUEST_PROFILE_MISSING',

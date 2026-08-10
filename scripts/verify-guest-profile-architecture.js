@@ -34,8 +34,10 @@ assert(schema.includes('revoke select, insert, update, delete on public.guest_pr
 assert(!schema.includes('grant insert on public.guest_profiles to authenticated'), 'Browser darf Gastprofile nicht direkt anlegen.');
 
 assert(edge.includes(".rpc('get_guest_profile_for_scan'"), 'Scanner Edge Function nutzt die zentrale Guest-Aufloesung nicht.');
+assert(edge.includes('if (!card.business_id) {\n      return null;'), 'Tenantlose Legacy-Karten muessen weiterhin scanbar bleiben.');
 assert(edge.includes('guest_profile: guestProfile'), 'Scanner Edge Function liefert kein minimiertes Guest-Profil.');
 assert(server.includes(".rpc('get_guest_profile_for_scan'"), 'Lokaler Scanner-Fallback nutzt die zentrale Guest-Aufloesung nicht.');
+assert(server.includes('if (!card.business_id) {\n      return null;'), 'Lokaler Scanner-Fallback muss tenantlose Legacy-Karten weiter unterstuetzen.');
 assert(server.includes('guest_profile: guestProfile'), 'Lokaler Scanner-Fallback liefert kein minimiertes Guest-Profil.');
 assert(responses.includes('export function publicOperatorGuestProfile'), 'Guest-Response-Sanitizer fehlt.');
 const operatorCardResponse = responses.slice(
