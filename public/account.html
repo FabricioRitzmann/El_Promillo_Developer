@@ -173,6 +173,21 @@
           </label>
         </div>
       </form>
+
+      <section class="panel theme-settings" aria-labelledby="appThemeHeading">
+        <div class="section-title">
+          <div>
+            <p class="eyebrow">Erscheinungsbild</p>
+            <h2 id="appThemeHeading">Farbschema auswählen</h2>
+            <p class="muted">Gilt für die interne Promillo-App dieser Firma. Farben bestehender und neuer Wallet-Karten bleiben unverändert.</p>
+          </div>
+        </div>
+        <div id="appThemeOptions" class="theme-option-grid" role="radiogroup" aria-label="App-Farbschema"></div>
+        <div class="theme-save-row">
+          <span id="appThemeStatus" class="theme-save-status" role="status" aria-live="polite"></span>
+          <button id="saveAppThemeButton" class="primary" type="button">Theme speichern</button>
+        </div>
+      </section>
     </main>
 
     <script type="module" src="js/account.js"></script>

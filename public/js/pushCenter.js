@@ -1,6 +1,7 @@
 import { requireLogin } from './guards.js';
 import { pagePath } from './path.js';
 import { byId, escapeHtml, renderBusinessHeader, showMessage } from './ui.js';
+import { applyBusinessAppTheme, applyCachedAppTheme } from './theme.js';
 
 const state = {
   client: null,
@@ -430,7 +431,7 @@ function renderHistory() {
 
 async function loadData() {
   const businessRows = await state.client.selectRows('businesses', {
-    select: 'id,owner_id,name,address,location_lat,location_lng,logo_url,company_logo_updated_at,updated_at',
+    select: 'id,owner_id,name,address,location_lat,location_lng,logo_url,company_logo_updated_at,app_theme,updated_at',
     filters: [{ column: 'owner_id', op: 'eq', value: state.session.user.id }],
     limit: 1
   });
@@ -441,6 +442,7 @@ async function loadData() {
   }
 
   renderBusinessHeader(state.business);
+  applyBusinessAppTheme(state.business, state.session.user.id);
   businessLocation.textContent = state.business.address || state.business.name || 'Firmenstandort';
 
   const [templates, rules, campaigns] = await Promise.all([
@@ -600,6 +602,7 @@ async function init() {
 
   state.client = auth.client;
   state.session = auth.session;
+  applyCachedAppTheme(state.session.user.id);
   bindEvents();
 
   try {

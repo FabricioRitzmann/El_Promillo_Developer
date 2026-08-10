@@ -4,6 +4,7 @@ import { setupLanguageSelectors } from './i18n.js';
 import { pagePath } from './path.js';
 import { businessLogoUrl, byId, cardTypeLabel, escapeHtml, renderBusinessHeader, showMessage } from './ui.js';
 import { cardFeatureRows, featureEnabled, templateFeatureSummary } from './templateFeatures.js';
+import { applyBusinessAppTheme, applyCachedAppTheme } from './theme.js';
 
 const state = {
   client: null,
@@ -33,6 +34,7 @@ const businessDashboardSelect = [
   'logo_url',
   'company_logo_path',
   'company_logo_updated_at',
+  'app_theme',
   'created_at',
   'updated_at'
 ].join(',');
@@ -292,6 +294,7 @@ async function loadBusiness() {
   });
 
   renderBusinessHeader(state.business || {});
+  applyBusinessAppTheme(state.business, state.session.user.id);
 }
 
 async function loadTemplates() {
@@ -1548,6 +1551,7 @@ async function initDashboard() {
   state.client = context.client;
   state.session = context.session;
   state.profile = context.profile;
+  applyCachedAppTheme(state.session.user.id);
 
   initDashboardTabs();
 

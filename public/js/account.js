@@ -11,12 +11,14 @@ import {
   showMessage
 } from './ui.js';
 import { imageFileToPngUnderLimit } from './imageUploadOptimizer.js';
+import { APP_THEMES, applyAppTheme, applyBusinessAppTheme, applyCachedAppTheme, normalizeAppTheme } from './theme.js';
 
 const state = {
   client: null,
   session: null,
   profile: null,
-  business: null
+  business: null,
+  previewTheme: null
 };
 
 const businessAccountSelect = [
@@ -32,6 +34,7 @@ const businessAccountSelect = [
   'logo_url',
   'company_logo_path',
   'company_logo_updated_at',
+  'app_theme',
   'guest_scan_settings',
   'created_at',
   'updated_at'
@@ -46,6 +49,9 @@ const companyLogoPreview = byId('companyLogoPreview');
 const companyLogoUpload = byId('companyLogoUpload');
 const uploadCompanyLogoButton = byId('uploadCompanyLogoButton');
 const removeCompanyLogoButton = byId('removeCompanyLogoButton');
+const appThemeOptions = byId('appThemeOptions');
+const appThemeStatus = byId('appThemeStatus');
+const saveAppThemeButton = byId('saveAppThemeButton');
 const businessLogoBucket = 'business-logos';
 const maxLogoFileBytes = 2 * 1024 * 1024;
 const maxLogoSourceFileBytes = 25 * 1024 * 1024;
@@ -134,9 +140,52 @@ function fillBusinessForm() {
   businessForm.notes_auto_show_warning.checked = scanSettings.notes_auto_show_warning !== false;
   businessForm.notes_auto_show_important.checked = scanSettings.notes_auto_show_important !== false;
   businessForm.notes_auto_show_normal.checked = scanSettings.notes_auto_show_normal === true;
+  state.previewTheme = applyBusinessAppTheme(state.business, state.session?.user?.id);
+  renderThemeOptions();
   renderCompanyLogoPreview();
   renderBusinessHeader(state.business || {});
   renderMobileAccountSummary();
+}
+
+function renderThemeOptions() {
+  if (!appThemeOptions) return;
+
+  const selectedTheme = normalizeAppTheme(state.previewTheme || state.business?.app_theme);
+  appThemeOptions.innerHTML = APP_THEMES.map((theme) => `
+    <label class="theme-option">
+      <input type="radio" name="app_theme" value="${escapeHtml(theme.id)}" ${theme.id === selectedTheme ? 'checked' : ''}>
+      <span class="theme-preview" style="--theme-primary:${escapeHtml(theme.colors[0])};--theme-background:${escapeHtml(theme.colors[1])};--theme-secondary:${escapeHtml(theme.colors[2])}"><span></span></span>
+      <strong>${escapeHtml(theme.label)}</strong>
+    </label>
+  `).join('');
+}
+
+function previewAppTheme(theme) {
+  state.previewTheme = applyAppTheme(theme);
+  if (appThemeStatus) appThemeStatus.textContent = 'Vorschau aktiv – noch nicht gespeichert.';
+}
+
+async function saveAppTheme() {
+  const appTheme = normalizeAppTheme(state.previewTheme || state.business?.app_theme);
+  saveAppThemeButton && (saveAppThemeButton.disabled = true);
+  if (appThemeStatus) appThemeStatus.textContent = 'Theme wird gespeichert …';
+
+  try {
+    if (!state.business?.id) {
+      await persistBusiness({ app_theme: appTheme });
+    } else {
+      state.business = (await state.client.updateRows('businesses', { app_theme: appTheme }, [
+        { column: 'id', op: 'eq', value: state.business.id },
+        { column: 'owner_id', op: 'eq', value: state.session.user.id }
+      ], { select: businessAccountSelect }))[0];
+      state.previewTheme = applyBusinessAppTheme(state.business, state.session.user.id);
+      renderThemeOptions();
+    }
+
+    if (appThemeStatus) appThemeStatus.textContent = 'Theme gespeichert.';
+  } finally {
+    saveAppThemeButton && (saveAppThemeButton.disabled = false);
+  }
 }
 
 async function loadBusiness() {
@@ -414,6 +463,7 @@ async function initAccount() {
   state.client = context.client;
   state.session = context.session;
   state.profile = context.profile;
+  applyCachedAppTheme(state.session.user.id);
 
   renderLoginData();
   await loadBusiness();
@@ -436,6 +486,17 @@ async function initAccount() {
     renderBusinessHeader({
       ...state.business,
       name: businessForm.name.value
+    });
+  });
+
+  appThemeOptions?.addEventListener('change', (event) => {
+    const input = event.target.closest('input[name="app_theme"]');
+    if (input) previewAppTheme(input.value);
+  });
+
+  saveAppThemeButton?.addEventListener('click', () => {
+    saveAppTheme().catch((error) => {
+      if (appThemeStatus) appThemeStatus.textContent = error.message;
     });
   });
 

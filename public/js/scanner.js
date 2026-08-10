@@ -5,6 +5,7 @@ import { pagePath } from './path.js';
 import { byId, cardTypeLabel, escapeHtml, normalizeCode, renderBusinessHeader, showMessage, walletPreviewHtml } from './ui.js';
 import { cardEmblemMeta } from './cardEmblems.js';
 import { activeFeatureLabels, featureEnabled, normalizeScannerAction, normalizeTemplateType, scannerAccessHighlights, validateScannerAction } from './templateFeatures.js';
+import { applyBusinessAppTheme, applyCachedAppTheme } from './theme.js';
 
 const state = {
   client: null,
@@ -40,7 +41,8 @@ const businessScannerSelect = [
   'name',
   'logo_url',
   'company_logo_path',
-  'company_logo_updated_at'
+  'company_logo_updated_at',
+  'app_theme'
 ].join(',');
 
 const scannerMessage = byId('scannerMessage');
@@ -125,6 +127,7 @@ async function loadBusinessHeader() {
   }
 
   renderBusinessHeader(state.business || {});
+  applyBusinessAppTheme(state.business, state.session.user.id);
 }
 
 function stopCamera() {
@@ -1388,6 +1391,7 @@ async function initScanner() {
 
   state.client = context.client;
   state.session = context.session;
+  applyCachedAppTheme(state.session.user.id);
   await loadBusinessHeader();
 
   byId('startScanner')?.addEventListener('click', () => {

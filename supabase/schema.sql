@@ -93,6 +93,23 @@ add column if not exists company_logo_path text,
 add column if not exists company_logo_updated_at timestamptz;
 
 alter table public.businesses
+add column if not exists app_theme text not null default 'promillo-standard';
+
+alter table public.businesses
+drop constraint if exists businesses_app_theme_check;
+
+alter table public.businesses
+add constraint businesses_app_theme_check check (app_theme in (
+  'promillo-standard',
+  'blue-white',
+  'green-white',
+  'violet-white',
+  'navy-lightgray',
+  'black-white',
+  'anthracite-gold'
+)) not valid;
+
+alter table public.businesses
 add column if not exists guest_scan_settings jsonb not null default '{
   "regular_info_auto_show": false,
   "notes_auto_show_warning": true,
@@ -5909,6 +5926,7 @@ grant select (
   logo_url,
   company_logo_path,
   company_logo_updated_at,
+  app_theme,
   created_at,
   updated_at
 ) on public.businesses to authenticated;
@@ -5923,7 +5941,8 @@ grant insert (
   website,
   logo_url,
   company_logo_path,
-  company_logo_updated_at
+  company_logo_updated_at,
+  app_theme
 ) on public.businesses to authenticated;
 grant update (
   name,
@@ -5935,7 +5954,8 @@ grant update (
   website,
   logo_url,
   company_logo_path,
-  company_logo_updated_at
+  company_logo_updated_at,
+  app_theme
 ) on public.businesses to authenticated;
 grant select (guest_scan_settings) on public.businesses to authenticated;
 grant insert (guest_scan_settings) on public.businesses to authenticated;

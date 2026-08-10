@@ -18,6 +18,7 @@ import {
   templateFeatureSummary,
   templateSettings
 } from './templateFeatures.js';
+import { applyBusinessAppTheme, applyCachedAppTheme } from './theme.js';
 
 const state = {
   client: null,
@@ -45,6 +46,7 @@ const businessEditorSelect = [
   'logo_url',
   'company_logo_path',
   'company_logo_updated_at',
+  'app_theme',
   'created_at',
   'updated_at'
 ].join(',');
@@ -1892,6 +1894,7 @@ async function loadBusiness() {
   });
 
   renderBusinessHeader(state.business || {});
+  applyBusinessAppTheme(state.business, state.session.user.id);
 }
 
 async function loadTemplate() {
@@ -2014,6 +2017,7 @@ async function initEditor() {
   state.client = context.client;
   state.session = context.session;
   state.profile = context.profile;
+  applyCachedAppTheme(state.session.user.id);
 
   templateForm?.addEventListener('submit', (event) => {
     saveTemplate(event).catch((error) => showMessage(editorMessage, error.message, 'error'));
