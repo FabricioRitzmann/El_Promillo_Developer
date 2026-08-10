@@ -5,7 +5,7 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "precheck": "node scripts/verify-guest-profile-architecture.js && node scripts/verify-guest-restrictions.js && node scripts/verify-guest-information.js",
+    "precheck": "node scripts/verify-guest-profile-architecture.js && node scripts/verify-guest-restrictions.js && node scripts/verify-guest-information.js && node scripts/verify-visit-counter.js",
     "start": "node server/index.js",
     "dev": "node --watch server/index.js",
     "check:company-logo": "node --check public/js/account.js && node --check public/js/editor.js && node --check public/js/logoColorPicker.js && node scripts/verify-company-logo-variants.js",

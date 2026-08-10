@@ -815,6 +815,10 @@ async function loadLocalCardInstanceForScan(card) {
       'first_scanned_at',
       'last_scanned_at',
       'scan_count',
+      'lifetime_visits',
+      'visits_today',
+      'visits_today_date',
+      'last_visit_at',
       'resolved_emblem_key',
       'resolved_emblem_url',
       'emblem_updated_at',
@@ -1029,6 +1033,19 @@ async function manageGuestInformation(card, userId, role, body = {}) {
   return publicGuestInformation(response.data, role);
 }
 
+async function registerEntryVisit(card, userId, body = {}) {
+  const { data, error } = await supabaseAdmin.rpc('register_card_entry_visit', {
+    p_customer_card_id: card.id,
+    p_actor_id: userId,
+    p_idempotency_key: body.idempotencyKey || body.idempotency_key || ''
+  });
+  if (error) {
+    const message = String(error.message || '');
+    throw createStructuredError(message.includes('DISABLED') ? 409 : message.includes('FORBIDDEN') ? 403 : 400, 'ENTRY_VISIT_FAILED', 'Eintrittsbesuch konnte nicht registriert werden.', message);
+  }
+  return data || null;
+}
+
 function isMissingWalletEmblemColumn(error) {
   const message = String(error?.message || error?.details || '');
 
@@ -1238,7 +1255,11 @@ async function syncLocalCardInstance(updatedCard, template, now, scanContext = {
     'emblem_updated_at',
     'first_scanned_at',
     'last_scanned_at',
-    'scan_count'
+    'scan_count',
+    'lifetime_visits',
+    'visits_today',
+    'visits_today_date',
+    'last_visit_at'
   ];
   let { data: updatedInstance, error: updateInstanceError } = await supabaseAdmin
     .from('card_instances')
@@ -1287,6 +1308,10 @@ async function syncLocalCardInstance(updatedCard, template, now, scanContext = {
     first_scanned_at: updatedInstance.first_scanned_at,
     last_scanned_at: updatedInstance.last_scanned_at,
     scan_count: Number(updatedInstance.scan_count || scanCount),
+    lifetime_visits: Number(updatedInstance.lifetime_visits || 0),
+    visits_today: Number(updatedInstance.visits_today || 0),
+    visits_today_date: updatedInstance.visits_today_date || null,
+    last_visit_at: updatedInstance.last_visit_at || null,
     resolved_emblem_key: updatedInstance.resolved_emblem_key || resolvedEmblem.resolved_emblem_key,
     resolved_emblem_url: updatedInstance.resolved_emblem_url || resolvedEmblem.resolved_emblem_url,
     emblem_updated_at: updatedInstance.emblem_updated_at || resolvedEmblem.emblem_updated_at,
@@ -2523,6 +2548,10 @@ app.post('/api/scanner/actions', async (req, res) => {
           first_scanned_at: cardInstanceBeforeScan.first_scanned_at,
           last_scanned_at: cardInstanceBeforeScan.last_scanned_at,
           scan_count: cardInstanceBeforeScan.scan_count,
+          lifetime_visits: cardInstanceBeforeScan.lifetime_visits || 0,
+          visits_today: cardInstanceBeforeScan.visits_today || 0,
+          visits_today_date: cardInstanceBeforeScan.visits_today_date || null,
+          last_visit_at: cardInstanceBeforeScan.last_visit_at || null,
           resolved_emblem_key: cardInstanceBeforeScan.resolved_emblem_key,
           resolved_emblem_url: cardInstanceBeforeScan.resolved_emblem_url,
           emblem_updated_at: cardInstanceBeforeScan.emblem_updated_at,
@@ -2791,13 +2820,12 @@ app.post('/api/scanner/actions', async (req, res) => {
         };
       }
 
-      if (normalizedAction === 'visit') {
+  if (normalizedAction === 'visit') {
         const metadata = card.metadata && typeof card.metadata === 'object' ? card.metadata : {};
 
         updates.metadata = {
           ...metadata,
-          visit_count: Number(metadata.visit_count || 0) + 1,
-          last_visit_at: now
+      last_visit_at: now
         };
       }
 
@@ -2900,6 +2928,15 @@ app.post('/api/scanner/actions', async (req, res) => {
       demographics,
       userId: user.id
     });
+    const visitStats = normalizedAction === 'visit'
+      ? await registerEntryVisit(updatedCard, user.id, req.body || {})
+      : null;
+    if (visitStats) {
+      updatedCardInstance.lifetime_visits = visitStats.lifetime_visits;
+      updatedCardInstance.visits_today = visitStats.visits_today;
+      updatedCardInstance.visits_today_date = visitStats.visits_today_date;
+      updatedCardInstance.last_visit_at = visitStats.last_visit_at;
+    }
     const emblemUpdate = await recordLocalWalletEmblemUpdate(
       updatedCard,
       updatedCardInstance,
@@ -3069,6 +3106,10 @@ app.post('/api/scanner/actions', async (req, res) => {
         cloakroom_reminder: cloakroomReminder,
         cloakroom_location_reminder: cloakroomLocationReminder,
         scan_count: updatedCardInstance.scan_count,
+        lifetime_visits: updatedCardInstance.lifetime_visits || 0,
+        visits_today: updatedCardInstance.visits_today || 0,
+        visits_today_date: updatedCardInstance.visits_today_date || null,
+        last_visit_at: updatedCardInstance.last_visit_at || null,
         before: {
           stamp_count: card.stamp_count,
           streak_count: card.streak_count,
@@ -3096,6 +3137,10 @@ app.post('/api/scanner/actions', async (req, res) => {
         first_scanned_at: updatedCardInstance.first_scanned_at,
         last_scanned_at: updatedCardInstance.last_scanned_at,
         scan_count: updatedCardInstance.scan_count,
+        lifetime_visits: updatedCardInstance.lifetime_visits || 0,
+        visits_today: updatedCardInstance.visits_today || 0,
+        visits_today_date: updatedCardInstance.visits_today_date || null,
+        last_visit_at: updatedCardInstance.last_visit_at || null,
         resolved_emblem_key: updatedCardInstance.resolved_emblem_key,
         resolved_emblem_url: updatedCardInstance.resolved_emblem_url,
         emblem_updated_at: updatedCardInstance.emblem_updated_at
@@ -3103,6 +3148,7 @@ app.post('/api/scanner/actions', async (req, res) => {
       emblem_update: emblemUpdate,
       cloakroom_reminder: cloakroomReminder,
       cloakroom_location_reminder: cloakroomLocationReminder,
+      visit_stats: visitStats,
       guest_profile: guestProfile,
       guest_restrictions: await getGuestRestrictionsForScan(updatedCard, operatorRole),
       guest_information: await getGuestInformationForScan(updatedCard, operatorRole),

@@ -86,6 +86,7 @@ const sendGoogleCardInstanceSelect = [
   'emblem_updated_at',
   'current_streak',
   'current_stamps',
+  'lifetime_visits',
   'vip_level',
   'balance_cents',
   'currency',

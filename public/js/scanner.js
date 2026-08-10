@@ -415,10 +415,14 @@ function renderCard() {
     quickActions.push(`<button type="button" class="secondary" data-action="cloakroom-toggle">${cloakroomActive ? 'Garderobenabholung' : 'Garderobenabgabe'}</button>`);
   }
 
-  if (featureEnabled(template, 'visit')) {
-    const visitCount = Number(card.metadata?.visit_count || 0);
-    detailItems.push(`<div><dt>Besuche</dt><dd>${visitCount}</dd></div>`);
-    quickActions.push('<button type="button" class="secondary" data-action="visit">Besuch erfassen</button>');
+  if (featureEnabled(template, 'visit') && template.settings?.visitCounterEnabled === true) {
+    const visitCount = Number(cardInstance.lifetime_visits || 0);
+    const zurichToday = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Zurich' }).format(new Date());
+    const visitsToday = cardInstance.visits_today_date === zurichToday ? Number(cardInstance.visits_today || 0) : 0;
+    detailItems.push(`<div><dt>Besuche gesamt</dt><dd>${visitCount}</dd></div>`);
+    detailItems.push(`<div><dt>Heute</dt><dd>${visitsToday}</dd></div>`);
+    detailItems.push(`<div><dt>Letzter Besuch</dt><dd>${cardInstance.last_visit_at ? escapeHtml(new Date(cardInstance.last_visit_at).toLocaleString('de-CH')) : '-'}</dd></div>`);
+    quickActions.push('<button type="button" class="secondary" data-action="visit">Eintritt registrieren</button>');
   }
 
   if (featureEnabled(template, 'checkin')) {
@@ -1060,6 +1064,16 @@ function applyScannerActionResult(result) {
   renderCard();
 }
 
+function showVisitMilestone(result) {
+  if (!result.visit_stats?.milestone_reached) return false;
+  state.notificationQueue = [{
+    eyebrow: 'Meilenstein erreicht',
+    title: `${Number(result.visit_stats.milestone_reached)}. Besuch`,
+    html: `<p>Dieser Gast wurde gerade zum <strong>${Number(result.visit_stats.milestone_reached)}. Mal</strong> registriert.</p>`
+  }];
+  return showNextGuestNotification();
+}
+
 async function continuePendingDemographics(event) {
   event.preventDefault();
 
@@ -1097,6 +1111,7 @@ async function continuePendingDemographics(event) {
   state.pendingDemographicsPayload = null;
   hideDemographicsModal();
   applyScannerActionResult(result);
+  showVisitMilestone(result);
   showMessage(
     scannerMessage,
     result.emblem_update?.queued
@@ -1121,6 +1136,9 @@ async function runScannerAction(action, payload = {}) {
     ...payload,
     restrictionAcknowledged: state.restrictionAcknowledged
   };
+  if (actionToSend === 'visit' && !requestPayload.idempotencyKey) {
+    requestPayload.idempotencyKey = crypto.randomUUID();
+  }
   const result = await callScannerActionApi(actionToSend, requestPayload);
 
   if (result.requires_restriction_acknowledgement) {
@@ -1139,6 +1157,7 @@ async function runScannerAction(action, payload = {}) {
   }
 
   applyScannerActionResult(result);
+  showVisitMilestone(result);
   showMessage(
     scannerMessage,
     result.emblem_update?.queued

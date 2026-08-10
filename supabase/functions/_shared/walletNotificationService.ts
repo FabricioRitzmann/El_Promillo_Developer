@@ -124,6 +124,7 @@ const CARD_INSTANCE_SELECT = [
   'wallet_serial_number',
   'current_streak',
   'current_stamps',
+  'lifetime_visits',
   'vip_level',
   'custom_counter',
   'balance_cents',

@@ -106,6 +106,28 @@
               </label>
             </div>
 
+            <div id="visitCounterPanel" class="feature-fields visit-counter-panel">
+              <h3>Besuchszähler</h3>
+              <label class="check-row">
+                <input name="visit_counter_enabled" type="checkbox">
+                <span>Besuchszähler aktivieren</span>
+              </label>
+              <div id="visitCounterOptions" hidden>
+                <label class="check-row">
+                  <input name="visit_counter_wallet_visible" type="checkbox">
+                  <span>Besuchszähler auf Wallet-Karte anzeigen</span>
+                </label>
+                <label class="check-row">
+                  <input name="visit_milestones_enabled" type="checkbox">
+                  <span>Meilenstein-Benachrichtigungen aktivieren</span>
+                </label>
+                <label>Meilensteine (kommagetrennt)
+                  <input name="visit_milestones" placeholder="10, 25, 50, 100, 250, 500">
+                </label>
+                <p class="muted">Gezählt werden nur erfolgreiche Eintrittsscans, nicht das bloße Laden einer Karte.</p>
+              </div>
+            </div>
+
             <div id="optionalFeaturePanel" class="feature-fields optional-feature-panel" hidden>
               <h3 class="optional-feature-title">Optionale Zusatzfunktionen</h3>
               <p id="clubFeatureSpaceWarning" class="message warning" hidden>Es sind viele Funktionen aktiv. Auf Wallet-Karten ist der Platz begrenzt.</p>

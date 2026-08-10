@@ -201,6 +201,10 @@ function templateProgressText(template: Row = {}, instance: Row = {}) {
   const balanceCents = Math.max(0, numericValue(instance.balance_cents, 0));
   const currency = stringValue(instance.currency || template.settings?.currency || 'CHF');
 
+  if (template.settings?.visitCounterEnabled === true && template.settings?.visitCounterWalletVisible === true) {
+    return `${Math.max(0, numericValue(instance.lifetime_visits, 0))} Besuche`;
+  }
+
   if (templateType === 'stamp_card') {
     return `${stampCount}/${stampsRequired} Stempel`;
   }

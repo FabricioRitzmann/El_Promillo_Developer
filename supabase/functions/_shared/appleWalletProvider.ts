@@ -789,6 +789,16 @@ function buildPassJson(template: Row, cardInstance: Row, fields: Row = {}) {
     changeMessage: '%@'
   }));
 
+  const settings = templateSettings(template);
+  if (settings.visitCounterEnabled === true && settings.visitCounterWalletVisible === true) {
+    auxiliaryFields.unshift({
+      key: 'lifetimeVisits',
+      label: 'Besuche',
+      value: numberValue(cardInstance.lifetime_visits, 0),
+      changeMessage: 'Besuche: %@'
+    });
+  }
+
   if (rewardVisible(template, cardInstance)) {
     auxiliaryFields.push({
       key: 'reward',

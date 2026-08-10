@@ -434,6 +434,10 @@ function loadTemplateIntoForm(template) {
   setTemplateField('notifications_enabled', settings.notificationsEnabled !== false);
   setTemplateField('notification_message', settings.notificationMessage || '');
   setTemplateField('custom_fields_text', settings.customFieldsText || '');
+  setTemplateField('visit_counter_enabled', settings.visitCounterEnabled === true);
+  setTemplateField('visit_counter_wallet_visible', settings.visitCounterWalletVisible === true);
+  setTemplateField('visit_milestones_enabled', settings.visitMilestonesEnabled === true);
+  setTemplateField('visit_milestones', Array.isArray(settings.visitMilestones) ? settings.visitMilestones.join(', ') : '10, 25, 50, 100, 250, 500');
   setTemplateField('stamps_required', template.stamps_required || 10);
   setTemplateField('streak_goal', template.streak_goal || settings.streakGoal || '');
   setTemplateField('streak_note', settings.streakNote || '');
@@ -496,6 +500,14 @@ function templateSettingsFromForm(formData, templateType) {
     notificationsEnabled: formData.get('notifications_enabled') === 'on',
     notificationMessage: String(formData.get('notification_message') || '').trim(),
     customFieldsText: String(formData.get('custom_fields_text') || '').trim(),
+    visitCounterEnabled: formData.get('visit_counter_enabled') === 'on',
+    visitCounterWalletVisible: formData.get('visit_counter_wallet_visible') === 'on',
+    visitMilestonesEnabled: formData.get('visit_milestones_enabled') === 'on',
+    visitMilestones: [...new Set(String(formData.get('visit_milestones') || '')
+      .split(',')
+      .map((value) => Number(value.trim()))
+      .filter((value) => Number.isSafeInteger(value) && value > 0 && value <= 1000000))]
+      .sort((a, b) => a - b),
     stampIconUrl: String(formData.get('stamp_icon_url') || '').trim(),
     streakIconUrl: String(formData.get('streak_icon_url') || '').trim(),
     streakGoal: streakGoal > 0 ? streakGoal : null,
@@ -1792,6 +1804,13 @@ function updateConditionalTemplateFields() {
   document.querySelectorAll('[data-reward-field]').forEach((element) => {
     element.hidden = !templateSupportsReward(draft);
   });
+
+  const visitCounterOptions = byId('visitCounterOptions');
+  const visitCounterEnabled = Boolean(templateForm.elements.visit_counter_enabled?.checked);
+  if (visitCounterOptions) visitCounterOptions.hidden = !visitCounterEnabled;
+  if (templateForm.elements.visit_milestones) {
+    templateForm.elements.visit_milestones.disabled = !visitCounterEnabled || !templateForm.elements.visit_milestones_enabled?.checked;
+  }
 
   renderEditorPreview();
   renderWalletNotificationsPanel().catch(() => {});

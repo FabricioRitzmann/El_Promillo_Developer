@@ -695,6 +695,50 @@ add column if not exists first_scanned_at timestamptz;
 alter table public.card_instances
 add column if not exists scan_count integer default 0;
 
+alter table public.card_instances
+add column if not exists lifetime_visits integer not null default 0,
+add column if not exists visits_today integer not null default 0,
+add column if not exists visits_today_date date,
+add column if not exists last_visit_at timestamptz;
+
+alter table public.card_instances
+drop constraint if exists card_instances_visit_counts_check;
+
+alter table public.card_instances
+add constraint card_instances_visit_counts_check
+check (lifetime_visits >= 0 and visits_today >= 0) not valid;
+
+create table if not exists public.card_visit_events (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null references public.operator_profiles(id) on delete restrict,
+  business_id uuid not null references public.businesses(id) on delete restrict,
+  template_id uuid not null references public.card_templates(id) on delete restrict,
+  customer_card_id uuid not null references public.customer_cards(id) on delete restrict,
+  card_instance_id uuid not null references public.card_instances(id) on delete restrict,
+  event_type text not null default 'ENTRY_SCAN' check (event_type = 'ENTRY_SCAN'),
+  idempotency_key text not null,
+  visit_number integer not null check (visit_number > 0),
+  occurred_at timestamptz not null default clock_timestamp(),
+  created_by uuid not null references public.operator_profiles(id) on delete restrict,
+  constraint card_visit_events_idempotency_key_length check (char_length(idempotency_key) between 8 and 200),
+  constraint card_visit_events_card_key unique (business_id, card_instance_id, idempotency_key),
+  constraint card_visit_events_card_number unique (card_instance_id, visit_number)
+);
+
+create table if not exists public.card_visit_milestones (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null references public.operator_profiles(id) on delete restrict,
+  business_id uuid not null references public.businesses(id) on delete restrict,
+  template_id uuid not null references public.card_templates(id) on delete restrict,
+  customer_card_id uuid not null references public.customer_cards(id) on delete restrict,
+  card_instance_id uuid not null references public.card_instances(id) on delete restrict,
+  visit_event_id uuid not null references public.card_visit_events(id) on delete restrict,
+  milestone_value integer not null check (milestone_value > 0),
+  reached_at timestamptz not null default clock_timestamp(),
+  acknowledged_at timestamptz,
+  constraint card_visit_milestones_once unique (card_instance_id, milestone_value)
+);
+
 update public.card_instances
 set
   vip_benefits_used = coalesce(vip_benefits_used, '[]'::jsonb),
@@ -1792,6 +1836,8 @@ create unique index if not exists card_instances_google_object_id_unique_idx
 on public.card_instances(google_object_id)
 where google_object_id is not null;
 create index if not exists card_instances_notification_idx on public.card_instances(owner_id, business_id, wallet_platform, push_enabled);
+create index if not exists card_visit_events_business_occurred_idx on public.card_visit_events(business_id, occurred_at desc);
+create index if not exists card_visit_milestones_business_reached_idx on public.card_visit_milestones(business_id, reached_at desc);
 create index if not exists card_instances_resolved_emblem_key_idx on public.card_instances(resolved_emblem_key);
 create index if not exists club_card_actions_owner_id_idx on public.club_card_actions(owner_id);
 create index if not exists club_card_actions_business_id_idx on public.club_card_actions(business_id);
@@ -2873,6 +2919,139 @@ $$;
 
 revoke all on function public.manage_guest_note(uuid, text, uuid, uuid, text, text, text) from public, anon, authenticated;
 grant execute on function public.manage_guest_note(uuid, text, uuid, uuid, text, text, text) to service_role;
+
+create or replace function public.register_card_entry_visit(
+  p_customer_card_id uuid,
+  p_actor_id uuid,
+  p_idempotency_key text
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  card_row record;
+  instance_row public.card_instances%rowtype;
+  existing_event public.card_visit_events%rowtype;
+  visit_event public.card_visit_events%rowtype;
+  actor_role text;
+  settings jsonb;
+  local_today date := timezone('Europe/Zurich', clock_timestamp())::date;
+  previous_visits integer;
+  next_visits integer;
+  today_visits integer;
+  milestone_reached integer;
+  wallet_update_queued boolean := false;
+begin
+  if char_length(btrim(coalesce(p_idempotency_key, ''))) not between 8 and 200 then
+    raise exception 'VISIT_IDEMPOTENCY_KEY_INVALID: Idempotency-Key muss 8 bis 200 Zeichen lang sein.';
+  end if;
+
+  select card.id, card.owner_id, card.business_id, card.template_id, template.settings
+  into card_row
+  from public.customer_cards card
+  join public.card_templates template on template.id = card.template_id
+  where card.id = p_customer_card_id;
+
+  if not found or card_row.business_id is null then
+    raise exception 'VISIT_CARD_NOT_FOUND: Karte wurde nicht gefunden.';
+  end if;
+  actor_role := public.business_role_for_user(card_row.business_id, p_actor_id);
+  if actor_role is null then
+    raise exception 'VISIT_FORBIDDEN: Kein Zugriff auf dieses Business.';
+  end if;
+  settings := coalesce(card_row.settings, '{}'::jsonb);
+  if coalesce((settings->>'visitCounterEnabled')::boolean, false) is not true then
+    raise exception 'VISIT_COUNTER_DISABLED: Besuchszaehler ist fuer dieses Template deaktiviert.';
+  end if;
+
+  select * into instance_row from public.card_instances
+  where customer_card_id = p_customer_card_id
+    and business_id = card_row.business_id
+  order by created_at asc limit 1 for update;
+  if not found then
+    raise exception 'VISIT_CARD_INSTANCE_REQUIRED: Karteninstanz fehlt.';
+  end if;
+
+  select * into existing_event from public.card_visit_events
+  where business_id = card_row.business_id
+    and card_instance_id = instance_row.id
+    and idempotency_key = btrim(p_idempotency_key);
+  if found then
+    select milestone_value into milestone_reached from public.card_visit_milestones
+    where visit_event_id = existing_event.id limit 1;
+    return jsonb_build_object(
+      'event_type', 'ENTRY_SCAN', 'idempotent_replay', true,
+      'visit_event_id', existing_event.id, 'lifetime_visits', instance_row.lifetime_visits,
+      'visits_today', case when instance_row.visits_today_date = local_today then instance_row.visits_today else 0 end,
+      'visits_today_date', local_today, 'last_visit_at', instance_row.last_visit_at, 'milestone_reached', milestone_reached,
+      'wallet_update_queued', false
+    );
+  end if;
+
+  previous_visits := instance_row.lifetime_visits;
+  next_visits := previous_visits + 1;
+  today_visits := case when instance_row.visits_today_date = local_today then instance_row.visits_today + 1 else 1 end;
+
+  insert into public.card_visit_events (
+    owner_id, business_id, template_id, customer_card_id, card_instance_id,
+    event_type, idempotency_key, visit_number, created_by
+  ) values (
+    card_row.owner_id, card_row.business_id, card_row.template_id, p_customer_card_id, instance_row.id,
+    'ENTRY_SCAN', btrim(p_idempotency_key), next_visits, p_actor_id
+  ) returning * into visit_event;
+
+  update public.card_instances set
+    lifetime_visits = next_visits,
+    visits_today = today_visits,
+    visits_today_date = local_today,
+    last_visit_at = visit_event.occurred_at
+  where id = instance_row.id;
+
+  if coalesce((settings->>'visitMilestonesEnabled')::boolean, false)
+     and jsonb_typeof(settings->'visitMilestones') = 'array'
+     and exists (
+       select 1 from jsonb_array_elements_text(settings->'visitMilestones') value
+       where value::integer = next_visits
+     ) then
+    insert into public.card_visit_milestones (
+      owner_id, business_id, template_id, customer_card_id, card_instance_id,
+      visit_event_id, milestone_value
+    ) values (
+      card_row.owner_id, card_row.business_id, card_row.template_id, p_customer_card_id,
+      instance_row.id, visit_event.id, next_visits
+    ) on conflict (card_instance_id, milestone_value) do nothing
+    returning milestone_value into milestone_reached;
+  end if;
+
+  if coalesce((settings->>'visitCounterWalletVisible')::boolean, false)
+     and instance_row.wallet_platform in ('apple', 'google', 'samsung') then
+    insert into public.wallet_update_queue (
+      owner_id, business_id, card_instance_id, wallet_platform, update_type, payload
+    ) values (
+      card_row.owner_id, card_row.business_id, instance_row.id, instance_row.wallet_platform,
+      'visit_counter_update', jsonb_build_object(
+        'source', 'entry_scan', 'customer_card_id', p_customer_card_id,
+        'lifetime_visits', next_visits, 'visits_today', today_visits,
+        'last_visit_at', visit_event.occurred_at, 'visit_event_id', visit_event.id
+      )
+    );
+    wallet_update_queued := true;
+  end if;
+
+  return jsonb_build_object(
+    'event_type', 'ENTRY_SCAN', 'idempotent_replay', false,
+    'visit_event_id', visit_event.id, 'previous_lifetime_visits', previous_visits,
+    'lifetime_visits', next_visits, 'visits_today', today_visits,
+    'visits_today_date', local_today, 'last_visit_at', visit_event.occurred_at, 'milestone_reached', milestone_reached,
+    'wallet_update_queued', wallet_update_queued
+  );
+end;
+$$;
+
+revoke all on function public.register_card_entry_visit(uuid, uuid, text) from public, anon, authenticated;
+grant execute on function public.register_card_entry_visit(uuid, uuid, text) to service_role;
 
 create or replace function public.prevent_guest_restriction_delete()
 returns trigger
@@ -5285,6 +5464,8 @@ alter table public.guest_note_events enable row level security;
 alter table public.card_templates enable row level security;
 alter table public.customer_cards enable row level security;
 alter table public.card_instances enable row level security;
+alter table public.card_visit_events enable row level security;
+alter table public.card_visit_milestones enable row level security;
 alter table public.club_card_actions enable row level security;
 alter table public.balance_transactions enable row level security;
 alter table public.topup_payment_sessions enable row level security;
@@ -5498,6 +5679,16 @@ drop policy if exists "unlocked operators can update own card instances" on publ
 -- Keine direkte Browser-Update-Policy für card_instances:
 -- Wallet-Identität, Push-Status und Zähler werden über Edge Functions,
 -- SQL-Trigger oder Service-Role-Pfade geschrieben.
+
+drop policy if exists "business members can read card visit events" on public.card_visit_events;
+create policy "business members can read card visit events" on public.card_visit_events
+for select to authenticated
+using (public.current_operator_unlocked() and public.current_user_business_role(business_id) is not null);
+
+drop policy if exists "business members can read card visit milestones" on public.card_visit_milestones;
+create policy "business members can read card visit milestones" on public.card_visit_milestones
+for select to authenticated
+using (public.current_operator_unlocked() and public.current_user_business_role(business_id) is not null);
 
 drop policy if exists "unlocked operators can read own club card actions" on public.club_card_actions;
 create policy "unlocked operators can read own club card actions"
@@ -5927,6 +6118,13 @@ grant select (
   created_at,
   updated_at
 ) on public.card_instances to authenticated;
+grant select (lifetime_visits, visits_today, visits_today_date, last_visit_at) on public.card_instances to authenticated;
+revoke select, insert, update, delete on public.card_visit_events from authenticated;
+grant select (id, owner_id, business_id, template_id, customer_card_id, card_instance_id, event_type, visit_number, occurred_at, created_by)
+on public.card_visit_events to authenticated;
+revoke select, insert, update, delete on public.card_visit_milestones from authenticated;
+grant select (id, owner_id, business_id, template_id, customer_card_id, card_instance_id, visit_event_id, milestone_value, reached_at, acknowledged_at)
+on public.card_visit_milestones to authenticated;
 revoke select, insert, update, delete on public.club_card_actions from authenticated;
 grant select (
   id,

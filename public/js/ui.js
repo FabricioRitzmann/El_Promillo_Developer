@@ -228,6 +228,14 @@ function walletPreviewPassFields(template, card, business) {
     value: row.value
   }));
 
+  if (settings.visitCounterEnabled === true && settings.visitCounterWalletVisible === true) {
+    auxiliaryFields.unshift({
+      key: 'lifetimeVisits',
+      label: 'Besuche',
+      value: String(card?.lifetime_visits ?? card?.metadata?.visit_count ?? 87)
+    });
+  }
+
   if (rewardVisible) {
     auxiliaryFields.push({
       key: 'reward',
