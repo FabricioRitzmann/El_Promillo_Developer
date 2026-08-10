@@ -21,6 +21,7 @@
     <nav class="app-tabbar" aria-label="Hauptbereiche">
       <a class="app-tab" href="dashboard.html#dashboardOverview" data-i18n="nav.dashboard">Dashboard</a>
       <a class="app-tab" href="dashboard.html#visitorStatistics" data-i18n="nav.visitors">Besucherstatistik</a>
+      <a id="accountCrmNav" class="app-tab" href="crm.html" hidden>Gäste</a>
       <a class="app-tab" href="push-center.html" data-i18n="nav.pushCenter">Push Center</a>
       <a class="app-tab" href="scanner.html" data-i18n="nav.scanner">Scanner</a>
       <a class="app-tab app-tab-account is-active" href="account.html" aria-current="page" aria-label="Konto">
@@ -150,6 +151,18 @@
           <div class="button-row account-location-actions">
             <button id="saveBusinessLocationButton" class="primary" type="submit" data-i18n="account.locationSave">Standortangaben speichern</button>
           </div>
+        </div>
+
+        <div class="account-location-block guest-crm-settings">
+          <h2>Guest CRM / Member CRM</h2>
+          <p class="muted">Aktiviert den optionalen Gäste-Bereich für personalisierte Karten. Einfache Loyalty Cards funktionieren unabhängig davon weiter.</p>
+          <label class="choice-card">
+            <input name="guest_crm_enabled" type="checkbox">
+            <span>Guest CRM aktivieren</span>
+          </label>
+          <label>Zeitraum für „aktiver Gast“ (Tage)
+            <input name="crm_active_guest_days" type="number" min="1" max="3650" value="30">
+          </label>
         </div>
 
         <div class="account-location-block guest-scan-settings">

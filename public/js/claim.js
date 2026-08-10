@@ -10,6 +10,8 @@ const claimButton = byId('claimButton');
 const googleWalletButton = byId('googleWalletButton');
 const preview = byId('claimPreview');
 const resultPanel = byId('claimResult');
+const claimCrmForm = byId('claimCrmForm');
+const claimCrmFields = byId('claimCrmFields');
 
 let template = null;
 let publicConfig = null;
@@ -65,10 +67,54 @@ async function loadTemplate() {
   }
 
   preview.innerHTML = walletPreviewHtml(template);
+  renderClaimCrmForm();
   walletPrimaryButton.disabled = false;
   claimButton.disabled = false;
   googleWalletButton.disabled = false;
   configureWalletButtons();
+}
+
+function crmFieldInput(field) {
+  const key = String(field.key || '');
+  const required = field.required === true;
+  const label = `${escapeHtml(field.label || key)}${required ? ' *' : ''}`;
+  const name = `crm_${key}`;
+  if (field.type === 'BOOLEAN') return `<label class="check-row"><input name="${escapeHtml(name)}" type="checkbox" ${required ? 'required' : ''}><span>${label}</span></label>`;
+  if (field.type === 'SELECT') return `<label>${label}<select name="${escapeHtml(name)}" ${required ? 'required' : ''}><option value="">Bitte wählen</option>${(field.options || []).map((option) => `<option value="${escapeHtml(option)}">${escapeHtml(option)}</option>`).join('')}</select></label>`;
+  if (field.type === 'MULTISELECT') return `<label>${label}<select name="${escapeHtml(name)}" multiple ${required ? 'required' : ''}>${(field.options || []).map((option) => `<option value="${escapeHtml(option)}">${escapeHtml(option)}</option>`).join('')}</select></label>`;
+  if (field.type === 'TEXTAREA') return `<label>${label}<textarea name="${escapeHtml(name)}" ${required ? 'required' : ''}></textarea></label>`;
+  if (field.type === 'ADDRESS') return `<fieldset class="claim-address-fields"><legend>${label}</legend><label>Strasse<input name="crm_street" ${required ? 'required' : ''}></label><label>Hausnummer<input name="crm_house_number"></label><label>Postleitzahl<input name="crm_postal_code" ${required ? 'required' : ''}></label><label>Ort<input name="crm_city" ${required ? 'required' : ''}></label><label>Land<input name="crm_country"></label></fieldset>`;
+  const type = { EMAIL: 'email', TEL: 'tel', DATE: 'date', NUMBER: 'number', URL: 'url' }[field.type] || 'text';
+  return `<label>${label}<input name="${escapeHtml(name)}" type="${type}" ${type === 'url' ? 'pattern="https://.*"' : ''} ${required ? 'required' : ''}></label>`;
+}
+
+function renderClaimCrmForm() {
+  const fields = Array.isArray(template?.crm_registration_fields) ? template.crm_registration_fields : [];
+  const enabled = template?.crm_registration_enabled === true && fields.length > 0;
+  if (!claimCrmForm || !claimCrmFields) return;
+  claimCrmForm.hidden = !enabled;
+  claimCrmFields.innerHTML = enabled ? fields.map(crmFieldInput).join('') : '';
+}
+
+function crmRegistrationPayload() {
+  if (claimCrmForm?.hidden) return {};
+  if (!claimCrmForm.reportValidity()) throw new Error('Bitte fülle alle Pflichtfelder korrekt aus.');
+  const data = new FormData(claimCrmForm);
+  const fields = Array.isArray(template?.crm_registration_fields) ? template.crm_registration_fields : [];
+  const standard = {};
+  const socialLinks = [];
+  const customValues = {};
+  for (const field of fields) {
+    const name = `crm_${field.key}`;
+    const value = field.type === 'BOOLEAN' ? data.get(name) === 'on' : field.type === 'MULTISELECT' ? data.getAll(name) : String(data.get(name) || '').trim();
+    if (field.key.startsWith('custom:')) customValues[field.key.slice(7)] = value;
+    else if (['linkedin', 'instagram', 'facebook', 'tiktok', 'x', 'website'].includes(field.key) && value) socialLinks.push({ platform: field.key, url: value });
+    else if (field.key !== 'address') standard[field.key] = value;
+  }
+  if (fields.some((field) => field.key === 'address')) {
+    for (const key of ['street', 'house_number', 'postal_code', 'city', 'country']) standard[key] = String(data.get(`crm_${key}`) || '').trim();
+  }
+  return { standard, social_links: socialLinks, custom_values: customValues };
 }
 
 async function downloadPkpassResponse(response) {
@@ -202,16 +248,17 @@ async function claimCard(walletPlatform = 'apple') {
   showMessage(claimMessage, 'Kundenkarte wird erstellt ...');
 
   let result;
+  const crmRegistration = crmRegistrationPayload();
   const walletObjectId = getClaimWalletObjectId(walletPlatform);
 
   try {
-    result = await claimCardViaEdge(walletPlatform, walletObjectId);
+    result = await claimCardViaEdge(walletPlatform, walletObjectId, crmRegistration);
   } catch (error) {
     if (!error.fallbackToLocal) {
       throw error;
     }
 
-    result = await claimCardViaLocalApi(walletPlatform, walletObjectId);
+    result = await claimCardViaLocalApi(walletPlatform, walletObjectId, crmRegistration);
   }
 
   rememberClaimWalletObjectId(walletPlatform, result.card?.wallet_object_id || walletObjectId);
@@ -438,7 +485,7 @@ async function createGoogleWalletSaveLink(result) {
 }
 
 
-async function claimCardViaEdge(walletPlatform, walletObjectId) {
+async function claimCardViaEdge(walletPlatform, walletObjectId, crmRegistration = {}) {
   const supabaseUrl = publicConfig?.supabase?.url?.replace(/\/$/, '');
   const anonKey = publicConfig?.supabase?.anonKey;
 
@@ -461,7 +508,8 @@ async function claimCardViaEdge(walletPlatform, walletObjectId) {
         claimToken: currentClaimToken || undefined,
         walletPlatform,
         walletObjectId,
-        claimSource: currentClaimSource
+        claimSource: currentClaimSource,
+        crmRegistration
       })
     });
   } catch (error) {
@@ -487,7 +535,7 @@ async function claimCardViaEdge(walletPlatform, walletObjectId) {
   };
 }
 
-async function claimCardViaLocalApi(walletPlatform, walletObjectId) {
+async function claimCardViaLocalApi(walletPlatform, walletObjectId, crmRegistration = {}) {
   const response = await fetch(apiUrl('/api/cards/claim'), {
     method: 'POST',
     headers: {
@@ -498,7 +546,8 @@ async function claimCardViaLocalApi(walletPlatform, walletObjectId) {
       claimToken: currentClaimToken || undefined,
       walletPlatform,
       walletObjectId,
-      claimSource: currentClaimSource
+      claimSource: currentClaimSource,
+      crmRegistration
     })
   });
 

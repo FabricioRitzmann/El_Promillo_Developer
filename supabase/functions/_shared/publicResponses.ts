@@ -219,6 +219,13 @@ export function publicCardTemplateResponse(template: Row = {}) {
   const business = Array.isArray(template.businesses) ? template.businesses[0] : template.businesses;
   const businessName = business?.name || business?.company_name || template.business_name;
   const businessLogoUrl = business?.logo_url || business?.company_logo_url || template.business_logo_url || template.company_logo_url || template.logo_url || '';
+  const settings = isPlainObject(template.settings) ? template.settings : {};
+  const allowedStandardCrmFields = new Set(['first_name', 'last_name', 'display_name', 'email', 'phone', 'mobile_phone', 'birth_date', 'company', 'job_title', 'address', 'linkedin', 'instagram', 'facebook', 'tiktok', 'x', 'website']);
+  const crmFields = Array.isArray(settings.crmRegistrationFields) ? settings.crmRegistrationFields
+    .filter((field: Row) => isPlainObject(field) && field.enabled === true && (allowedStandardCrmFields.has(String(field.key)) || /^custom:[0-9a-f-]{36}$/i.test(String(field.key))))
+    .slice(0, 50)
+    .map((field: Row) => ({ key: String(field.key), label: String(field.label || field.key).slice(0, 200), type: String(field.type || 'TEXT').slice(0, 20), source: field.source === 'custom' ? 'custom' : 'standard', required: field.required === true, options: Array.isArray(field.options) ? field.options.map(String).slice(0, 100) : [] })) : [];
+  const crmRegistrationEnabled = business?.guest_crm_enabled === true && settings.personalizedGuestDataEnabled === true && crmFields.length > 0;
 
   return {
     id: template.id,
@@ -235,7 +242,9 @@ export function publicCardTemplateResponse(template: Row = {}) {
     stamps_required: template.stamps_required,
     streak_goal: template.streak_goal,
     vip_tier: template.vip_tier,
-    settings: sanitizeMetadata(template.settings || {}),
+    settings: sanitizeMetadata(settings),
+    crm_registration_enabled: crmRegistrationEnabled,
+    crm_registration_fields: crmRegistrationEnabled ? crmFields : [],
     club_features: sanitizeMetadata(template.club_features || {}),
     club_settings: sanitizeMetadata(template.club_settings || {}),
     is_active: template.is_active

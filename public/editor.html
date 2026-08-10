@@ -108,6 +108,16 @@
               <p class="muted">Zeigt in der Wallet-Karte einen Link zur öffentlichen Erstellungsseite dieses Templates. Clubkarten sind standardmässig aktiviert.</p>
             </div>
 
+            <div id="editorCrmPersonalization" class="feature-fields crm-personalization-panel" hidden>
+              <h3>Personalisierung / CRM</h3>
+              <label class="check-row">
+                <input name="personalized_guest_data_enabled" type="checkbox">
+                <span>Personalisierte Gastdaten erfassen</span>
+              </label>
+              <p class="muted">Die öffentliche Registrierungsseite erhält ausschliesslich die hier freigegebenen Felder. Interne Notizen, Stammgastinformationen und Sperren bleiben immer verborgen.</p>
+              <div id="editorCrmFieldOptions" class="crm-editor-field-options" hidden></div>
+            </div>
+
             <div class="feature-fields" data-feature-group="customFields" hidden>
               <label>Freifelder / Infotext
                 <textarea name="custom_fields_text" rows="3" placeholder="z. B. Mitgliedsnummer, Kategorie, Hinweise"></textarea>

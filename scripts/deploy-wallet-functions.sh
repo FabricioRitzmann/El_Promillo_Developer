@@ -6,6 +6,7 @@ cd "$ROOT_DIR"
 
 FUNCTIONS=(
   claim-card
+  guest-crm
   get-public-template
   get-wallet-message
   claim-apple-pass

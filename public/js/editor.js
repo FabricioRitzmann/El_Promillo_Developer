@@ -31,7 +31,8 @@ const state = {
   notificationTemplates: [],
   optionalFeatureSelections: {},
   walletNotificationIdempotency: null,
-  editorLogoColorPicking: false
+  editorLogoColorPicking: false,
+  crmDefinitions: []
 };
 
 const businessEditorSelect = [
@@ -48,6 +49,7 @@ const businessEditorSelect = [
   'company_logo_path',
   'company_logo_updated_at',
   'app_theme',
+  'guest_crm_enabled',
   'created_at',
   'updated_at'
 ].join(',');
@@ -99,6 +101,15 @@ const editorPdfA6 = byId('editorPdfA6');
 const editorFeatureSummary = byId('editorFeatureSummary');
 const optionalFeaturePanel = byId('optionalFeaturePanel');
 const optionalFeatureToggles = byId('optionalFeatureToggles');
+const editorCrmPersonalization = byId('editorCrmPersonalization');
+const editorCrmFieldOptions = byId('editorCrmFieldOptions');
+const personalizedTemplateTypes = new Set(['club_card', 'vip_card', 'membership_card', 'generic_card']);
+const standardCrmFields = [
+  ['first_name', 'Vorname', 'TEXT'], ['last_name', 'Nachname', 'TEXT'], ['display_name', 'Anzeigename', 'TEXT'],
+  ['email', 'E-Mail', 'EMAIL'], ['phone', 'Telefonnummer', 'TEL'], ['mobile_phone', 'Mobiltelefon', 'TEL'],
+  ['birth_date', 'Geburtsdatum', 'DATE'], ['company', 'Firma', 'TEXT'], ['job_title', 'Position / Jobtitel', 'TEXT'],
+  ['address', 'Adresse', 'ADDRESS'], ['linkedin', 'LinkedIn', 'URL'], ['instagram', 'Instagram', 'URL']
+].map(([key, label, type]) => ({ key, label, type, source: 'standard' }));
 const clubFeatureSpaceWarning = byId('clubFeatureSpaceWarning');
 const editorLogoColorPickerButton = byId('editorLogoColorPickerButton');
 const editorLogoColorPickerPanel = byId('editorLogoColorPickerPanel');
@@ -436,6 +447,7 @@ function loadTemplateIntoForm(template) {
   setTemplateField('reward_text', template.reward_text || '');
   setTemplateField('notifications_enabled', settings.notificationsEnabled !== false);
   setTemplateField('public_share_link_enabled', publicShareLinkEnabled(template));
+  setTemplateField('personalized_guest_data_enabled', settings.personalizedGuestDataEnabled === true);
   setTemplateField('notification_message', settings.notificationMessage || '');
   setTemplateField('custom_fields_text', settings.customFieldsText || '');
   setTemplateField('visit_counter_enabled', settings.visitCounterEnabled === true);
@@ -477,6 +489,36 @@ function loadTemplateIntoForm(template) {
   setTemplateField('membership_status', settings.membershipStatus || '');
   setTemplateField('membership_expires_at', settings.membershipExpiresAt || '');
   setTemplateField('membership_benefits', settings.membershipBenefits || '');
+  renderCrmFieldOptions(settings.crmRegistrationFields || []);
+}
+
+function availableCrmFields() {
+  const custom = state.crmDefinitions
+    .filter((definition) => definition.active && definition.public_registration_allowed)
+    .map((definition) => ({ key: `custom:${definition.id}`, label: definition.name, type: definition.field_type, source: 'custom', options: definition.options || [] }));
+  return [...standardCrmFields, ...custom];
+}
+
+function renderCrmFieldOptions(selectedFields = null) {
+  if (!editorCrmFieldOptions) return;
+  const settings = state.template ? templateSettings(state.template) : {};
+  const selected = new Map((selectedFields || settings.crmRegistrationFields || []).map((field) => [field.key, field]));
+  editorCrmFieldOptions.innerHTML = availableCrmFields().map((field) => {
+    const config = selected.get(field.key) || {};
+    return `<div class="crm-editor-field-row">
+      <label class="check-row"><input type="checkbox" data-crm-field-enabled value="${escapeHtml(field.key)}" ${config.enabled ? 'checked' : ''}><span>${escapeHtml(field.label)}</span></label>
+      <label class="check-row"><input type="checkbox" data-crm-field-required value="${escapeHtml(field.key)}" ${config.required ? 'checked' : ''} ${config.enabled ? '' : 'disabled'}><span>Pflichtfeld</span></label>
+    </div>`;
+  }).join('');
+}
+
+function crmRegistrationFieldsFromForm() {
+  const fields = new Map(availableCrmFields().map((field) => [field.key, field]));
+  return Array.from(editorCrmFieldOptions?.querySelectorAll('[data-crm-field-enabled]:checked') || []).map((checkbox) => {
+    const field = fields.get(checkbox.value);
+    const required = editorCrmFieldOptions.querySelector(`[data-crm-field-required][value="${CSS.escape(checkbox.value)}"]`)?.checked === true;
+    return { key: field.key, label: field.label, type: field.type, source: field.source, options: field.options || [], enabled: true, required };
+  });
 }
 
 function templateSettingsFromForm(formData, templateType) {
@@ -503,6 +545,8 @@ function templateSettingsFromForm(formData, templateType) {
     club_features: templateType === 'club_card' ? clubFeatureState : { ...CLUB_FEATURE_DEFAULTS },
     notificationsEnabled: formData.get('notifications_enabled') === 'on',
     publicShareLinkEnabled: formData.get('public_share_link_enabled') === 'on',
+    personalizedGuestDataEnabled: formData.get('personalized_guest_data_enabled') === 'on',
+    crmRegistrationFields: formData.get('personalized_guest_data_enabled') === 'on' ? crmRegistrationFieldsFromForm() : [],
     notificationMessage: String(formData.get('notification_message') || '').trim(),
     customFieldsText: String(formData.get('custom_fields_text') || '').trim(),
     visitCounterEnabled: formData.get('visit_counter_enabled') === 'on',
@@ -1817,6 +1861,10 @@ function updateConditionalTemplateFields() {
     templateForm.elements.visit_milestones.disabled = !visitCounterEnabled || !templateForm.elements.visit_milestones_enabled?.checked;
   }
 
+  const crmAvailable = state.business?.guest_crm_enabled === true && personalizedTemplateTypes.has(normalizeTemplateType(draft));
+  if (editorCrmPersonalization) editorCrmPersonalization.hidden = !crmAvailable;
+  if (editorCrmFieldOptions) editorCrmFieldOptions.hidden = !crmAvailable || !templateForm.elements.personalized_guest_data_enabled?.checked;
+
   renderEditorPreview();
   renderWalletNotificationsPanel().catch(() => {});
 }
@@ -1898,6 +1946,20 @@ async function loadBusiness() {
 
   renderBusinessHeader(state.business || {});
   applyBusinessAppTheme(state.business, state.session.user.id);
+}
+
+async function loadCrmDefinitions() {
+  if (!state.business?.guest_crm_enabled) {
+    state.crmDefinitions = [];
+    return;
+  }
+  state.crmDefinitions = await state.client.selectRows('crm_field_definitions', {
+    select: 'id,name,field_key,field_type,required,active,public_registration_allowed,options,display_order',
+    filters: [{ column: 'business_id', op: 'eq', value: state.business.id }, { column: 'active', op: 'eq', value: true }],
+    order: 'display_order.asc',
+    limit: 200
+  }).catch(() => []);
+  renderCrmFieldOptions();
 }
 
 async function loadTemplate() {
@@ -2065,6 +2127,14 @@ async function initEditor() {
 
   optionalFeaturePanel?.addEventListener('input', handleOptionalFeatureToggle);
   optionalFeaturePanel?.addEventListener('change', handleOptionalFeatureToggle);
+  editorCrmFieldOptions?.addEventListener('change', (event) => {
+    if (!event.target.matches('[data-crm-field-enabled]')) return;
+    const required = editorCrmFieldOptions.querySelector(`[data-crm-field-required][value="${CSS.escape(event.target.value)}"]`);
+    if (required) {
+      required.disabled = !event.target.checked;
+      if (!event.target.checked) required.checked = false;
+    }
+  });
 
   walletNotificationForm?.addEventListener('submit', (event) => {
     submitWalletNotification(event).catch((error) => showMessage(walletNotificationMessage, error.message, 'error'));
@@ -2084,6 +2154,7 @@ async function initEditor() {
 
   updateEditorModeUi();
   await loadBusiness();
+  await loadCrmDefinitions();
   syncDefaultsFromBusiness();
   await loadTemplate();
   await loadNotificationTemplates();

@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>El Promillo – Gäste CRM</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="business-brand-link" href="dashboard.html" aria-label="Dashboard">
+        <span class="business-brand-logo" data-business-logo>MU</span>
+        <span class="business-brand-name" data-business-name>Mein Unternehmen</span>
+      </a>
+      <span class="app-brand-mark" aria-label="El Promillo"><span class="app-brand-emblem" aria-hidden="true"></span><img class="app-brand-lockup" src="assets/el-promillo-title-lockup-new-cutout.png" alt="" aria-hidden="true"></span>
+    </header>
+    <nav class="app-tabbar" aria-label="Hauptbereiche">
+      <a class="app-tab" href="dashboard.html">Dashboard</a>
+      <a class="app-tab" href="dashboard.html#visitorStatistics">Besucherstatistik</a>
+      <a class="app-tab is-active" href="crm.html" aria-current="page">Gäste</a>
+      <a class="app-tab" href="push-center.html">Push Center</a>
+      <a class="app-tab" href="scanner.html">Scanner</a>
+      <a class="app-tab app-tab-account" href="account.html" aria-label="Konto">Konto</a>
+    </nav>
+    <main class="page-shell crm-page">
+      <section class="page-heading"><div><p class="eyebrow">Optionales Member CRM</p><h1>Gäste</h1><p class="view-subtitle">Personalisierte Gäste, Mitgliedschaften und Kontaktdaten mandantensicher verwalten.</p></div><button id="crmExportButton" class="secondary" type="button" hidden>CSV exportieren</button></section>
+      <div id="crmMessage" class="message" hidden></div>
+
+      <section class="section-block" aria-labelledby="crmStatsTitle">
+        <div class="section-title"><div><h2 id="crmStatsTitle">CRM / Gäste</h2><p class="muted">Aktiv bedeutet mindestens ein Besuch im konfigurierten Zeitraum.</p></div></div>
+        <div id="crmStats" class="stats-kpi-grid"></div>
+      </section>
+
+      <section class="section-block">
+        <form id="crmFilterForm" class="panel crm-filter-panel">
+          <label class="crm-search-field">Suche
+            <input name="query" type="search" placeholder="Name, E-Mail, Telefon, Karten-ID, Mitgliedsnummer">
+          </label>
+          <label>Kartenart<select name="template_type"><option value="">Alle</option><option value="club_card">Clubkarte</option><option value="vip_card">VIP</option><option value="membership_card">Member Card</option><option value="generic_card">Andere</option></select></label>
+          <label>Besuche<select name="visit_bucket"><option value="">Alle</option><option value="zero">0</option><option value="one_to_five">1–5</option><option value="six_to_ten">6–10</option><option value="ten_plus">10+</option><option value="twenty_five_plus">25+</option><option value="fifty_plus">50+</option><option value="hundred_plus">100+</option></select></label>
+          <label>Letzter Besuch<select name="last_seen"><option value="">Alle</option><option value="today">Heute</option><option value="7">7 Tage</option><option value="30">30 Tage</option><option value="90">90 Tage</option><option value="inactive">Länger nicht besucht</option></select></label>
+          <label>Profildaten<select name="profile_state"><option value="">Alle</option><option value="complete">Vollständig</option><option value="incomplete">Unvollständig</option><option value="email">E-Mail vorhanden</option><option value="phone">Telefon vorhanden</option></select></label>
+          <label>Altersgruppe<select name="age_group"><option value="">Alle</option><option value="18_24">18–24</option><option value="25_29">25–29</option><option value="30_39">30–39</option><option value="40_49">40–49</option><option value="50_59">50–59</option><option value="60_69">60–69</option><option value="70_plus">70+</option></select></label>
+          <label>Registriert von<input name="registration_from" type="date"></label>
+          <label>bis<input name="registration_to" type="date"></label>
+          <button class="primary" type="submit">Filtern</button>
+        </form>
+        <div id="crmGuestList" class="crm-guest-list"></div>
+        <div class="crm-pagination"><button id="crmPreviousPage" class="secondary" type="button">Zurück</button><span id="crmPageStatus"></span><button id="crmNextPage" class="secondary" type="button">Weiter</button></div>
+      </section>
+
+      <section id="crmDetail" class="section-block crm-detail" hidden>
+        <div class="section-title"><div><p class="eyebrow">Zentrales Guest Profile</p><h2 id="crmDetailTitle">Gast</h2></div><button id="crmCloseDetail" class="secondary" type="button">Schliessen</button></div>
+        <nav class="crm-detail-tabs" aria-label="CRM-Profilbereiche"><button type="button" data-crm-tab="overview" class="is-active">Übersicht</button><button type="button" data-crm-tab="contact">Kontakt</button><button type="button" data-crm-tab="visits">Besuche</button><button type="button" data-crm-tab="cards">Karten</button><button type="button" data-crm-tab="internal">Intern</button><button type="button" data-crm-tab="custom">CRM-Felder</button></nav>
+        <div id="crmDetailContent"></div>
+      </section>
+
+      <section id="crmFieldDefinitionsSection" class="section-block" hidden>
+        <div class="section-title"><div><h2>Eigene CRM-Felder</h2><p class="muted">Skalierbare Zusatzfelder für dieses Business.</p></div></div>
+        <form id="crmFieldDefinitionForm" class="panel crm-definition-form">
+          <input name="id" type="hidden"><label>Name<input name="name" required maxlength="200"></label><label>Schlüssel<input name="field_key" required pattern="[a-z][a-z0-9_]{1,63}"></label>
+          <label>Typ<select name="field_type"><option>TEXT</option><option>TEXTAREA</option><option>NUMBER</option><option>DATE</option><option>BOOLEAN</option><option>SELECT</option><option>MULTISELECT</option><option>URL</option></select></label>
+          <label>Optionen (kommagetrennt)<input name="options"></label><label class="check-row"><input name="required" type="checkbox"><span>Standardmässig Pflichtfeld</span></label><label class="check-row"><input name="public_registration_allowed" type="checkbox"><span>Für öffentliche Registrierung freigebbar</span></label><button class="primary" type="submit">Feld speichern</button>
+        </form>
+        <div id="crmFieldDefinitions" class="template-list"></div>
+      </section>
+    </main>
+    <script type="module" src="js/crm.js"></script>
+  </body>
+</html>

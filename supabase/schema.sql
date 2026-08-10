@@ -96,6 +96,17 @@ alter table public.businesses
 add column if not exists app_theme text not null default 'promillo-standard';
 
 alter table public.businesses
+add column if not exists guest_crm_enabled boolean not null default false,
+add column if not exists crm_active_guest_days integer not null default 30;
+
+alter table public.businesses
+drop constraint if exists businesses_crm_active_guest_days_check;
+
+alter table public.businesses
+add constraint businesses_crm_active_guest_days_check
+check (crm_active_guest_days between 1 and 3650) not valid;
+
+alter table public.businesses
 drop constraint if exists businesses_app_theme_check;
 
 alter table public.businesses
@@ -338,6 +349,133 @@ add column if not exists last_seen_at timestamptz,
 add column if not exists metadata jsonb not null default '{}'::jsonb,
 add column if not exists created_at timestamptz not null default now(),
 add column if not exists updated_at timestamptz not null default now();
+
+-- Optionale CRM-Daten erweitern das zentrale Guest Profile 1:1. Sie bilden
+-- ausdrücklich kein separates Kunden- oder Login-System.
+create table if not exists public.guest_crm_profiles (
+  guest_profile_id uuid primary key,
+  owner_id uuid not null references public.operator_profiles(id) on delete restrict,
+  business_id uuid not null references public.businesses(id) on delete cascade,
+  first_name text,
+  last_name text,
+  display_name text,
+  birth_date date,
+  company text,
+  job_title text,
+  email text,
+  phone text,
+  mobile_phone text,
+  street text,
+  house_number text,
+  address_addition text,
+  postal_code text,
+  city text,
+  region text,
+  country text,
+  created_by uuid references public.operator_profiles(id) on delete set null,
+  updated_by uuid references public.operator_profiles(id) on delete set null,
+  anonymized_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint guest_crm_profiles_guest_business_fkey
+    foreign key (guest_profile_id, business_id)
+    references public.guest_profiles(id, business_id) on delete cascade,
+  constraint guest_crm_profiles_email_check
+    check (email is null or email ~* '^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$'),
+  constraint guest_crm_profiles_lengths_check check (
+    coalesce(char_length(first_name), 0) <= 200
+    and coalesce(char_length(last_name), 0) <= 200
+    and coalesce(char_length(display_name), 0) <= 300
+    and coalesce(char_length(company), 0) <= 300
+    and coalesce(char_length(job_title), 0) <= 300
+    and coalesce(char_length(email), 0) <= 320
+    and coalesce(char_length(phone), 0) <= 80
+    and coalesce(char_length(mobile_phone), 0) <= 80
+    and coalesce(char_length(street), 0) <= 300
+    and coalesce(char_length(house_number), 0) <= 50
+    and coalesce(char_length(address_addition), 0) <= 300
+    and coalesce(char_length(postal_code), 0) <= 40
+    and coalesce(char_length(city), 0) <= 200
+    and coalesce(char_length(region), 0) <= 200
+    and coalesce(char_length(country), 0) <= 120
+  )
+);
+
+create table if not exists public.guest_social_links (
+  id uuid primary key default gen_random_uuid(),
+  guest_profile_id uuid not null,
+  owner_id uuid not null references public.operator_profiles(id) on delete restrict,
+  business_id uuid not null references public.businesses(id) on delete cascade,
+  platform text not null check (platform in ('linkedin', 'instagram', 'facebook', 'tiktok', 'x', 'website', 'other')),
+  label text,
+  url text not null check (url ~* '^https://'),
+  created_by uuid references public.operator_profiles(id) on delete set null,
+  updated_by uuid references public.operator_profiles(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint guest_social_links_guest_business_fkey
+    foreign key (guest_profile_id, business_id)
+    references public.guest_profiles(id, business_id) on delete cascade,
+  constraint guest_social_links_unique unique (guest_profile_id, platform, url),
+  constraint guest_social_links_lengths_check check (
+    char_length(url) <= 2000 and coalesce(char_length(label), 0) <= 200
+  )
+);
+
+create table if not exists public.crm_field_definitions (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null references public.operator_profiles(id) on delete restrict,
+  business_id uuid not null references public.businesses(id) on delete cascade,
+  name text not null,
+  field_key text not null,
+  field_type text not null check (field_type in ('TEXT', 'TEXTAREA', 'NUMBER', 'DATE', 'BOOLEAN', 'SELECT', 'MULTISELECT', 'URL')),
+  required boolean not null default false,
+  active boolean not null default true,
+  public_registration_allowed boolean not null default false,
+  options jsonb not null default '[]'::jsonb,
+  display_order integer not null default 0,
+  created_by uuid references public.operator_profiles(id) on delete set null,
+  updated_by uuid references public.operator_profiles(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint crm_field_definitions_business_key unique (business_id, field_key),
+  constraint crm_field_definitions_key_check check (field_key ~ '^[a-z][a-z0-9_]{1,63}$'),
+  constraint crm_field_definitions_name_check check (char_length(btrim(name)) between 1 and 200),
+  constraint crm_field_definitions_options_check check (jsonb_typeof(options) = 'array' and octet_length(options::text) <= 10000)
+);
+
+create table if not exists public.crm_field_values (
+  id uuid primary key default gen_random_uuid(),
+  guest_profile_id uuid not null,
+  field_definition_id uuid not null references public.crm_field_definitions(id) on delete cascade,
+  owner_id uuid not null references public.operator_profiles(id) on delete restrict,
+  business_id uuid not null references public.businesses(id) on delete cascade,
+  value jsonb not null default 'null'::jsonb,
+  created_by uuid references public.operator_profiles(id) on delete set null,
+  updated_by uuid references public.operator_profiles(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint crm_field_values_guest_business_fkey
+    foreign key (guest_profile_id, business_id)
+    references public.guest_profiles(id, business_id) on delete cascade,
+  constraint crm_field_values_unique unique (guest_profile_id, field_definition_id),
+  constraint crm_field_values_size_check check (octet_length(value::text) <= 20000)
+);
+
+create table if not exists public.guest_crm_audit_events (
+  id uuid primary key default gen_random_uuid(),
+  guest_profile_id uuid not null,
+  owner_id uuid not null references public.operator_profiles(id) on delete restrict,
+  business_id uuid not null references public.businesses(id) on delete restrict,
+  event_type text not null check (event_type in ('CREATED', 'UPDATED', 'SOCIAL_UPDATED', 'CUSTOM_FIELD_UPDATED', 'ANONYMIZED')),
+  changed_fields text[] not null default '{}',
+  performed_by uuid references public.operator_profiles(id) on delete set null,
+  source text not null default 'operator' check (source in ('operator', 'public_registration', 'migration')),
+  occurred_at timestamptz not null default now(),
+  constraint guest_crm_audit_events_guest_business_fkey
+    foreign key (guest_profile_id, business_id)
+    references public.guest_profiles(id, business_id) on delete restrict
+);
 
 alter table public.guest_profiles
 drop constraint if exists guest_profiles_age_group_check;
@@ -1820,6 +1958,13 @@ create index if not exists businesses_owner_id_idx on public.businesses(owner_id
 create index if not exists guest_profiles_owner_id_idx on public.guest_profiles(owner_id);
 create index if not exists guest_profiles_business_id_idx on public.guest_profiles(business_id);
 create index if not exists guest_profiles_last_seen_at_idx on public.guest_profiles(business_id, last_seen_at desc);
+create index if not exists guest_crm_profiles_business_name_idx on public.guest_crm_profiles(business_id, last_name, first_name, created_at desc);
+create index if not exists guest_crm_profiles_business_email_idx on public.guest_crm_profiles(business_id, lower(email)) where email is not null;
+create index if not exists guest_crm_profiles_business_phone_idx on public.guest_crm_profiles(business_id, phone) where phone is not null;
+create index if not exists guest_social_links_guest_idx on public.guest_social_links(business_id, guest_profile_id, platform);
+create index if not exists crm_field_definitions_business_order_idx on public.crm_field_definitions(business_id, active, display_order, name);
+create index if not exists crm_field_values_guest_idx on public.crm_field_values(business_id, guest_profile_id, field_definition_id);
+create index if not exists guest_crm_audit_guest_idx on public.guest_crm_audit_events(business_id, guest_profile_id, occurred_at desc);
 create index if not exists business_memberships_user_business_idx on public.business_memberships(user_id, business_id) where active;
 create index if not exists guest_restrictions_guest_active_idx on public.guest_restrictions(guest_profile_id, restriction_type, status, starts_at, ends_at);
 create index if not exists guest_restrictions_business_created_idx on public.guest_restrictions(business_id, created_at desc);
@@ -1972,6 +2117,26 @@ for each row execute function public.set_updated_at();
 drop trigger if exists set_guest_profiles_updated_at on public.guest_profiles;
 create trigger set_guest_profiles_updated_at
 before update on public.guest_profiles
+for each row execute function public.set_updated_at();
+
+drop trigger if exists set_guest_crm_profiles_updated_at on public.guest_crm_profiles;
+create trigger set_guest_crm_profiles_updated_at
+before update on public.guest_crm_profiles
+for each row execute function public.set_updated_at();
+
+drop trigger if exists set_guest_social_links_updated_at on public.guest_social_links;
+create trigger set_guest_social_links_updated_at
+before update on public.guest_social_links
+for each row execute function public.set_updated_at();
+
+drop trigger if exists set_crm_field_definitions_updated_at on public.crm_field_definitions;
+create trigger set_crm_field_definitions_updated_at
+before update on public.crm_field_definitions
+for each row execute function public.set_updated_at();
+
+drop trigger if exists set_crm_field_values_updated_at on public.crm_field_values;
+create trigger set_crm_field_values_updated_at
+before update on public.crm_field_values
 for each row execute function public.set_updated_at();
 
 drop trigger if exists set_business_memberships_updated_at on public.business_memberships;
@@ -2237,6 +2402,74 @@ drop trigger if exists validate_guest_profiles_tenant_consistency on public.gues
 create trigger validate_guest_profiles_tenant_consistency
 before insert or update on public.guest_profiles
 for each row execute function public.validate_guest_profile_tenant_consistency();
+
+create or replace function public.validate_guest_crm_child_tenant()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  guest_row record;
+  definition_business_id uuid;
+begin
+  select owner_id, business_id into guest_row
+  from public.guest_profiles where id = new.guest_profile_id;
+  if not found then
+    raise exception 'CRM_GUEST_NOT_FOUND: CRM-Datensatz verweist auf ein unbekanntes Gastprofil.';
+  end if;
+  if new.owner_id <> guest_row.owner_id or new.business_id <> guest_row.business_id then
+    raise exception 'CRM_TENANT_MISMATCH: CRM-Datensatz und Gastprofil gehoeren nicht zum selben Tenant.';
+  end if;
+  if TG_TABLE_NAME = 'crm_field_values' then
+    select business_id into definition_business_id from public.crm_field_definitions where id = new.field_definition_id;
+    if definition_business_id is null or definition_business_id <> new.business_id then
+      raise exception 'CRM_FIELD_TENANT_MISMATCH: Felddefinition gehoert zu einem anderen Tenant.';
+    end if;
+  end if;
+  if TG_OP = 'UPDATE' and (new.owner_id is distinct from old.owner_id or new.business_id is distinct from old.business_id or new.guest_profile_id is distinct from old.guest_profile_id) then
+    raise exception 'CRM_TENANT_IMMUTABLE: CRM-Tenant und Gastzuordnung sind unveraenderlich.';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists validate_guest_crm_profiles_tenant on public.guest_crm_profiles;
+create trigger validate_guest_crm_profiles_tenant before insert or update on public.guest_crm_profiles for each row execute function public.validate_guest_crm_child_tenant();
+drop trigger if exists validate_guest_social_links_tenant on public.guest_social_links;
+create trigger validate_guest_social_links_tenant before insert or update on public.guest_social_links for each row execute function public.validate_guest_crm_child_tenant();
+drop trigger if exists validate_crm_field_values_tenant on public.crm_field_values;
+create trigger validate_crm_field_values_tenant before insert or update on public.crm_field_values for each row execute function public.validate_guest_crm_child_tenant();
+drop trigger if exists validate_guest_crm_audit_tenant on public.guest_crm_audit_events;
+create trigger validate_guest_crm_audit_tenant before insert or update on public.guest_crm_audit_events for each row execute function public.validate_guest_crm_child_tenant();
+
+create or replace function public.validate_crm_field_definition_tenant()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare business_owner_id uuid;
+begin
+  select owner_id into business_owner_id from public.businesses where id = new.business_id;
+  if business_owner_id is null or new.owner_id <> business_owner_id then
+    raise exception 'CRM_FIELD_OWNER_MISMATCH: Felddefinition und Business gehoeren nicht zum selben Betreiber.';
+  end if;
+  if TG_OP = 'UPDATE' and (new.owner_id is distinct from old.owner_id or new.business_id is distinct from old.business_id or new.field_key is distinct from old.field_key) then
+    raise exception 'CRM_FIELD_IDENTITY_IMMUTABLE: Tenant und Feldschluessel sind unveraenderlich.';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists validate_crm_field_definitions_tenant on public.crm_field_definitions;
+create trigger validate_crm_field_definitions_tenant before insert or update on public.crm_field_definitions for each row execute function public.validate_crm_field_definition_tenant();
+
+create or replace function public.prevent_guest_crm_audit_mutation()
+returns trigger language plpgsql as $$
+begin
+  raise exception 'CRM_AUDIT_IMMUTABLE: CRM-Auditereignisse duerfen nicht veraendert oder geloescht werden.';
+end;
+$$;
+
+drop trigger if exists prevent_guest_crm_audit_update_delete on public.guest_crm_audit_events;
+create trigger prevent_guest_crm_audit_update_delete before update or delete on public.guest_crm_audit_events for each row execute function public.prevent_guest_crm_audit_mutation();
 
 create or replace function public.ensure_customer_card_guest_profile()
 returns trigger
@@ -5499,6 +5732,11 @@ $$;
 alter table public.operator_profiles enable row level security;
 alter table public.businesses enable row level security;
 alter table public.guest_profiles enable row level security;
+alter table public.guest_crm_profiles enable row level security;
+alter table public.guest_social_links enable row level security;
+alter table public.crm_field_definitions enable row level security;
+alter table public.crm_field_values enable row level security;
+alter table public.guest_crm_audit_events enable row level security;
 alter table public.business_memberships enable row level security;
 alter table public.guest_restrictions enable row level security;
 alter table public.guest_restriction_events enable row level security;
@@ -5581,6 +5819,67 @@ using (
 drop policy if exists "unlocked operators can insert own guest profiles" on public.guest_profiles;
 drop policy if exists "unlocked operators can update own guest profiles" on public.guest_profiles;
 drop policy if exists "unlocked operators can delete own guest profiles" on public.guest_profiles;
+
+drop policy if exists "business members can read guest crm profiles" on public.guest_crm_profiles;
+create policy "business members can read guest crm profiles"
+on public.guest_crm_profiles for select to authenticated
+using (
+  public.current_operator_unlocked()
+  and public.current_user_business_role(business_id) is not null
+  and exists (select 1 from public.businesses b where b.id = business_id and b.guest_crm_enabled)
+);
+
+drop policy if exists "business members can read guest social links" on public.guest_social_links;
+create policy "business members can read guest social links"
+on public.guest_social_links for select to authenticated
+using (
+  public.current_operator_unlocked()
+  and public.current_user_business_role(business_id) is not null
+  and exists (select 1 from public.businesses b where b.id = business_id and b.guest_crm_enabled)
+);
+
+drop policy if exists "business members can read crm field definitions" on public.crm_field_definitions;
+create policy "business members can read crm field definitions"
+on public.crm_field_definitions for select to authenticated
+using (
+  public.current_operator_unlocked()
+  and public.current_user_business_role(business_id) is not null
+  and exists (select 1 from public.businesses b where b.id = business_id and b.guest_crm_enabled)
+);
+
+drop policy if exists "business members can read crm field values" on public.crm_field_values;
+create policy "business members can read crm field values"
+on public.crm_field_values for select to authenticated
+using (
+  public.current_operator_unlocked()
+  and public.current_user_business_role(business_id) is not null
+  and exists (select 1 from public.businesses b where b.id = business_id and b.guest_crm_enabled)
+);
+
+drop policy if exists "business managers can read crm audit" on public.guest_crm_audit_events;
+create policy "business managers can read crm audit"
+on public.guest_crm_audit_events for select to authenticated
+using (
+  public.current_operator_unlocked()
+  and public.current_user_business_role(business_id) in ('admin', 'manager')
+  and exists (select 1 from public.businesses b where b.id = business_id and b.guest_crm_enabled)
+);
+
+-- CRM-Schreibvorgaenge laufen ausschliesslich ueber die authentifizierte
+-- Guest-CRM-Edge-Function oder den streng validierten Claim-Flow.
+drop policy if exists "business members can insert guest crm profiles" on public.guest_crm_profiles;
+drop policy if exists "business members can update guest crm profiles" on public.guest_crm_profiles;
+drop policy if exists "business members can delete guest crm profiles" on public.guest_crm_profiles;
+drop policy if exists "business members can insert guest social links" on public.guest_social_links;
+drop policy if exists "business members can update guest social links" on public.guest_social_links;
+drop policy if exists "business members can delete guest social links" on public.guest_social_links;
+drop policy if exists "business members can insert crm field definitions" on public.crm_field_definitions;
+drop policy if exists "business members can update crm field definitions" on public.crm_field_definitions;
+drop policy if exists "business members can delete crm field definitions" on public.crm_field_definitions;
+drop policy if exists "business members can insert crm field values" on public.crm_field_values;
+drop policy if exists "business members can update crm field values" on public.crm_field_values;
+drop policy if exists "business members can delete crm field values" on public.crm_field_values;
+drop policy if exists "business members can insert crm audit" on public.guest_crm_audit_events;
 
 drop policy if exists "business members can read own membership" on public.business_memberships;
 create policy "business members can read own membership"
@@ -5947,6 +6246,8 @@ grant select (
   company_logo_path,
   company_logo_updated_at,
   app_theme,
+  guest_crm_enabled,
+  crm_active_guest_days,
   created_at,
   updated_at
 ) on public.businesses to authenticated;
@@ -5962,7 +6263,9 @@ grant insert (
   logo_url,
   company_logo_path,
   company_logo_updated_at,
-  app_theme
+  app_theme,
+  guest_crm_enabled,
+  crm_active_guest_days
 ) on public.businesses to authenticated;
 grant update (
   name,
@@ -5975,11 +6278,23 @@ grant update (
   logo_url,
   company_logo_path,
   company_logo_updated_at,
-  app_theme
+  app_theme,
+  guest_crm_enabled,
+  crm_active_guest_days
 ) on public.businesses to authenticated;
 grant select (guest_scan_settings) on public.businesses to authenticated;
 grant insert (guest_scan_settings) on public.businesses to authenticated;
 grant update (guest_scan_settings) on public.businesses to authenticated;
+revoke select, insert, update, delete on public.guest_crm_profiles from anon, authenticated;
+revoke select, insert, update, delete on public.guest_social_links from anon, authenticated;
+revoke select, insert, update, delete on public.crm_field_definitions from anon, authenticated;
+revoke select, insert, update, delete on public.crm_field_values from anon, authenticated;
+revoke select, insert, update, delete on public.guest_crm_audit_events from anon, authenticated;
+grant select on public.guest_crm_profiles to authenticated;
+grant select on public.guest_social_links to authenticated;
+grant select on public.crm_field_definitions to authenticated;
+grant select on public.crm_field_values to authenticated;
+grant select on public.guest_crm_audit_events to authenticated;
 revoke select, insert, update, delete on public.guest_profiles from anon, authenticated;
 grant select (
   id,

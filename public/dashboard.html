@@ -21,6 +21,7 @@
     <nav class="app-tabbar" aria-label="Hauptbereiche">
       <a class="app-tab is-active" href="dashboard.html#dashboardOverview" data-dashboard-tab="dashboard" aria-current="page">Dashboard</a>
       <a class="app-tab" href="dashboard.html#visitorStatistics" data-dashboard-tab="statistics">Besucherstatistik</a>
+      <a id="dashboardCrmNav" class="app-tab" href="crm.html" hidden>Gäste</a>
       <a class="app-tab" href="push-center.html">Push Center</a>
       <a class="app-tab" href="scanner.html">Scanner</a>
       <a class="app-tab app-tab-account" href="account.html" aria-label="Konto">
@@ -159,6 +160,10 @@
         </form>
         <div id="statsMessage" class="message" hidden></div>
         <div id="statsKpiGrid" class="stats-kpi-grid"></div>
+        <section id="dashboardCrmStats" class="panel" hidden>
+          <div class="section-title"><div><h3>CRM / Gäste</h3><p class="muted">Registrierte, aktive und VIP-Gäste aus dem optionalen Member CRM.</p></div><a class="button secondary" href="crm.html">CRM öffnen</a></div>
+          <div id="dashboardCrmStatsGrid" class="stats-kpi-grid"></div>
+        </section>
         <div id="statsCharts" class="stats-chart-grid"></div>
         <div id="lastScansTable" class="table-panel"></div>
         <div id="hiddenStatsDock"></div>

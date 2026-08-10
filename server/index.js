@@ -45,7 +45,7 @@ const localTemplatePublicSelect = [
   'club_settings',
   'public_claim_token',
   'is_active',
-  'businesses(name,logo_url)'
+  'businesses(name,logo_url,guest_crm_enabled)'
 ].join(',');
 const localTemplateInternalSelect = [
   'owner_id',
@@ -249,6 +249,60 @@ function claimToken(value) {
 
 function publicClaimSource(value) {
   return String(value || '').trim() === 'wallet_share' ? 'wallet_share' : 'direct_qr';
+}
+
+function safePublicCrmUrl(value) {
+  try {
+    const url = new URL(String(value || '').trim());
+    return url.protocol === 'https:' && !url.username && !url.password ? url.toString() : '';
+  } catch {
+    return '';
+  }
+}
+
+async function createLocalPersonalizedGuestProfile(template, registration) {
+  if (!registration || typeof registration !== 'object' || Array.isArray(registration)) return null;
+  const business = Array.isArray(template.businesses) ? template.businesses[0] : template.businesses;
+  const settings = template.settings && typeof template.settings === 'object' ? template.settings : {};
+  const fields = Array.isArray(settings.crmRegistrationFields) ? settings.crmRegistrationFields.filter((field) => field?.enabled === true).slice(0, 50) : [];
+  if (business?.guest_crm_enabled !== true || settings.personalizedGuestDataEnabled !== true || !fields.length) throw createStructuredError(403, 'CRM_REGISTRATION_NOT_ALLOWED', 'Personalisierung ist für diese Karte nicht freigegeben.', 'Guest CRM oder Template-Personalisierung ist deaktiviert.');
+  const standard = registration.standard && typeof registration.standard === 'object' ? registration.standard : {};
+  const socialsInput = Array.isArray(registration.social_links) ? registration.social_links : [];
+  const customInput = registration.custom_values && typeof registration.custom_values === 'object' ? registration.custom_values : {};
+  const allowedStandard = new Set(['first_name', 'last_name', 'display_name', 'email', 'phone', 'mobile_phone', 'birth_date', 'company', 'job_title', 'street', 'house_number', 'address_addition', 'postal_code', 'city', 'region', 'country']);
+  const allowedSocials = new Set(['linkedin', 'instagram', 'facebook', 'tiktok', 'x', 'website']);
+  const configuredStandard = new Set(fields.map((field) => String(field.key || '')).filter((key) => allowedStandard.has(key)));
+  if (fields.some((field) => field.key === 'address')) for (const key of ['street', 'house_number', 'address_addition', 'postal_code', 'city', 'region', 'country']) configuredStandard.add(key);
+  const configuredSocials = new Set(fields.map((field) => String(field.key || '')).filter((key) => allowedSocials.has(key)));
+  for (const field of fields) {
+    const key = String(field.key || '');
+    const value = key === 'address' ? (standard.street || standard.postal_code || standard.city) : key.startsWith('custom:') ? customInput[key.slice(7)] : allowedSocials.has(key) ? socialsInput.find((entry) => entry.platform === key)?.url : standard[key];
+    if (field.required === true && (value == null || String(value).trim() === '' || (Array.isArray(value) && !value.length))) throw createStructuredError(400, 'CRM_REQUIRED_FIELD_MISSING', `${field.label || key} ist ein Pflichtfeld.`, 'Bitte Pflichtfelder ausfüllen.');
+  }
+  const crm = Object.fromEntries(Object.entries(standard).filter(([key]) => configuredStandard.has(key)).map(([key, value]) => [key, String(value || '').trim() || null]));
+  if (crm.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(crm.email)) throw createStructuredError(400, 'CRM_EMAIL_INVALID', 'E-Mail-Adresse ist ungültig.', 'Prüfe die E-Mail-Adresse.');
+  const socials = socialsInput.map((entry) => ({ platform: String(entry.platform || '').toLowerCase(), url: safePublicCrmUrl(entry.url) })).filter((entry) => configuredSocials.has(entry.platform) && entry.url).slice(0, 20);
+  if (socialsInput.some((entry) => entry.url && !safePublicCrmUrl(entry.url))) throw createStructuredError(400, 'CRM_SOCIAL_URL_INVALID', 'Social-Link ist ungültig.', 'Nur HTTPS-URLs sind erlaubt.');
+  const customIds = fields.map((field) => String(field.key || '').match(/^custom:([0-9a-f-]{36})$/i)?.[1]).filter(Boolean);
+  const definitions = customIds.length ? await supabaseAdmin.from('crm_field_definitions').select('id').eq('business_id', template.business_id).eq('active', true).eq('public_registration_allowed', true).in('id', customIds) : { data: [], error: null };
+  if (definitions.error) throw definitions.error;
+  if ((definitions.data || []).length !== new Set(customIds).size) throw createStructuredError(403, 'CRM_CUSTOM_FIELD_NOT_ALLOWED', 'CRM-Feld ist nicht öffentlich freigegeben.', 'Template-Konfiguration aktualisieren.');
+  const displayName = crm.display_name || [crm.first_name, crm.last_name].filter(Boolean).join(' ') || null;
+  const profile = await supabaseAdmin.from('guest_profiles').insert({ owner_id: template.owner_id, business_id: template.business_id, display_name: displayName, metadata: { created_from: 'public_crm_registration' } }).select('id').single();
+  if (profile.error) throw profile.error;
+  const guestId = profile.data.id;
+  const crmResult = await supabaseAdmin.from('guest_crm_profiles').insert({ guest_profile_id: guestId, owner_id: template.owner_id, business_id: template.business_id, ...crm });
+  if (crmResult.error) throw crmResult.error;
+  if (socials.length) {
+    const result = await supabaseAdmin.from('guest_social_links').insert(socials.map((entry) => ({ ...entry, guest_profile_id: guestId, owner_id: template.owner_id, business_id: template.business_id })));
+    if (result.error) throw result.error;
+  }
+  if ((definitions.data || []).length) {
+    const result = await supabaseAdmin.from('crm_field_values').insert(definitions.data.map((definition) => ({ guest_profile_id: guestId, field_definition_id: definition.id, owner_id: template.owner_id, business_id: template.business_id, value: customInput[definition.id] ?? null })));
+    if (result.error) throw result.error;
+  }
+  await supabaseAdmin.from('guest_crm_audit_events').insert({ guest_profile_id: guestId, owner_id: template.owner_id, business_id: template.business_id, event_type: 'CREATED', changed_fields: Object.keys(crm), source: 'public_registration' });
+  return guestId;
 }
 
 function isUuid(value) {
@@ -2089,6 +2143,14 @@ function sanitizeBrowserMetadata(value) {
 function publicCardTemplateResponse(template = {}) {
   const businessName = templateBusinessName(template);
   const businessLogoUrl = templateBusinessLogoUrl(template);
+  const business = Array.isArray(template.businesses) ? template.businesses[0] : template.businesses;
+  const settings = template.settings && typeof template.settings === 'object' ? template.settings : {};
+  const allowedStandardCrmFields = new Set(['first_name', 'last_name', 'display_name', 'email', 'phone', 'mobile_phone', 'birth_date', 'company', 'job_title', 'address', 'linkedin', 'instagram', 'facebook', 'tiktok', 'x', 'website']);
+  const crmFields = Array.isArray(settings.crmRegistrationFields) ? settings.crmRegistrationFields
+    .filter((field) => field && typeof field === 'object' && field.enabled === true && (allowedStandardCrmFields.has(String(field.key)) || /^custom:[0-9a-f-]{36}$/i.test(String(field.key))))
+    .slice(0, 50)
+    .map((field) => ({ key: String(field.key), label: String(field.label || field.key).slice(0, 200), type: String(field.type || 'TEXT').slice(0, 20), source: field.source === 'custom' ? 'custom' : 'standard', required: field.required === true, options: Array.isArray(field.options) ? field.options.map(String).slice(0, 100) : [] })) : [];
+  const crmRegistrationEnabled = business?.guest_crm_enabled === true && settings.personalizedGuestDataEnabled === true && crmFields.length > 0;
 
   return {
     id: template.id,
@@ -2105,7 +2167,9 @@ function publicCardTemplateResponse(template = {}) {
     stamps_required: template.stamps_required,
     streak_goal: template.streak_goal,
     vip_tier: template.vip_tier,
-    settings: sanitizeBrowserMetadata(template.settings || {}),
+    settings: sanitizeBrowserMetadata(settings),
+    crm_registration_enabled: crmRegistrationEnabled,
+    crm_registration_fields: crmRegistrationEnabled ? crmFields : [],
     club_features: sanitizeBrowserMetadata(template.club_features || {}),
     club_settings: sanitizeBrowserMetadata(template.club_settings || {}),
     is_active: template.is_active
@@ -2350,6 +2414,7 @@ app.post('/api/cards/claim', async (req, res) => {
       return;
     }
 
+    const personalizedGuestProfileId = await createLocalPersonalizedGuestProfile(template, req.body?.crmRegistration || req.body?.crm_registration);
     const cardInstanceNumber = generateCardInstanceNumber();
     const passSerialNumber = generateSerialNumber();
     const draftCard = {
@@ -2357,6 +2422,7 @@ app.post('/api/cards/claim', async (req, res) => {
       owner_id: template.owner_id,
       business_id: template.business_id,
       template_id: template.id,
+      guest_profile_id: personalizedGuestProfileId || undefined,
       card_instance_number: cardInstanceNumber,
       customer_code: generateCustomerCode(),
       stamp_count: 0,

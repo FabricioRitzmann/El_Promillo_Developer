@@ -16,7 +16,7 @@ const templateSelect = [
   'primary_color',
   'text_color',
   'logo_url',
-  'businesses(name,logo_url)',
+  'businesses(name,logo_url,guest_crm_enabled)',
   'reward_text',
   'stamps_required',
   'streak_goal',

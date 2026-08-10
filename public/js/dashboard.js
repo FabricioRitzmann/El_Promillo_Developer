@@ -1,5 +1,5 @@
 import { requireLogin } from './guards.js';
-import { appUrl, apiUrl } from './config.js';
+import { appUrl, apiUrl, edgeFunctionUrl, loadPublicConfig } from './config.js';
 import { setupLanguageSelectors } from './i18n.js';
 import { pagePath } from './path.js';
 import { businessLogoUrl, byId, cardTypeLabel, escapeHtml, renderBusinessHeader, showMessage } from './ui.js';
@@ -35,6 +35,8 @@ const businessDashboardSelect = [
   'company_logo_path',
   'company_logo_updated_at',
   'app_theme',
+  'guest_crm_enabled',
+  'crm_active_guest_days',
   'created_at',
   'updated_at'
 ].join(',');
@@ -105,6 +107,9 @@ const statsKpiGrid = byId('statsKpiGrid');
 const statsCharts = byId('statsCharts');
 const lastScansTable = byId('lastScansTable');
 const hiddenStatsDock = byId('hiddenStatsDock');
+const dashboardCrmNav = byId('dashboardCrmNav');
+const dashboardCrmStats = byId('dashboardCrmStats');
+const dashboardCrmStatsGrid = byId('dashboardCrmStatsGrid');
 const dashboardTabs = Array.from(document.querySelectorAll('[data-dashboard-tab]'));
 const dashboardPagePanels = Array.from(document.querySelectorAll('[data-dashboard-page]'));
 const statsClubFeatureLabels = {
@@ -295,6 +300,25 @@ async function loadBusiness() {
 
   renderBusinessHeader(state.business || {});
   applyBusinessAppTheme(state.business, state.session.user.id);
+  if (dashboardCrmNav) dashboardCrmNav.hidden = state.business?.guest_crm_enabled !== true;
+  await loadCrmStatsSummary();
+}
+
+async function loadCrmStatsSummary() {
+  if (!state.business?.guest_crm_enabled || !dashboardCrmStats || !dashboardCrmStatsGrid) return;
+  const config = await loadPublicConfig();
+  const response = await fetch(edgeFunctionUrl('guest-crm'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', apikey: config.supabase.anonKey, Authorization: `Bearer ${state.session.access_token}` },
+    body: JSON.stringify({ action: 'stats', business_id: state.business.id })
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) return;
+  const stats = result.data || {};
+  dashboardCrmStats.hidden = false;
+  dashboardCrmStatsGrid.innerHTML = [
+    ['Registrierte Gäste', stats.total_guests], ['Aktive Gäste', stats.active_guests], ['VIP / Member', stats.vip_guests], ['Ø Besuche', stats.average_visits]
+  ].map(([label, value]) => `<article class="stat-card"><span>${escapeHtml(label)}</span><strong>${escapeHtml(String(value ?? 0))}</strong></article>`).join('');
 }
 
 async function loadTemplates() {

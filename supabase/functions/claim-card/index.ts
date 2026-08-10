@@ -27,7 +27,7 @@ const claimTemplateSelect = [
   'primary_color',
   'text_color',
   'logo_url',
-  'businesses(name,logo_url)',
+  'businesses(name,logo_url,guest_crm_enabled)',
   'reward_text',
   'stamps_required',
   'streak_goal',
@@ -137,6 +137,138 @@ function validateWalletObjectId(walletObjectId: string) {
 
 function isUniqueViolation(error: any) {
   return error?.code === '23505';
+}
+
+function safeHttpsUrl(value: unknown) {
+  const candidate = stringValue(value);
+  if (!candidate) return '';
+  try {
+    const url = new URL(candidate);
+    return url.protocol === 'https:' && !url.username && !url.password ? url.toString() : '';
+  } catch (_error) {
+    return '';
+  }
+}
+
+function crmRegistrationConfig(template: Row) {
+  const business = templateBusiness(template) || {};
+  const settings = template.settings && typeof template.settings === 'object' ? template.settings : {};
+  const fields = Array.isArray(settings.crmRegistrationFields)
+    ? settings.crmRegistrationFields.filter((field: Row) => field && field.enabled === true).slice(0, 50)
+    : [];
+  return {
+    enabled: business.guest_crm_enabled === true && settings.personalizedGuestDataEnabled === true && fields.length > 0,
+    fields
+  };
+}
+
+async function createPersonalizedGuestProfile(supabaseAdmin: any, template: Row, body: Row) {
+  const registration = body.crmRegistration || body.crm_registration;
+  if (!registration || typeof registration !== 'object' || Array.isArray(registration)) return null;
+  const config = crmRegistrationConfig(template);
+  if (!config.enabled) {
+    throw createStructuredError(403, 'CRM_REGISTRATION_NOT_ALLOWED', 'Personalisierung ist für diese Karte nicht freigegeben.', 'Öffentliche CRM-Daten dürfen nur für ein aktiviertes Template erfasst werden.');
+  }
+  const standardInput = registration.standard && typeof registration.standard === 'object' ? registration.standard : {};
+  const socialInput = Array.isArray(registration.social_links) ? registration.social_links : [];
+  const customInput = registration.custom_values && typeof registration.custom_values === 'object' ? registration.custom_values : {};
+  const standardAllowed = new Set(['first_name', 'last_name', 'display_name', 'email', 'phone', 'mobile_phone', 'birth_date', 'company', 'job_title', 'street', 'house_number', 'address_addition', 'postal_code', 'city', 'region', 'country']);
+  const socialAllowed = new Set(['linkedin', 'instagram', 'facebook', 'tiktok', 'x', 'website']);
+  const configuredStandardKeys = new Set(config.fields.map((field: Row) => stringValue(field.key)).filter((key: string) => standardAllowed.has(key)));
+  if (config.fields.some((field: Row) => stringValue(field.key) === 'address')) {
+    for (const key of ['street', 'house_number', 'address_addition', 'postal_code', 'city', 'region', 'country']) configuredStandardKeys.add(key);
+  }
+  const configuredSocialKeys = new Set(config.fields.map((field: Row) => stringValue(field.key)).filter((key: string) => socialAllowed.has(key)));
+  const crmPayload: Row = {};
+  const configuredCustomIds: string[] = [];
+  for (const field of config.fields) {
+    const key = stringValue(field.key);
+    let value: any;
+    if (key === 'address') value = stringValue(standardInput.street || standardInput.postal_code || standardInput.city);
+    else if (key.startsWith('custom:')) {
+      const definitionId = key.slice(7);
+      if (/^[0-9a-f-]{36}$/i.test(definitionId)) configuredCustomIds.push(definitionId);
+      value = customInput[definitionId];
+    } else if (socialAllowed.has(key)) value = socialInput.find((entry: Row) => stringValue(entry.platform).toLowerCase() === key)?.url;
+    else value = standardInput[key];
+    if (field.required === true && (value === null || value === undefined || stringValue(value) === '' || (Array.isArray(value) && !value.length))) {
+      throw createStructuredError(400, 'CRM_REQUIRED_FIELD_MISSING', `${stringValue(field.label || key)} ist ein Pflichtfeld.`, 'Fülle alle im Karteneditor als Pflichtfeld markierten Angaben aus.');
+    }
+  }
+  for (const [key, value] of Object.entries(standardInput)) {
+    if (configuredStandardKeys.has(key)) crmPayload[key] = stringValue(value) || null;
+  }
+  if (crmPayload.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(crmPayload.email)) {
+    throw createStructuredError(400, 'CRM_EMAIL_INVALID', 'E-Mail-Adresse ist ungültig.', 'Prüfe die Schreibweise der E-Mail-Adresse.');
+  }
+  if (crmPayload.birth_date && !/^\d{4}-\d{2}-\d{2}$/.test(crmPayload.birth_date)) {
+    throw createStructuredError(400, 'CRM_BIRTH_DATE_INVALID', 'Geburtsdatum ist ungültig.', 'Verwende ein gültiges Datum.');
+  }
+  const socials = socialInput.slice(0, 20).map((entry: Row) => ({ platform: stringValue(entry.platform).toLowerCase(), url: safeHttpsUrl(entry.url) })).filter((entry: Row) => configuredSocialKeys.has(entry.platform) && entry.url);
+  if (socialInput.some((entry: Row) => stringValue(entry.url) && !safeHttpsUrl(entry.url))) {
+    throw createStructuredError(400, 'CRM_SOCIAL_URL_INVALID', 'Social-Link ist ungültig.', 'Social Links müssen vollständige HTTPS-URLs sein.');
+  }
+  let definitions: Row[] = [];
+  if (configuredCustomIds.length) {
+    const result = await supabaseAdmin.from('crm_field_definitions').select('id,name,field_type,required,options').eq('business_id', template.business_id).eq('active', true).eq('public_registration_allowed', true).in('id', configuredCustomIds);
+    if (result.error) throw result.error;
+    definitions = result.data || [];
+    if (definitions.length !== new Set(configuredCustomIds).size) {
+      throw createStructuredError(403, 'CRM_CUSTOM_FIELD_NOT_ALLOWED', 'Ein CRM-Feld ist nicht öffentlich freigegeben.', 'Aktualisiere die Template-Konfiguration im Karteneditor.');
+    }
+  }
+  for (const definition of definitions) {
+    const value = customInput[definition.id];
+    if (definition.required && (value === null || value === undefined || stringValue(value) === '' || (Array.isArray(value) && !value.length))) {
+      throw createStructuredError(400, 'CRM_CUSTOM_REQUIRED', `${definition.name} ist ein Pflichtfeld.`, 'Fülle das erforderliche CRM-Feld aus.');
+    }
+    if (definition.field_type === 'URL' && value && !safeHttpsUrl(value)) {
+      throw createStructuredError(400, 'CRM_CUSTOM_URL_INVALID', `${definition.name}: URL ist ungültig.`, 'URLs müssen HTTPS verwenden.');
+    }
+    if (definition.field_type === 'NUMBER' && value !== null && value !== undefined && stringValue(value) !== '' && !Number.isFinite(Number(value))) {
+      throw createStructuredError(400, 'CRM_CUSTOM_NUMBER_INVALID', `${definition.name}: Zahl ist ungültig.`, 'Gib einen gültigen Zahlenwert ein.');
+    }
+    if (definition.field_type === 'DATE' && value && !/^\d{4}-\d{2}-\d{2}$/.test(String(value))) {
+      throw createStructuredError(400, 'CRM_CUSTOM_DATE_INVALID', `${definition.name}: Datum ist ungültig.`, 'Verwende ein gültiges Datum.');
+    }
+    if (definition.field_type === 'BOOLEAN' && value !== null && value !== undefined && typeof value !== 'boolean') {
+      throw createStructuredError(400, 'CRM_CUSTOM_BOOLEAN_INVALID', `${definition.name}: Wahr/Falsch-Wert ist ungültig.`, 'Verwende einen gültigen Wahr/Falsch-Wert.');
+    }
+    if (['SELECT', 'MULTISELECT'].includes(definition.field_type)) {
+      const allowed = new Set(Array.isArray(definition.options) ? definition.options.map(String) : []);
+      const values = Array.isArray(value) ? value.map(String) : value ? [String(value)] : [];
+      if (values.some((entry) => !allowed.has(entry))) throw createStructuredError(400, 'CRM_CUSTOM_OPTION_INVALID', `${definition.name}: Auswahl ist ungültig.`, 'Wähle nur konfigurierte Optionen.');
+    }
+  }
+  const duplicateQuery = crmPayload.email
+    ? await supabaseAdmin.from('guest_crm_profiles').select('guest_profile_id').eq('business_id', template.business_id).ilike('email', crmPayload.email).limit(1)
+    : crmPayload.phone
+      ? await supabaseAdmin.from('guest_crm_profiles').select('guest_profile_id').eq('business_id', template.business_id).eq('phone', crmPayload.phone).limit(1)
+      : { data: [] };
+  if ('error' in duplicateQuery && duplicateQuery.error) throw duplicateQuery.error;
+  const possibleDuplicate = Boolean(duplicateQuery.data?.length);
+  const displayName = crmPayload.display_name || [crmPayload.first_name, crmPayload.last_name].filter(Boolean).join(' ') || null;
+  const profileResult = await supabaseAdmin.from('guest_profiles').insert({
+    owner_id: template.owner_id, business_id: template.business_id, display_name: displayName,
+    metadata: { created_from: 'public_crm_registration', possible_duplicate: possibleDuplicate }
+  }).select('id').single();
+  if (profileResult.error) throw profileResult.error;
+  const guestId = profileResult.data.id;
+  const crmResult = await supabaseAdmin.from('guest_crm_profiles').insert({
+    guest_profile_id: guestId, owner_id: template.owner_id, business_id: template.business_id, ...crmPayload
+  });
+  if (crmResult.error) throw crmResult.error;
+  if (socials.length) {
+    const result = await supabaseAdmin.from('guest_social_links').insert(socials.map((entry: Row) => ({ ...entry, guest_profile_id: guestId, owner_id: template.owner_id, business_id: template.business_id })));
+    if (result.error) throw result.error;
+  }
+  if (definitions.length) {
+    const result = await supabaseAdmin.from('crm_field_values').insert(definitions.map((definition) => ({ guest_profile_id: guestId, field_definition_id: definition.id, owner_id: template.owner_id, business_id: template.business_id, value: customInput[definition.id] ?? null })));
+    if (result.error) throw result.error;
+  }
+  const auditResult = await supabaseAdmin.from('guest_crm_audit_events').insert({ guest_profile_id: guestId, owner_id: template.owner_id, business_id: template.business_id, event_type: 'CREATED', changed_fields: [...Object.keys(crmPayload), ...(socials.length ? ['socials'] : []), ...(definitions.length ? ['custom_fields'] : [])], source: 'public_registration' });
+  if (auditResult.error) throw auditResult.error;
+  return { guestId, possibleDuplicate };
 }
 
 function publicClaimCard(card: Row) {
@@ -321,6 +453,8 @@ async function createCardInstance(supabaseAdmin: any, template: Row, body: Row) 
     return await reuseExistingClaimCard(supabaseAdmin, template, existingCard, platform, walletObjectId, source);
   }
 
+  const personalizedGuest = await createPersonalizedGuestProfile(supabaseAdmin, template, body);
+
   const cardInstanceNumber = generateCardInstanceNumber();
   const customerCode = generateCustomerCode();
   const cardId = crypto.randomUUID();
@@ -344,6 +478,7 @@ async function createCardInstance(supabaseAdmin: any, template: Row, body: Row) 
       owner_id: template.owner_id,
       business_id: template.business_id,
       template_id: template.id,
+      guest_profile_id: personalizedGuest?.guestId || null,
       card_instance_number: cardInstanceNumber,
       customer_code: customerCode,
       stamp_count: 0,
@@ -412,6 +547,8 @@ async function createCardInstance(supabaseAdmin: any, template: Row, body: Row) 
       wallet_platform: platform,
       wallet_object_id: walletObjectId,
       source,
+      personalized_guest: Boolean(personalizedGuest),
+      possible_duplicate: Boolean(personalizedGuest?.possibleDuplicate),
       template_type: normalizeTemplateType(template)
     }
   });

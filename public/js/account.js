@@ -35,6 +35,8 @@ const businessAccountSelect = [
   'company_logo_path',
   'company_logo_updated_at',
   'app_theme',
+  'guest_crm_enabled',
+  'crm_active_guest_days',
   'guest_scan_settings',
   'created_at',
   'updated_at'
@@ -52,6 +54,7 @@ const removeCompanyLogoButton = byId('removeCompanyLogoButton');
 const appThemeOptions = byId('appThemeOptions');
 const appThemeStatus = byId('appThemeStatus');
 const saveAppThemeButton = byId('saveAppThemeButton');
+const accountCrmNav = byId('accountCrmNav');
 const businessLogoBucket = 'business-logos';
 const maxLogoFileBytes = 2 * 1024 * 1024;
 const maxLogoSourceFileBytes = 25 * 1024 * 1024;
@@ -140,6 +143,9 @@ function fillBusinessForm() {
   businessForm.notes_auto_show_warning.checked = scanSettings.notes_auto_show_warning !== false;
   businessForm.notes_auto_show_important.checked = scanSettings.notes_auto_show_important !== false;
   businessForm.notes_auto_show_normal.checked = scanSettings.notes_auto_show_normal === true;
+  businessForm.guest_crm_enabled.checked = state.business?.guest_crm_enabled === true;
+  businessForm.crm_active_guest_days.value = state.business?.crm_active_guest_days || 30;
+  if (accountCrmNav) accountCrmNav.hidden = state.business?.guest_crm_enabled !== true;
   state.previewTheme = applyBusinessAppTheme(state.business, state.session?.user?.id);
   renderThemeOptions();
   renderCompanyLogoPreview();
@@ -211,6 +217,8 @@ function businessPayloadFromForm() {
     website: String(formData.get('website') || '').trim(),
     logo_url: String(formData.get('logo_url') || state.business?.logo_url || '').trim(),
     company_logo_path: String(formData.get('company_logo_path') || state.business?.company_logo_path || '').trim() || null,
+    guest_crm_enabled: formData.get('guest_crm_enabled') === 'on',
+    crm_active_guest_days: Math.min(3650, Math.max(1, Number(formData.get('crm_active_guest_days') || 30))),
     guest_scan_settings: {
       regular_info_auto_show: formData.get('regular_info_auto_show') === 'on',
       notes_auto_show_warning: formData.get('notes_auto_show_warning') === 'on',
