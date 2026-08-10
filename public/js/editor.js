@@ -1,5 +1,6 @@
 import { requireLogin } from './guards.js';
 import { appUrl, apiUrl } from './config.js';
+import { setupLanguageSelectors } from './i18n.js';
 import { pagePath } from './path.js';
 import { imageFileToPngUnderLimit } from './imageUploadOptimizer.js';
 import { sampleImageColorFromPointer } from './logoColorPicker.js';
@@ -1983,6 +1984,8 @@ async function saveTemplate(event) {
 }
 
 async function initEditor() {
+  setupLanguageSelectors(document);
+
   const context = await requireLogin({ requireUnlock: true });
 
   if (!context) {

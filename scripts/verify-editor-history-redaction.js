@@ -102,7 +102,7 @@ assertIncludes(schemaSource, [
   'drop policy if exists "unlocked operators can update own draft wallet notification campaigns" on public.wallet_notification_campaigns',
   'Keine direkte Browser-Update-Policy für wallet_notification_campaigns',
   'revoke select, insert, update, delete on public.wallet_notification_campaigns from authenticated',
-  'id,\n  business_id,\n  template_id,\n  title,\n  message,\n  target_type,\n  send_type,\n  scheduled_at,\n  location_lat,\n  location_lng,\n  location_radius_m,\n  status,\n  created_at,\n  sent_at',
+  'id,\n  business_id,\n  template_id,\n  notification_rule_id,\n  title,\n  message,\n  target_type,\n  send_type,\n  scheduled_at,\n  location_lat,\n  location_lng,\n  location_radius_m,\n  status,\n  created_at,\n  sent_at',
   'revoke select on public.wallet_notification_recipients from authenticated',
   'grant select (',
   'id,\n  campaign_id,\n  business_id,\n  card_instance_id,\n  wallet_platform,\n  status,\n  error_code,\n  error_message,\n  created_at,\n  sent_at',

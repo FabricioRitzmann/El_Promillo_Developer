@@ -8,6 +8,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
 import { SCANNER_ACTIONS, featureEnabled, normalizeTemplateType, validateScannerAction, type FeatureName } from '../_shared/templateFeatures.ts';
 import { publicOperatorCard } from '../_shared/publicResponses.ts';
+import { publicOperatorGuestProfile } from '../_shared/publicResponses.ts';
 import { resolveCardEmblem, supabaseCardEmblemUrl } from '../_shared/cardEmblems.ts';
 
 type Row = Record<string, any>;
@@ -85,6 +86,7 @@ const scannerActionsCardSelect = [
   'id',
   'owner_id',
   'business_id',
+  'guest_profile_id',
   'template_id',
   'card_instance_number',
   'customer_code',
@@ -478,6 +480,32 @@ async function loadCardInstanceForScan(supabaseAdmin: any, card: Row) {
   }
 
   return data;
+}
+
+async function getGuestProfileForScan(supabaseAdmin: any, card: Row) {
+  const { data, error } = await supabaseAdmin.rpc('get_guest_profile_for_scan', {
+    p_customer_card_id: card.id
+  });
+
+  if (error) {
+    throw createStructuredError(
+      500,
+      'SCANNER_GUEST_PROFILE_LOAD_FAILED',
+      'Gastprofil konnte nicht geladen werden.',
+      error.message || 'get_guest_profile_for_scan hat einen Fehler zurueckgegeben.'
+    );
+  }
+
+  if (!data) {
+    throw createStructuredError(
+      409,
+      'SCANNER_GUEST_PROFILE_MISSING',
+      'Gastprofil fehlt.',
+      'Bitte fuehre die Guest-Profile-Migration aus, damit die Karte sicher zugeordnet wird.'
+    );
+  }
+
+  return publicOperatorGuestProfile(data);
 }
 
 function demographicsRequiredPayload(card: Row, instance: Row, template: Row, action: string) {
@@ -1433,10 +1461,13 @@ Deno.serve(async (request) => {
     const cardInstanceBeforeScan = await loadCardInstanceForScan(supabaseAdmin, card);
 
     if (action === 'inspect') {
+      const guestProfile = await getGuestProfileForScan(supabaseAdmin, card);
+
       return json({
         ok: true,
         action: 'inspect',
         card: publicOperatorCard(card),
+        guest_profile: guestProfile,
         card_instance: {
           id: cardInstanceBeforeScan.id,
           card_instance_number: cardInstanceBeforeScan.card_instance_number,
@@ -1679,6 +1710,8 @@ Deno.serve(async (request) => {
       created_by: user.id
     });
 
+    const guestProfile = await getGuestProfileForScan(supabaseAdmin, updatedCard);
+
     return json({
       ok: true,
       action: normalizedAction,
@@ -1700,6 +1733,7 @@ Deno.serve(async (request) => {
       emblem_update: emblemUpdate,
       cloakroom_reminder: cloakroomReminder,
       cloakroom_location_reminder: cloakroomLocationReminder,
+      guest_profile: guestProfile,
       card: publicOperatorCard(updatedCard)
     });
   } catch (error) {

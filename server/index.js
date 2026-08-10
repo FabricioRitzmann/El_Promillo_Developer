@@ -56,6 +56,7 @@ const localOperatorCardSelect = [
   'id',
   'owner_id',
   'business_id',
+  'guest_profile_id',
   'template_id',
   'card_instance_number',
   'customer_code',
@@ -841,6 +842,32 @@ async function loadLocalCardInstanceForScan(card) {
   }
 
   return data;
+}
+
+async function getGuestProfileForScan(card) {
+  const { data, error } = await supabaseAdmin.rpc('get_guest_profile_for_scan', {
+    p_customer_card_id: card.id
+  });
+
+  if (error) {
+    throw createStructuredError(
+      500,
+      'SCANNER_GUEST_PROFILE_LOAD_FAILED',
+      'Gastprofil konnte nicht geladen werden.',
+      error.message || 'get_guest_profile_for_scan hat einen Fehler zurueckgegeben.'
+    );
+  }
+
+  if (!data) {
+    throw createStructuredError(
+      409,
+      'SCANNER_GUEST_PROFILE_MISSING',
+      'Gastprofil fehlt.',
+      'Bitte fuehre die Guest-Profile-Migration aus, damit die Karte sicher zugeordnet wird.'
+    );
+  }
+
+  return publicOperatorGuestProfile(data);
 }
 
 function isMissingWalletEmblemColumn(error) {
@@ -1920,6 +1947,25 @@ function publicOperatorCard(card = {}) {
   };
 }
 
+function publicOperatorGuestProfile(profile = {}) {
+  if (!profile?.id) {
+    return null;
+  }
+
+  return {
+    id: profile.id,
+    display_name: profile.display_name || null,
+    gender: profile.gender || null,
+    age_group: profile.age_group || null,
+    first_seen_at: profile.first_seen_at || null,
+    last_seen_at: profile.last_seen_at || null,
+    card_count: Math.max(0, Number(profile.card_count || 0)),
+    scan_count: Math.max(0, Number(profile.scan_count || 0)),
+    created_at: profile.created_at || null,
+    updated_at: profile.updated_at || null
+  };
+}
+
 const claimCustomerCardSelect = 'id, owner_id, business_id, template_id, card_instance_number, customer_code, status, stamp_count, streak_count, vip_status, pass_serial_number, wallet_platform, wallet_object_id, wallet_serial_number, balance_cents, currency, cloakroom_active, metadata, created_at';
 
 function isUniqueViolation(error) {
@@ -2293,10 +2339,13 @@ app.post('/api/scanner/actions', async (req, res) => {
     const cardInstanceBeforeScan = await loadLocalCardInstanceForScan(card);
 
     if (action === 'inspect') {
+      const guestProfile = await getGuestProfileForScan(card);
+
       res.json({
         ok: true,
         action: 'inspect',
         card: publicOperatorCard(card),
+        guest_profile: guestProfile,
         card_instance: {
           id: cardInstanceBeforeScan.id,
           card_instance_number: cardInstanceBeforeScan.card_instance_number,
@@ -2824,6 +2873,8 @@ app.post('/api/scanner/actions', async (req, res) => {
       created_by: user.id
     });
 
+    const guestProfile = await getGuestProfileForScan(updatedCard);
+
     res.json({
       ok: true,
       action: normalizedAction,
@@ -2844,6 +2895,7 @@ app.post('/api/scanner/actions', async (req, res) => {
       emblem_update: emblemUpdate,
       cloakroom_reminder: cloakroomReminder,
       cloakroom_location_reminder: cloakroomLocationReminder,
+      guest_profile: guestProfile,
       card: publicOperatorCard(updatedCard)
     });
   } catch (error) {

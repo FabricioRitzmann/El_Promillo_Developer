@@ -1,5 +1,6 @@
 import { requireLogin } from './guards.js';
 import { appUrl, apiUrl } from './config.js';
+import { setupLanguageSelectors } from './i18n.js';
 import { pagePath } from './path.js';
 import { businessLogoUrl, byId, cardTypeLabel, escapeHtml, renderBusinessHeader, showMessage } from './ui.js';
 import { cardFeatureRows, featureEnabled, templateFeatureSummary } from './templateFeatures.js';
@@ -1529,6 +1530,8 @@ async function loadVisitorStatistics() {
 }
 
 async function initDashboard() {
+  setupLanguageSelectors(document);
+
   const context = await requireLogin({ requireUnlock: true });
 
   if (!context) {

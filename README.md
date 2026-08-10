@@ -9,6 +9,7 @@ Ein schlankes, lokal startbares MVP für eine mandantenfähige digitale Wallet-K
 - Warteseite für nicht freigeschaltete Betreiber
 - Dashboard nur für Betreiber mit `unlock = true`
 - Mandantenfähige Datenstruktur mit Row Level Security
+- Zentrale, business-getrennte Guest-Profile-Architektur fuer individuelle Karten und Scan-Historie; Details unter [docs/GUEST_PROFILE_ARCHITECTURE.md](docs/GUEST_PROFILE_ARCHITECTURE.md)
 - Geschäftsprofil pro Betreiber
 - Separate Karten-Editor-Seite mit Live-Vorschau für generische Basiskarte, Stempelkarte, Streak-Karte, Eventkarte und Clubkarte
 - VIP, Guthaben, Garderobe, Coupon und Mitgliedschaft werden im Editor als optionale Clubkarten-Module aktiviert und nicht mehr als eigene Neuanlage-Typen angeboten

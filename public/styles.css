@@ -44,6 +44,9 @@
   --section-gap: 1.35rem;
   --card-padding: clamp(1rem, 1.6vw, 1.35rem);
   --grid-gap: 1rem;
+  --language-switcher-width: 10rem;
+  --nav-tab-min-width: 5.25rem;
+  --page-action-min-width: 10.5rem;
   --topbar-height: 5.1rem;
   --tabbar-height: 3.45rem;
   --sticky-stack-height: calc(var(--topbar-height) + var(--tabbar-height));
@@ -814,6 +817,7 @@ textarea {
 
 .app-tab {
   flex: 0 0 auto;
+  min-width: min(var(--nav-tab-min-width), 34vw);
   min-height: 2.4rem;
   padding: 0.52rem var(--app-tab-padding-x);
   color: var(--muted);
@@ -876,6 +880,7 @@ textarea {
   align-items: center;
   justify-content: center;
   width: 2.4rem;
+  min-width: 2.4rem;
   height: 2.4rem;
   padding: 0;
   border: 0;
@@ -926,6 +931,24 @@ textarea {
   gap: 1rem;
   align-items: center;
   min-width: 0;
+}
+
+.language-switcher {
+  display: grid;
+  grid-template-columns: 4.7rem minmax(0, 1fr);
+  align-items: center;
+  gap: 0.55rem;
+  width: min(100%, var(--language-switcher-width));
+}
+
+.page-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-height: 6.2rem;
+}
+
+.page-heading > .button {
+  min-width: var(--page-action-min-width);
 }
 
 .page-heading > div,
@@ -2593,6 +2616,10 @@ body:has(.modal-backdrop:not([hidden])) {
     align-items: flex-start;
     flex-direction: column;
     gap: 0.75rem;
+  }
+
+  .page-heading {
+    grid-template-columns: 1fr;
   }
 
   .page-heading .button,

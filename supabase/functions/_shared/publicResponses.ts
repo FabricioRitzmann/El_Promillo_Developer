@@ -281,3 +281,22 @@ export function publicOperatorCard(card: Row = {}) {
       : null
   };
 }
+
+export function publicOperatorGuestProfile(profile: Row = {}) {
+  if (!profile?.id) {
+    return null;
+  }
+
+  return {
+    id: profile.id,
+    display_name: profile.display_name || null,
+    gender: profile.gender || null,
+    age_group: profile.age_group || null,
+    first_seen_at: profile.first_seen_at || null,
+    last_seen_at: profile.last_seen_at || null,
+    card_count: Math.max(0, Number(profile.card_count || 0)),
+    scan_count: Math.max(0, Number(profile.scan_count || 0)),
+    created_at: profile.created_at || null,
+    updated_at: profile.updated_at || null
+  };
+}

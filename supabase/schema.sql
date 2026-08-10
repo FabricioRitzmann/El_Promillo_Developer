@@ -256,11 +256,50 @@ check (
   and lower(coalesce(club_features->>'membership', 'false')) in ('true', 'false')
 ) not valid;
 
+-- Zentrales, mandantenbezogenes Gastprofil. Eine Wallet-Karte bleibt eine
+-- eigene Entitaet und verweist lediglich auf genau ein Profil. Mehrere Karten
+-- desselben Businesses duerfen spaeter dasselbe Profil verwenden.
+create table if not exists public.guest_profiles (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null references public.operator_profiles(id) on delete cascade,
+  business_id uuid not null references public.businesses(id) on delete cascade,
+  display_name text,
+  external_customer_id uuid,
+  gender text,
+  age_group text,
+  first_seen_at timestamptz,
+  last_seen_at timestamptz,
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint guest_profiles_id_business_key unique (id, business_id),
+  constraint guest_profiles_gender_check
+    check (gender is null or gender in ('male', 'female')),
+  constraint guest_profiles_age_group_check
+    check (age_group is null or age_group in ('18_plus', '25_plus', '30_plus')),
+  constraint guest_profiles_seen_order_check
+    check (first_seen_at is null or last_seen_at is null or first_seen_at <= last_seen_at),
+  constraint guest_profiles_metadata_shape_check
+    check (jsonb_typeof(metadata) = 'object' and octet_length(metadata::text) <= 20000)
+);
+
+alter table public.guest_profiles
+add column if not exists display_name text,
+add column if not exists external_customer_id uuid,
+add column if not exists gender text,
+add column if not exists age_group text,
+add column if not exists first_seen_at timestamptz,
+add column if not exists last_seen_at timestamptz,
+add column if not exists metadata jsonb not null default '{}'::jsonb,
+add column if not exists created_at timestamptz not null default now(),
+add column if not exists updated_at timestamptz not null default now();
+
 create table if not exists public.customer_cards (
   id uuid primary key default gen_random_uuid(),
   owner_id uuid not null references public.operator_profiles(id) on delete cascade,
   business_id uuid references public.businesses(id) on delete set null,
   template_id uuid not null references public.card_templates(id) on delete cascade,
+  guest_profile_id uuid references public.guest_profiles(id) on delete restrict,
   card_instance_number text not null default ('CI-' || upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 12))),
   customer_code text not null unique,
   status text not null default 'active'
@@ -291,6 +330,9 @@ drop trigger if exists validate_customer_cards_features on public.customer_cards
 
 alter table public.customer_cards
 add column if not exists card_instance_number text;
+
+alter table public.customer_cards
+add column if not exists guest_profile_id uuid references public.guest_profiles(id) on delete restrict;
 
 update public.customer_cards
 set card_instance_number = coalesce(
@@ -1156,9 +1198,99 @@ create unique index if not exists wallet_notification_campaigns_owner_idempotenc
 on public.wallet_notification_campaigns(owner_id, business_id, idempotency_key)
 where idempotency_key is not null;
 
+-- Sicherer Legacy-Backfill: vorhandene customer_id-Gruppen werden nur innerhalb
+-- desselben Businesses zusammengefuehrt. Karten ohne bestehende customer_id
+-- erhalten jeweils ein eigenes Profil; es werden keine Personen erraten.
+drop table if exists pg_temp.guest_profile_backfill_map;
+create temporary table guest_profile_backfill_map (
+  customer_card_id uuid primary key,
+  guest_profile_id uuid not null
+);
+
+with unlinked_cards as (
+  select
+    c.id as customer_card_id,
+    c.owner_id,
+    c.business_id,
+    case
+      when ci.customer_id is not null then 'customer:' || ci.customer_id::text
+      else 'card:' || c.id::text
+    end as tenant_customer_key
+  from public.customer_cards c
+  left join public.card_instances ci on ci.customer_card_id = c.id
+  where c.guest_profile_id is null
+    and c.business_id is not null
+), guest_group_keys as (
+  select
+    distinct
+    owner_id,
+    business_id,
+    tenant_customer_key
+  from unlinked_cards
+), guest_groups as (
+  select
+    owner_id,
+    business_id,
+    tenant_customer_key,
+    gen_random_uuid() as guest_profile_id
+  from guest_group_keys
+)
+insert into guest_profile_backfill_map (customer_card_id, guest_profile_id)
+select cards.customer_card_id, groups.guest_profile_id
+from unlinked_cards cards
+join guest_groups groups
+  on groups.owner_id = cards.owner_id
+ and groups.business_id = cards.business_id
+ and groups.tenant_customer_key = cards.tenant_customer_key;
+
+insert into public.guest_profiles (
+  id,
+  owner_id,
+  business_id,
+  gender,
+  age_group,
+  first_seen_at,
+  last_seen_at,
+  metadata,
+  created_at,
+  updated_at
+)
+select
+  map.guest_profile_id,
+  min(c.owner_id::text)::uuid,
+  min(c.business_id::text)::uuid,
+  case when count(distinct ci.customer_gender) <= 1 then max(ci.customer_gender) end,
+  case when count(distinct ci.customer_age_group) <= 1 then max(ci.customer_age_group) end,
+  min(coalesce(ci.first_scanned_at, c.created_at)),
+  max(coalesce(ci.last_scanned_at, c.last_scanned_at)),
+  jsonb_build_object('backfill_source', 'customer_cards'),
+  min(c.created_at),
+  max(c.updated_at)
+from guest_profile_backfill_map map
+join public.customer_cards c on c.id = map.customer_card_id
+left join public.card_instances ci on ci.customer_card_id = c.id
+group by map.guest_profile_id
+on conflict (id) do nothing;
+
+update public.customer_cards c
+set guest_profile_id = map.guest_profile_id
+from guest_profile_backfill_map map
+where c.id = map.customer_card_id
+  and c.guest_profile_id is null;
+
+update public.card_instances ci
+set customer_id = c.guest_profile_id
+from public.customer_cards c
+where ci.customer_card_id = c.id
+  and c.guest_profile_id is not null
+  and ci.customer_id is distinct from c.guest_profile_id;
+
+drop table if exists pg_temp.guest_profile_backfill_map;
+
 insert into public.card_instances (
   id,
   customer_card_id,
+  customer_id,
   owner_id,
   business_id,
   template_id,
@@ -1180,6 +1312,7 @@ insert into public.card_instances (
 select
   c.id,
   c.id,
+  c.guest_profile_id,
   c.owner_id,
   c.business_id,
   c.template_id,
@@ -1231,6 +1364,7 @@ create table if not exists public.scan_events (
   id uuid primary key default gen_random_uuid(),
   owner_id uuid not null references public.operator_profiles(id) on delete cascade,
   business_id uuid references public.businesses(id) on delete set null,
+  guest_profile_id uuid references public.guest_profiles(id) on delete set null,
   template_id uuid references public.card_templates(id) on delete set null,
   customer_card_id uuid references public.customer_cards(id) on delete set null,
   card_instance_id uuid references public.card_instances(id) on delete set null,
@@ -1254,6 +1388,9 @@ create table if not exists public.scan_events (
 
 alter table public.scan_events
 add column if not exists business_id uuid references public.businesses(id) on delete set null;
+
+alter table public.scan_events
+add column if not exists guest_profile_id uuid references public.guest_profiles(id) on delete set null;
 
 alter table public.scan_events
 add column if not exists template_id uuid references public.card_templates(id) on delete set null;
@@ -1324,6 +1461,13 @@ set
   scan_hour = extract(hour from scanned_at)::integer,
   scan_weekday = extract(isodow from scanned_at)::integer
 where scan_hour is null or scan_weekday is null;
+
+update public.scan_events event
+set guest_profile_id = card.guest_profile_id
+from public.customer_cards card
+where event.customer_card_id = card.id
+  and card.guest_profile_id is not null
+  and event.guest_profile_id is distinct from card.guest_profile_id;
 
 alter table public.scan_events
 alter column scanned_at set default now(),
@@ -1410,11 +1554,15 @@ add constraint club_card_actions_customer_age_group_check
 check (customer_age_group is null or customer_age_group in ('18_plus', '25_plus', '30_plus')) not valid;
 
 create index if not exists businesses_owner_id_idx on public.businesses(owner_id);
+create index if not exists guest_profiles_owner_id_idx on public.guest_profiles(owner_id);
+create index if not exists guest_profiles_business_id_idx on public.guest_profiles(business_id);
+create index if not exists guest_profiles_last_seen_at_idx on public.guest_profiles(business_id, last_seen_at desc);
 create index if not exists card_templates_owner_id_idx on public.card_templates(owner_id);
 create index if not exists card_templates_business_id_idx on public.card_templates(business_id);
 create unique index if not exists card_templates_public_claim_token_idx on public.card_templates(public_claim_token);
 create index if not exists customer_cards_owner_id_idx on public.customer_cards(owner_id);
 create index if not exists customer_cards_template_id_idx on public.customer_cards(template_id);
+create index if not exists customer_cards_guest_profile_id_idx on public.customer_cards(guest_profile_id);
 create index if not exists customer_cards_customer_code_idx on public.customer_cards(customer_code);
 create index if not exists customer_cards_card_instance_number_idx on public.customer_cards(card_instance_number);
 create unique index if not exists customer_cards_wallet_object_unique_idx
@@ -1469,6 +1617,7 @@ create index if not exists club_card_actions_card_instance_id_idx on public.club
 create index if not exists club_card_actions_scan_event_id_idx on public.club_card_actions(scan_event_id);
 create index if not exists scan_events_owner_id_idx on public.scan_events(owner_id);
 create index if not exists scan_events_business_id_idx on public.scan_events(business_id);
+create index if not exists scan_events_guest_profile_id_idx on public.scan_events(guest_profile_id, scanned_at desc);
 create index if not exists scan_events_template_id_idx on public.scan_events(template_id);
 create index if not exists scan_events_customer_card_id_idx on public.scan_events(customer_card_id);
 create index if not exists scan_events_card_instance_id_idx on public.scan_events(card_instance_id);
@@ -1545,6 +1694,11 @@ for each row execute function public.set_updated_at();
 drop trigger if exists set_businesses_updated_at on public.businesses;
 create trigger set_businesses_updated_at
 before update on public.businesses
+for each row execute function public.set_updated_at();
+
+drop trigger if exists set_guest_profiles_updated_at on public.guest_profiles;
+create trigger set_guest_profiles_updated_at
+before update on public.guest_profiles
 for each row execute function public.set_updated_at();
 
 drop trigger if exists set_card_templates_updated_at on public.card_templates;
@@ -1751,6 +1905,222 @@ drop trigger if exists validate_businesses_owner_consistency on public.businesse
 create trigger validate_businesses_owner_consistency
 before insert or update on public.businesses
 for each row execute function public.validate_business_owner_consistency();
+
+create or replace function public.validate_guest_profile_tenant_consistency()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  business_owner_id uuid;
+begin
+  select owner_id
+  into business_owner_id
+  from public.businesses
+  where id = new.business_id;
+
+  if business_owner_id is null then
+    raise exception 'GUEST_BUSINESS_NOT_FOUND: Gastprofil verweist auf ein unbekanntes Business.';
+  end if;
+
+  if new.owner_id <> business_owner_id then
+    raise exception 'GUEST_TENANT_MISMATCH: Gastprofil und Business gehoeren nicht zum selben Betreiber.';
+  end if;
+
+  if TG_OP = 'UPDATE' and (
+    new.owner_id is distinct from old.owner_id
+    or new.business_id is distinct from old.business_id
+  ) then
+    raise exception 'GUEST_TENANT_IMMUTABLE: Betreiber und Business eines Gastprofils sind unveraenderlich.';
+  end if;
+
+  new.metadata := coalesce(new.metadata, '{}'::jsonb);
+  return new;
+end;
+$$;
+
+drop trigger if exists validate_guest_profiles_tenant_consistency on public.guest_profiles;
+create trigger validate_guest_profiles_tenant_consistency
+before insert or update on public.guest_profiles
+for each row execute function public.validate_guest_profile_tenant_consistency();
+
+create or replace function public.ensure_customer_card_guest_profile()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  profile_row record;
+begin
+  if new.business_id is null then
+    if new.guest_profile_id is not null then
+      raise exception 'GUEST_BUSINESS_REQUIRED: Eine Karte ohne Business darf keinem Gastprofil zugeordnet werden.';
+    end if;
+
+    return new;
+  end if;
+
+  if new.guest_profile_id is null then
+    insert into public.guest_profiles (
+      owner_id,
+      business_id,
+      first_seen_at,
+      last_seen_at,
+      metadata,
+      created_at,
+      updated_at
+    )
+    values (
+      new.owner_id,
+      new.business_id,
+      null,
+      null,
+      jsonb_build_object('created_from', 'customer_card'),
+      coalesce(new.created_at, now()),
+      coalesce(new.updated_at, now())
+    )
+    returning id into new.guest_profile_id;
+
+    return new;
+  end if;
+
+  select id, owner_id, business_id
+  into profile_row
+  from public.guest_profiles
+  where id = new.guest_profile_id;
+
+  if not found then
+    raise exception 'GUEST_PROFILE_NOT_FOUND: Zugeordnetes Gastprofil wurde nicht gefunden.';
+  end if;
+
+  if profile_row.owner_id <> new.owner_id or profile_row.business_id <> new.business_id then
+    raise exception 'GUEST_CARD_TENANT_MISMATCH: Karte und Gastprofil gehoeren nicht zum selben Business.';
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists ensure_customer_cards_guest_profile on public.customer_cards;
+create trigger ensure_customer_cards_guest_profile
+before insert or update of guest_profile_id, owner_id, business_id on public.customer_cards
+for each row execute function public.ensure_customer_card_guest_profile();
+
+create or replace function public.attach_guest_profile_to_scan_event()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  card_row record;
+  effective_scanned_at timestamptz;
+begin
+  if new.customer_card_id is null then
+    if new.guest_profile_id is not null then
+      raise exception 'SCAN_CARD_REQUIRED_FOR_GUEST: Gastbezogene Scan-Events brauchen eine Kundenkarte.';
+    end if;
+
+    return new;
+  end if;
+
+  select owner_id, business_id, template_id, guest_profile_id
+  into card_row
+  from public.customer_cards
+  where id = new.customer_card_id;
+
+  if not found then
+    raise exception 'SCAN_CARD_NOT_FOUND: Scan-Event verweist auf eine unbekannte Kundenkarte.';
+  end if;
+
+  if new.owner_id <> card_row.owner_id
+    or new.business_id is distinct from card_row.business_id
+    or new.template_id is distinct from card_row.template_id then
+    raise exception 'SCAN_TENANT_MISMATCH: Scan-Event und Kundenkarte gehoeren nicht zum selben Tenant/Template.';
+  end if;
+
+  if new.guest_profile_id is not null
+    and new.guest_profile_id is distinct from card_row.guest_profile_id then
+    raise exception 'SCAN_GUEST_MISMATCH: Scan-Event verweist auf ein anderes Gastprofil als die Karte.';
+  end if;
+
+  new.guest_profile_id := card_row.guest_profile_id;
+  effective_scanned_at := coalesce(new.scanned_at, now());
+
+  if new.guest_profile_id is not null then
+    update public.guest_profiles
+    set
+      first_seen_at = case
+        when first_seen_at is null then effective_scanned_at
+        else least(first_seen_at, effective_scanned_at)
+      end,
+      last_seen_at = case
+        when last_seen_at is null then effective_scanned_at
+        else greatest(last_seen_at, effective_scanned_at)
+      end,
+      gender = coalesce(gender, new.customer_gender),
+      age_group = coalesce(age_group, new.customer_age_group)
+    where id = new.guest_profile_id
+      and owner_id = new.owner_id
+      and business_id = new.business_id;
+
+    if not found then
+      raise exception 'SCAN_GUEST_TENANT_MISMATCH: Gastprofil ist fuer den Scan-Tenant nicht zugaenglich.';
+    end if;
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists attach_scan_events_guest_profile on public.scan_events;
+create trigger attach_scan_events_guest_profile
+before insert on public.scan_events
+for each row execute function public.attach_guest_profile_to_scan_event();
+
+create or replace function public.get_guest_profile_for_scan(p_customer_card_id uuid)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select jsonb_build_object(
+    'id', guest.id,
+    'display_name', guest.display_name,
+    'gender', guest.gender,
+    'age_group', guest.age_group,
+    'first_seen_at', guest.first_seen_at,
+    'last_seen_at', guest.last_seen_at,
+    'created_at', guest.created_at,
+    'updated_at', guest.updated_at,
+    'card_count', (
+      select count(*)
+      from public.customer_cards related_card
+      where related_card.guest_profile_id = guest.id
+        and related_card.owner_id = card.owner_id
+        and related_card.business_id = card.business_id
+    ),
+    'scan_count', (
+      select count(*)
+      from public.scan_events event
+      where event.guest_profile_id = guest.id
+        and event.owner_id = card.owner_id
+        and event.business_id = card.business_id
+    )
+  )
+  from public.customer_cards card
+  join public.guest_profiles guest
+    on guest.id = card.guest_profile_id
+   and guest.owner_id = card.owner_id
+   and guest.business_id = card.business_id
+  where card.id = p_customer_card_id;
+$$;
+
+revoke all on function public.get_guest_profile_for_scan(uuid) from public, anon, authenticated;
+grant execute on function public.get_guest_profile_for_scan(uuid) to service_role;
 
 create or replace function public.validate_card_template_business_consistency()
 returns trigger
@@ -2130,7 +2500,7 @@ begin
   end if;
 
   if new.customer_card_id is not null then
-    select owner_id, business_id, template_id
+    select owner_id, business_id, template_id, guest_profile_id
     into customer_card_row
     from public.customer_cards
     where id = new.customer_card_id;
@@ -2150,6 +2520,11 @@ begin
     if customer_card_row.template_id <> new.template_id then
       raise exception 'CARD_INSTANCE_TEMPLATE_MISMATCH: Karteninstanz passt nicht zum Kundenkarten-Template.';
     end if;
+
+    -- customer_id ist das bestehende, bereits von Wallet-Limits genutzte Feld
+    -- fuer eine gemeinsame Person. Es spiegelt deshalb die zentrale Guest-ID,
+    -- ohne eine zweite Card-ID einzufuehren.
+    new.customer_id := customer_card_row.guest_profile_id;
   end if;
 
   if not public.template_feature_allowed(
@@ -4121,6 +4496,7 @@ $$;
 
 alter table public.operator_profiles enable row level security;
 alter table public.businesses enable row level security;
+alter table public.guest_profiles enable row level security;
 alter table public.card_templates enable row level security;
 alter table public.customer_cards enable row level security;
 alter table public.card_instances enable row level security;
@@ -4176,6 +4552,28 @@ for update
 to authenticated
 using (owner_id = auth.uid() and public.current_operator_unlocked())
 with check (owner_id = auth.uid() and public.current_operator_unlocked());
+
+drop policy if exists "unlocked operators can read own guest profiles" on public.guest_profiles;
+create policy "unlocked operators can read own guest profiles"
+on public.guest_profiles
+for select
+to authenticated
+using (
+  owner_id = auth.uid()
+  and public.current_operator_unlocked()
+  and exists (
+    select 1
+    from public.businesses business
+    where business.id = guest_profiles.business_id
+      and business.owner_id = auth.uid()
+  )
+);
+
+-- Guest-Profile-Writes bleiben vollstaendig serverseitig. Dadurch koennen
+-- weder oeffentliche Claim-Seiten noch Browserclients interne Gastdaten setzen.
+drop policy if exists "unlocked operators can insert own guest profiles" on public.guest_profiles;
+drop policy if exists "unlocked operators can update own guest profiles" on public.guest_profiles;
+drop policy if exists "unlocked operators can delete own guest profiles" on public.guest_profiles;
 
 drop policy if exists "operators and public can read templates" on public.card_templates;
 drop policy if exists "unlocked operators can read own templates" on public.card_templates;
@@ -4491,6 +4889,19 @@ grant update (
   company_logo_path,
   company_logo_updated_at
 ) on public.businesses to authenticated;
+revoke select, insert, update, delete on public.guest_profiles from anon, authenticated;
+grant select (
+  id,
+  owner_id,
+  business_id,
+  display_name,
+  gender,
+  age_group,
+  first_seen_at,
+  last_seen_at,
+  created_at,
+  updated_at
+) on public.guest_profiles to authenticated;
 revoke select, insert, update, delete on public.card_templates from authenticated;
 grant select (
   id,

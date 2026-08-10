@@ -35,7 +35,7 @@
       <section class="page-heading">
         <div>
           <p class="eyebrow">Karten-Editor</p>
-          <h1 id="editorPageTitle">Neue Karte erstellen</h1>
+          <h1 id="editorPageTitle" data-i18n="editor.newTitle">Neue Karte erstellen</h1>
         </div>
         <a class="button secondary" href="dashboard.html">Zurück zur Übersicht</a>
       </section>
@@ -273,7 +273,7 @@
             </div>
 
             <div class="button-row wrap">
-              <button id="templateSubmitButton" class="primary" type="submit">Template speichern</button>
+              <button id="templateSubmitButton" class="primary" type="submit" data-i18n="editor.saveTemplate">Template speichern</button>
               <a class="button secondary" href="dashboard.html">Zur Übersicht</a>
             </div>
           </div>
@@ -300,7 +300,7 @@
       <section id="walletNotificationsPanel" class="panel wallet-notification-panel" hidden>
         <div class="panel-heading">
           <div>
-            <h2>Wallet Benachrichtigungen</h2>
+            <h2 data-i18n="editor.walletNotifications">Wallet Benachrichtigungen</h2>
             <p class="muted">Nachrichten werden als Apple-Wallet-Pass-Update oder Google-Wallet-Message verarbeitet.</p>
           </div>
           <div class="button-row wrap">
@@ -325,7 +325,7 @@
                   <input name="target_min" type="number" min="0" step="1">
                 </label>
                 <label>Maximum
-                  <input name="target_max" type="number" min="0" step="1">
+                  <input name="target_max" type="number" min="0" max="100000" step="1">
                 </label>
               </div>
               <label data-target-filter="vip_level" hidden>VIP-Level
