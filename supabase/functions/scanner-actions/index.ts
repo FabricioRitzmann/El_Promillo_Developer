@@ -512,6 +512,103 @@ async function getGuestProfileForScan(supabaseAdmin: any, card: Row) {
   return publicOperatorGuestProfile(data);
 }
 
+function restrictionPermissions(role: string) {
+  return {
+    can_view: Boolean(role),
+    can_view_reason: ['admin', 'manager', 'security'].includes(role),
+    can_view_internal_note: ['admin', 'manager'].includes(role),
+    can_create: ['admin', 'manager', 'security'].includes(role),
+    can_update: ['admin', 'manager'].includes(role),
+    can_lift: ['admin', 'manager'].includes(role)
+  };
+}
+
+function publicOperatorRestrictions(payload: Row | null, role: string) {
+  const permissions = restrictionPermissions(role);
+  const sanitize = (restriction: Row) => ({
+    id: restriction.id,
+    restriction_type: restriction.restriction_type,
+    status: restriction.status,
+    starts_at: restriction.starts_at,
+    ends_at: restriction.ends_at,
+    reason: permissions.can_view_reason ? restriction.reason || null : null,
+    internal_note: permissions.can_view_internal_note ? restriction.internal_note || null : null,
+    created_at: restriction.created_at,
+    updated_at: restriction.updated_at,
+    lifted_at: restriction.lifted_at || null,
+    lift_reason: permissions.can_view_reason ? restriction.lift_reason || null : null,
+    is_currently_active: Boolean(restriction.is_currently_active)
+  });
+
+  return {
+    active: Array.isArray(payload?.active) ? payload.active.map(sanitize) : [],
+    history: Array.isArray(payload?.history) ? payload.history.map(sanitize) : [],
+    permissions
+  };
+}
+
+async function operatorRoleForCard(supabaseAdmin: any, card: Row, userId: string) {
+  if (!card.business_id) {
+    return card.owner_id === userId ? 'admin' : '';
+  }
+
+  const { data, error } = await supabaseAdmin.rpc('business_role_for_user', {
+    p_business_id: card.business_id,
+    p_user_id: userId
+  });
+
+  if (error) {
+    throw createStructuredError(500, 'SCANNER_ROLE_LOAD_FAILED', 'Rolle konnte nicht geladen werden.', error.message);
+  }
+
+  return stringValue(data).toLowerCase();
+}
+
+async function getGuestRestrictionsForScan(supabaseAdmin: any, card: Row, role: string) {
+  if (!card.business_id || !card.guest_profile_id) {
+    return publicOperatorRestrictions(null, role);
+  }
+
+  const { data, error } = await supabaseAdmin.rpc('get_guest_restrictions_for_scan', {
+    p_customer_card_id: card.id
+  });
+
+  if (error) {
+    throw createStructuredError(500, 'SCANNER_RESTRICTIONS_LOAD_FAILED', 'Gaststatus konnte nicht geladen werden.', error.message);
+  }
+
+  return publicOperatorRestrictions(data, role);
+}
+
+async function manageGuestRestriction(supabaseAdmin: any, card: Row, userId: string, role: string, body: Row) {
+  const action = stringValue(body.action).replace(/^restriction-/, '');
+  const { data, error } = await supabaseAdmin.rpc('manage_guest_restriction', {
+    p_customer_card_id: card.id,
+    p_action: action,
+    p_actor_id: userId,
+    p_restriction_id: body.restrictionId || body.restriction_id || null,
+    p_restriction_type: body.restrictionType || body.restriction_type || null,
+    p_starts_at: body.startsAt || body.starts_at || null,
+    p_ends_at: body.endsAt || body.ends_at || null,
+    p_reason: body.reason || null,
+    p_internal_note: body.internalNote || body.internal_note || null,
+    p_lift_reason: body.liftReason || body.lift_reason || null
+  });
+
+  if (error) {
+    const message = stringValue(error.message);
+    const forbidden = message.includes('FORBIDDEN');
+    throw createStructuredError(
+      forbidden ? 403 : 400,
+      forbidden ? 'RESTRICTION_WRITE_FORBIDDEN' : 'RESTRICTION_WRITE_FAILED',
+      forbidden ? 'Keine Berechtigung für diese Änderung.' : 'Gaststatus konnte nicht gespeichert werden.',
+      message
+    );
+  }
+
+  return publicOperatorRestrictions(data, role);
+}
+
 function demographicsRequiredPayload(card: Row, instance: Row, template: Row, action: string) {
   return {
     ok: false,
@@ -1440,7 +1537,9 @@ Deno.serve(async (request) => {
       );
     }
 
-    if (card.owner_id !== user.id) {
+    const operatorRole = await operatorRoleForCard(supabaseAdmin, card, user.id);
+
+    if (!operatorRole) {
       throw createStructuredError(
         403,
         'CARD_FORBIDDEN',
@@ -1463,6 +1562,7 @@ Deno.serve(async (request) => {
     const now = new Date().toISOString();
     const action = stringValue(body.action);
     const cardInstanceBeforeScan = await loadCardInstanceForScan(supabaseAdmin, card);
+    const restrictions = await getGuestRestrictionsForScan(supabaseAdmin, card, operatorRole);
 
     if (action === 'inspect') {
       const guestProfile = await getGuestProfileForScan(supabaseAdmin, card);
@@ -1472,6 +1572,8 @@ Deno.serve(async (request) => {
         action: 'inspect',
         card: publicOperatorCard(card),
         guest_profile: guestProfile,
+        guest_restrictions: restrictions,
+        operator_role: operatorRole,
         card_instance: {
           id: cardInstanceBeforeScan.id,
           card_instance_number: cardInstanceBeforeScan.card_instance_number,
@@ -1488,6 +1590,30 @@ Deno.serve(async (request) => {
           emblem_updated_at: cardInstanceBeforeScan.emblem_updated_at,
           updated_at: cardInstanceBeforeScan.updated_at
         }
+      });
+    }
+
+    if (['restriction-create', 'restriction-update', 'restriction-lift'].includes(action)) {
+      const updatedRestrictions = await manageGuestRestriction(supabaseAdmin, card, user.id, operatorRole, body);
+
+      return json({
+        ok: true,
+        action,
+        card: publicOperatorCard(card),
+        guest_profile: await getGuestProfileForScan(supabaseAdmin, card),
+        guest_restrictions: updatedRestrictions,
+        operator_role: operatorRole,
+        card_instance: cardInstanceBeforeScan
+      });
+    }
+
+    if (restrictions.active.length > 0 && body.restrictionAcknowledged !== true) {
+      return json({
+        ok: true,
+        requires_restriction_acknowledgement: true,
+        message: 'Aktive Gastrestriktion muss vor der Scanner-Aktion bestaetigt werden.',
+        guest_restrictions: restrictions,
+        operator_role: operatorRole
       });
     }
 
@@ -1516,7 +1642,7 @@ Deno.serve(async (request) => {
       .from('customer_cards')
       .update(updates)
       .eq('id', card.id)
-      .eq('owner_id', user.id)
+      .eq('owner_id', card.owner_id)
       .select(scannerActionsCardSelect)
       .single();
 
@@ -1738,6 +1864,8 @@ Deno.serve(async (request) => {
       cloakroom_reminder: cloakroomReminder,
       cloakroom_location_reminder: cloakroomLocationReminder,
       guest_profile: guestProfile,
+      guest_restrictions: await getGuestRestrictionsForScan(supabaseAdmin, updatedCard, operatorRole),
+      operator_role: operatorRole,
       card: publicOperatorCard(updatedCard)
     });
   } catch (error) {

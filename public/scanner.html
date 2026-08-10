@@ -64,6 +64,55 @@
 
       <section id="cardPanel" class="panel" hidden></section>
 
+      <section id="restrictionWarningModal" class="modal-backdrop restriction-warning-backdrop" role="dialog" aria-modal="true" aria-labelledby="restrictionWarningTitle" hidden>
+        <div class="modal-panel restriction-warning-panel">
+          <p class="eyebrow">Gaststatus</p>
+          <h2 id="restrictionWarningTitle">ACHTUNG – aktive Restriktion</h2>
+          <div id="restrictionWarningItems" class="restriction-warning-items"></div>
+          <p class="muted">Bitte bestätige diesen Hinweis, bevor weitere Scanner-Aktionen ausgeführt werden.</p>
+          <div class="button-row wrap">
+            <button id="restrictionWarningConfirm" class="danger" type="button">Hinweis bestätigt</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="restrictionEditorModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="restrictionEditorTitle" hidden>
+        <form id="restrictionEditorForm" class="modal-panel restriction-editor-panel">
+          <input id="restrictionEditorMode" name="mode" type="hidden" value="create">
+          <input id="restrictionEditorId" name="restriction_id" type="hidden">
+          <p class="eyebrow">Interner Gaststatus</p>
+          <h2 id="restrictionEditorTitle">Restriktion erfassen</h2>
+          <label>Typ
+            <select id="restrictionType" name="restriction_type" required>
+              <option value="HOUSE_BAN">Hausverbot</option>
+              <option value="CASINO_BAN">Casinosperre</option>
+            </select>
+          </label>
+          <div id="restrictionPeriodFields" class="edit-grid">
+            <label>Startdatum
+              <input id="restrictionStartsAt" name="starts_at" type="datetime-local" required>
+            </label>
+            <label>Enddatum (optional)
+              <input id="restrictionEndsAt" name="ends_at" type="datetime-local">
+            </label>
+          </div>
+          <label id="restrictionReasonField">Grund
+            <textarea id="restrictionReason" name="reason" maxlength="2000" required></textarea>
+          </label>
+          <label id="restrictionInternalNoteField">Interne Bemerkung
+            <textarea id="restrictionInternalNote" name="internal_note" maxlength="5000"></textarea>
+          </label>
+          <label id="restrictionLiftReasonField" hidden>Aufhebungsgrund
+            <textarea id="restrictionLiftReason" name="lift_reason" maxlength="2000"></textarea>
+          </label>
+          <div id="restrictionEditorMessage" class="message" hidden></div>
+          <div class="button-row wrap">
+            <button id="restrictionEditorSubmit" class="danger" type="submit">Weiter zur Bestätigung</button>
+            <button id="restrictionEditorCancel" class="secondary" type="button">Abbrechen</button>
+          </div>
+        </form>
+      </section>
+
       <section id="accessStatusModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="accessStatusTitle" hidden>
         <div class="modal-panel access-status-panel">
           <p class="eyebrow">Eintrittshinweis</p>

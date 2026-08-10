@@ -652,6 +652,18 @@ textarea {
   border-width: 2px;
 }
 
+button.danger,
+.button.danger {
+  border-color: #b42318;
+  background: #b42318;
+  color: #fff;
+}
+
+button.danger:hover,
+.button.danger:hover {
+  background: #8f1c13;
+}
+
 .message.info {
   border-color: rgba(214, 184, 137, 0.32);
   background: rgba(231, 211, 175, 0.24);
@@ -2454,6 +2466,73 @@ body:has(.modal-backdrop:not([hidden])) {
 }
 
 .access-status-card-membership .access-status-icon { background: var(--accent-gold); color: var(--ink) !important; }
+
+.guest-status-section {
+  display: grid;
+  gap: 0.85rem;
+  margin: 1rem 0;
+  padding: 1rem;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius);
+  background: var(--surface-secondary);
+}
+
+.guest-status-section.has-active-restriction {
+  border: 2px solid #b42318;
+  background: rgba(180, 35, 24, 0.08);
+}
+
+.guest-status-heading,
+.restriction-history-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.restriction-list,
+.restriction-history,
+.restriction-warning-items {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.restriction-card,
+.restriction-warning-card,
+.restriction-history-row {
+  padding: 0.85rem;
+  border: 1px solid rgba(180, 35, 24, 0.3);
+  border-radius: var(--radius-sm);
+  background: var(--surface-elevated);
+}
+
+.restriction-card p,
+.restriction-warning-card p,
+.restriction-history-row p {
+  margin: 0.25rem 0 0;
+}
+
+.restriction-warning-panel {
+  display: grid;
+  gap: 1rem;
+  border: 3px solid #b42318;
+  box-shadow: 0 28px 90px rgba(180, 35, 24, 0.38);
+}
+
+.restriction-warning-panel h2 {
+  margin: 0;
+  color: #b42318;
+}
+
+.restriction-warning-card strong {
+  color: #b42318;
+  font-size: 1.15rem;
+}
+
+.restriction-editor-panel {
+  display: grid;
+  gap: 1rem;
+}
 
 .demographics-club-info {
   display: grid;

@@ -294,6 +294,82 @@ add column if not exists metadata jsonb not null default '{}'::jsonb,
 add column if not exists created_at timestamptz not null default now(),
 add column if not exists updated_at timestamptz not null default now();
 
+-- Additive Rollenabbildung fuer Mitarbeitende eines Businesses. Der bestehende
+-- Business-Owner bleibt implizit Admin und braucht keinen Membership-Datensatz.
+create table if not exists public.business_memberships (
+  id uuid primary key default gen_random_uuid(),
+  business_id uuid not null references public.businesses(id) on delete cascade,
+  user_id uuid not null references public.operator_profiles(id) on delete cascade,
+  role text not null default 'staff'
+    check (role in ('admin', 'manager', 'security', 'staff')),
+  active boolean not null default true,
+  created_by uuid references public.operator_profiles(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint business_memberships_business_user_key unique (business_id, user_id)
+);
+
+-- Hausverbot und Casinosperre bleiben getrennte, interne Restriction-Typen.
+-- Aufhebungen werden als Statuswechsel gespeichert; DELETE wird per Trigger
+-- vollstaendig blockiert, damit die Historie erhalten bleibt.
+create table if not exists public.guest_restrictions (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null references public.operator_profiles(id) on delete restrict,
+  business_id uuid not null references public.businesses(id) on delete restrict,
+  guest_profile_id uuid not null,
+  restriction_type text not null
+    check (restriction_type in ('HOUSE_BAN', 'CASINO_BAN')),
+  status text not null default 'active'
+    check (status in ('active', 'lifted')),
+  starts_at timestamptz not null default now(),
+  ends_at timestamptz,
+  reason text not null,
+  internal_note text,
+  created_by uuid not null references public.operator_profiles(id) on delete restrict,
+  updated_by uuid not null references public.operator_profiles(id) on delete restrict,
+  lifted_at timestamptz,
+  lifted_by uuid references public.operator_profiles(id) on delete restrict,
+  lift_reason text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint guest_restrictions_guest_business_fkey
+    foreign key (guest_profile_id, business_id)
+    references public.guest_profiles(id, business_id) on delete restrict,
+  constraint guest_restrictions_reason_length_check
+    check (char_length(btrim(reason)) between 1 and 2000),
+  constraint guest_restrictions_note_length_check
+    check (internal_note is null or char_length(internal_note) <= 5000),
+  constraint guest_restrictions_date_order_check
+    check (ends_at is null or ends_at > starts_at),
+  constraint guest_restrictions_lift_state_check
+    check (
+      (status = 'active' and lifted_at is null and lifted_by is null)
+      or (status = 'lifted' and lifted_at is not null and lifted_by is not null)
+    )
+);
+
+create table if not exists public.guest_restriction_events (
+  id uuid primary key default gen_random_uuid(),
+  restriction_id uuid not null references public.guest_restrictions(id) on delete restrict,
+  owner_id uuid not null references public.operator_profiles(id) on delete restrict,
+  business_id uuid not null references public.businesses(id) on delete restrict,
+  guest_profile_id uuid not null,
+  event_type text not null check (event_type in ('CREATED', 'UPDATED', 'LIFTED')),
+  previous_state jsonb,
+  new_state jsonb not null,
+  reason text,
+  performed_by uuid not null references public.operator_profiles(id) on delete restrict,
+  performed_at timestamptz not null default now(),
+  constraint guest_restriction_events_guest_business_fkey
+    foreign key (guest_profile_id, business_id)
+    references public.guest_profiles(id, business_id) on delete restrict,
+  constraint guest_restriction_events_state_shape_check
+    check (
+      (previous_state is null or jsonb_typeof(previous_state) = 'object')
+      and jsonb_typeof(new_state) = 'object'
+    )
+);
+
 create table if not exists public.customer_cards (
   id uuid primary key default gen_random_uuid(),
   owner_id uuid not null references public.operator_profiles(id) on delete cascade,
@@ -1552,6 +1628,11 @@ create index if not exists businesses_owner_id_idx on public.businesses(owner_id
 create index if not exists guest_profiles_owner_id_idx on public.guest_profiles(owner_id);
 create index if not exists guest_profiles_business_id_idx on public.guest_profiles(business_id);
 create index if not exists guest_profiles_last_seen_at_idx on public.guest_profiles(business_id, last_seen_at desc);
+create index if not exists business_memberships_user_business_idx on public.business_memberships(user_id, business_id) where active;
+create index if not exists guest_restrictions_guest_active_idx on public.guest_restrictions(guest_profile_id, restriction_type, status, starts_at, ends_at);
+create index if not exists guest_restrictions_business_created_idx on public.guest_restrictions(business_id, created_at desc);
+create index if not exists guest_restriction_events_restriction_idx on public.guest_restriction_events(restriction_id, performed_at desc);
+create index if not exists guest_restriction_events_guest_idx on public.guest_restriction_events(guest_profile_id, performed_at desc);
 create index if not exists card_templates_owner_id_idx on public.card_templates(owner_id);
 create index if not exists card_templates_business_id_idx on public.card_templates(business_id);
 create unique index if not exists card_templates_public_claim_token_idx on public.card_templates(public_claim_token);
@@ -1694,6 +1775,16 @@ for each row execute function public.set_updated_at();
 drop trigger if exists set_guest_profiles_updated_at on public.guest_profiles;
 create trigger set_guest_profiles_updated_at
 before update on public.guest_profiles
+for each row execute function public.set_updated_at();
+
+drop trigger if exists set_business_memberships_updated_at on public.business_memberships;
+create trigger set_business_memberships_updated_at
+before update on public.business_memberships
+for each row execute function public.set_updated_at();
+
+drop trigger if exists set_guest_restrictions_updated_at on public.guest_restrictions;
+create trigger set_guest_restrictions_updated_at
+before update on public.guest_restrictions
 for each row execute function public.set_updated_at();
 
 drop trigger if exists set_card_templates_updated_at on public.card_templates;
@@ -2116,6 +2207,340 @@ $$;
 
 revoke all on function public.get_guest_profile_for_scan(uuid) from public, anon, authenticated;
 grant execute on function public.get_guest_profile_for_scan(uuid) to service_role;
+
+create or replace function public.business_role_for_user(p_business_id uuid, p_user_id uuid)
+returns text
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select case
+    when exists (
+      select 1
+      from public.businesses business
+      where business.id = p_business_id
+        and business.owner_id = p_user_id
+    ) then 'admin'
+    else (
+      select membership.role
+      from public.business_memberships membership
+      where membership.business_id = p_business_id
+        and membership.user_id = p_user_id
+        and membership.active
+      limit 1
+    )
+  end;
+$$;
+
+revoke all on function public.business_role_for_user(uuid, uuid) from public, anon, authenticated;
+grant execute on function public.business_role_for_user(uuid, uuid) to service_role;
+
+create or replace function public.current_user_business_role(p_business_id uuid)
+returns text
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select public.business_role_for_user(p_business_id, auth.uid());
+$$;
+
+revoke all on function public.current_user_business_role(uuid) from public, anon;
+grant execute on function public.current_user_business_role(uuid) to authenticated;
+
+create or replace function public.get_guest_restrictions_for_scan(p_customer_card_id uuid)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select jsonb_build_object(
+    'guest_profile_id', card.guest_profile_id,
+    'active', coalesce((
+      select jsonb_agg(
+        jsonb_build_object(
+          'id', restriction.id,
+          'restriction_type', restriction.restriction_type,
+          'status', restriction.status,
+          'starts_at', restriction.starts_at,
+          'ends_at', restriction.ends_at,
+          'reason', restriction.reason,
+          'internal_note', restriction.internal_note,
+          'created_by', restriction.created_by,
+          'created_at', restriction.created_at,
+          'updated_by', restriction.updated_by,
+          'updated_at', restriction.updated_at,
+          'is_currently_active', true
+        ) order by restriction.restriction_type, restriction.starts_at desc
+      )
+      from public.guest_restrictions restriction
+      where restriction.guest_profile_id = card.guest_profile_id
+        and restriction.owner_id = card.owner_id
+        and restriction.business_id = card.business_id
+        and restriction.status = 'active'
+        and restriction.starts_at <= now()
+        and (restriction.ends_at is null or restriction.ends_at > now())
+    ), '[]'::jsonb),
+    'history', coalesce((
+      select jsonb_agg(
+        jsonb_build_object(
+          'id', restriction.id,
+          'restriction_type', restriction.restriction_type,
+          'status', restriction.status,
+          'starts_at', restriction.starts_at,
+          'ends_at', restriction.ends_at,
+          'reason', restriction.reason,
+          'internal_note', restriction.internal_note,
+          'created_by', restriction.created_by,
+          'created_at', restriction.created_at,
+          'updated_by', restriction.updated_by,
+          'updated_at', restriction.updated_at,
+          'lifted_at', restriction.lifted_at,
+          'lifted_by', restriction.lifted_by,
+          'lift_reason', restriction.lift_reason,
+          'is_currently_active', (
+            restriction.status = 'active'
+            and restriction.starts_at <= now()
+            and (restriction.ends_at is null or restriction.ends_at > now())
+          )
+        ) order by restriction.created_at desc
+      )
+      from public.guest_restrictions restriction
+      where restriction.guest_profile_id = card.guest_profile_id
+        and restriction.owner_id = card.owner_id
+        and restriction.business_id = card.business_id
+    ), '[]'::jsonb)
+  )
+  from public.customer_cards card
+  where card.id = p_customer_card_id
+    and card.business_id is not null
+    and card.guest_profile_id is not null;
+$$;
+
+revoke all on function public.get_guest_restrictions_for_scan(uuid) from public, anon, authenticated;
+grant execute on function public.get_guest_restrictions_for_scan(uuid) to service_role;
+
+create or replace function public.manage_guest_restriction(
+  p_customer_card_id uuid,
+  p_action text,
+  p_actor_id uuid,
+  p_restriction_id uuid default null,
+  p_restriction_type text default null,
+  p_starts_at timestamptz default null,
+  p_ends_at timestamptz default null,
+  p_reason text default null,
+  p_internal_note text default null,
+  p_lift_reason text default null
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  card_row record;
+  restriction_row public.guest_restrictions%rowtype;
+  previous_state jsonb;
+  next_state jsonb;
+  actor_role text;
+  normalized_action text := lower(btrim(coalesce(p_action, '')));
+  normalized_type text := upper(btrim(coalesce(p_restriction_type, '')));
+  effective_starts_at timestamptz;
+begin
+  select id, owner_id, business_id, guest_profile_id
+  into card_row
+  from public.customer_cards
+  where id = p_customer_card_id;
+
+  if not found or card_row.business_id is null or card_row.guest_profile_id is null then
+    raise exception 'RESTRICTION_CARD_GUEST_REQUIRED: Karte besitzt kein mandantenfaehiges Gastprofil.';
+  end if;
+
+  actor_role := public.business_role_for_user(card_row.business_id, p_actor_id);
+
+  if actor_role is null then
+    raise exception 'RESTRICTION_FORBIDDEN: Kein Zugriff auf dieses Business.';
+  end if;
+
+  if normalized_action = 'create' then
+    if actor_role not in ('admin', 'manager', 'security') then
+      raise exception 'RESTRICTION_WRITE_FORBIDDEN: Rolle darf keine Restriktion erfassen.';
+    end if;
+
+    if normalized_type not in ('HOUSE_BAN', 'CASINO_BAN') then
+      raise exception 'RESTRICTION_TYPE_INVALID: Unbekannter Restriction-Typ.';
+    end if;
+
+    if nullif(btrim(coalesce(p_reason, '')), '') is null then
+      raise exception 'RESTRICTION_REASON_REQUIRED: Grund fehlt.';
+    end if;
+
+    effective_starts_at := coalesce(p_starts_at, now());
+
+    if p_ends_at is not null and p_ends_at <= effective_starts_at then
+      raise exception 'RESTRICTION_DATE_INVALID: Enddatum muss nach dem Startdatum liegen.';
+    end if;
+
+    if exists (
+      select 1
+      from public.guest_restrictions existing
+      where existing.guest_profile_id = card_row.guest_profile_id
+        and existing.business_id = card_row.business_id
+        and existing.restriction_type = normalized_type
+        and existing.status = 'active'
+        and tstzrange(existing.starts_at, existing.ends_at, '[)')
+          && tstzrange(effective_starts_at, p_ends_at, '[)')
+    ) then
+      raise exception 'RESTRICTION_ACTIVE_EXISTS: Fuer diesen Typ existiert bereits ein ueberlappender aktiver Zeitraum.';
+    end if;
+
+    insert into public.guest_restrictions (
+      owner_id,
+      business_id,
+      guest_profile_id,
+      restriction_type,
+      starts_at,
+      ends_at,
+      reason,
+      internal_note,
+      created_by,
+      updated_by
+    ) values (
+      card_row.owner_id,
+      card_row.business_id,
+      card_row.guest_profile_id,
+      normalized_type,
+      effective_starts_at,
+      p_ends_at,
+      btrim(p_reason),
+      nullif(btrim(coalesce(p_internal_note, '')), ''),
+      p_actor_id,
+      p_actor_id
+    ) returning * into restriction_row;
+
+    next_state := to_jsonb(restriction_row);
+
+    insert into public.guest_restriction_events (
+      restriction_id, owner_id, business_id, guest_profile_id, event_type,
+      previous_state, new_state, reason, performed_by
+    ) values (
+      restriction_row.id, card_row.owner_id, card_row.business_id,
+      card_row.guest_profile_id, 'CREATED', null, next_state,
+      restriction_row.reason, p_actor_id
+    );
+  elsif normalized_action in ('update', 'lift') then
+    if actor_role not in ('admin', 'manager') then
+      raise exception 'RESTRICTION_WRITE_FORBIDDEN: Rolle darf Restriktionen nicht aendern oder aufheben.';
+    end if;
+
+    select * into restriction_row
+    from public.guest_restrictions restriction
+    where restriction.id = p_restriction_id
+      and restriction.guest_profile_id = card_row.guest_profile_id
+      and restriction.owner_id = card_row.owner_id
+      and restriction.business_id = card_row.business_id
+    for update;
+
+    if not found then
+      raise exception 'RESTRICTION_NOT_FOUND: Restriktion wurde nicht gefunden.';
+    end if;
+
+    previous_state := to_jsonb(restriction_row);
+
+    if normalized_action = 'update' then
+      if restriction_row.status <> 'active' then
+        raise exception 'RESTRICTION_ALREADY_LIFTED: Aufgehobene Restriktionen bleiben unveraenderlich.';
+      end if;
+
+      effective_starts_at := coalesce(p_starts_at, restriction_row.starts_at);
+
+      if p_ends_at is not null and p_ends_at <= effective_starts_at then
+        raise exception 'RESTRICTION_DATE_INVALID: Enddatum muss nach dem Startdatum liegen.';
+      end if;
+
+      update public.guest_restrictions
+      set
+        starts_at = effective_starts_at,
+        ends_at = p_ends_at,
+        reason = coalesce(nullif(btrim(coalesce(p_reason, '')), ''), restriction_row.reason),
+        internal_note = nullif(btrim(coalesce(p_internal_note, '')), ''),
+        updated_by = p_actor_id,
+        updated_at = now()
+      where id = restriction_row.id
+      returning * into restriction_row;
+
+      next_state := to_jsonb(restriction_row);
+
+      insert into public.guest_restriction_events (
+        restriction_id, owner_id, business_id, guest_profile_id, event_type,
+        previous_state, new_state, reason, performed_by
+      ) values (
+        restriction_row.id, card_row.owner_id, card_row.business_id,
+        card_row.guest_profile_id, 'UPDATED', previous_state, next_state,
+        restriction_row.reason, p_actor_id
+      );
+    else
+      if restriction_row.status <> 'active' then
+        raise exception 'RESTRICTION_ALREADY_LIFTED: Restriktion wurde bereits aufgehoben.';
+      end if;
+
+      if nullif(btrim(coalesce(p_lift_reason, '')), '') is null then
+        raise exception 'RESTRICTION_LIFT_REASON_REQUIRED: Aufhebungsgrund fehlt.';
+      end if;
+
+      update public.guest_restrictions
+      set
+        status = 'lifted',
+        lifted_at = now(),
+        lifted_by = p_actor_id,
+        lift_reason = btrim(p_lift_reason),
+        updated_by = p_actor_id,
+        updated_at = now()
+      where id = restriction_row.id
+      returning * into restriction_row;
+
+      next_state := to_jsonb(restriction_row);
+
+      insert into public.guest_restriction_events (
+        restriction_id, owner_id, business_id, guest_profile_id, event_type,
+        previous_state, new_state, reason, performed_by
+      ) values (
+        restriction_row.id, card_row.owner_id, card_row.business_id,
+        card_row.guest_profile_id, 'LIFTED', previous_state, next_state,
+        restriction_row.lift_reason, p_actor_id
+      );
+    end if;
+  else
+    raise exception 'RESTRICTION_ACTION_INVALID: Aktion muss create, update oder lift sein.';
+  end if;
+
+  return public.get_guest_restrictions_for_scan(p_customer_card_id);
+end;
+$$;
+
+revoke all on function public.manage_guest_restriction(uuid, text, uuid, uuid, text, timestamptz, timestamptz, text, text, text) from public, anon, authenticated;
+grant execute on function public.manage_guest_restriction(uuid, text, uuid, uuid, text, timestamptz, timestamptz, text, text, text) to service_role;
+
+create or replace function public.prevent_guest_restriction_delete()
+returns trigger
+language plpgsql
+as $$
+begin
+  raise exception 'RESTRICTION_DELETE_FORBIDDEN: Restriktionen und ihre Historie duerfen nicht hart geloescht werden.';
+end;
+$$;
+
+drop trigger if exists prevent_guest_restrictions_delete on public.guest_restrictions;
+create trigger prevent_guest_restrictions_delete
+before delete on public.guest_restrictions
+for each row execute function public.prevent_guest_restriction_delete();
+
+drop trigger if exists prevent_guest_restriction_events_delete on public.guest_restriction_events;
+create trigger prevent_guest_restriction_events_delete
+before delete on public.guest_restriction_events
+for each row execute function public.prevent_guest_restriction_delete();
 
 create or replace function public.validate_card_template_business_consistency()
 returns trigger
@@ -4490,6 +4915,9 @@ $$;
 alter table public.operator_profiles enable row level security;
 alter table public.businesses enable row level security;
 alter table public.guest_profiles enable row level security;
+alter table public.business_memberships enable row level security;
+alter table public.guest_restrictions enable row level security;
+alter table public.guest_restriction_events enable row level security;
 alter table public.card_templates enable row level security;
 alter table public.customer_cards enable row level security;
 alter table public.card_instances enable row level security;
@@ -4529,7 +4957,10 @@ create policy "unlocked operators can read own business"
 on public.businesses
 for select
 to authenticated
-using (owner_id = auth.uid() and public.current_operator_unlocked());
+using (
+  public.current_operator_unlocked()
+  and public.current_user_business_role(id) is not null
+);
 
 drop policy if exists "unlocked operators can insert own business" on public.businesses;
 create policy "unlocked operators can insert own business"
@@ -4552,14 +4983,8 @@ on public.guest_profiles
 for select
 to authenticated
 using (
-  owner_id = auth.uid()
-  and public.current_operator_unlocked()
-  and exists (
-    select 1
-    from public.businesses business
-    where business.id = guest_profiles.business_id
-      and business.owner_id = auth.uid()
-  )
+  public.current_operator_unlocked()
+  and public.current_user_business_role(business_id) is not null
 );
 
 -- Guest-Profile-Writes bleiben vollstaendig serverseitig. Dadurch koennen
@@ -4567,6 +4992,48 @@ using (
 drop policy if exists "unlocked operators can insert own guest profiles" on public.guest_profiles;
 drop policy if exists "unlocked operators can update own guest profiles" on public.guest_profiles;
 drop policy if exists "unlocked operators can delete own guest profiles" on public.guest_profiles;
+
+drop policy if exists "business members can read own membership" on public.business_memberships;
+create policy "business members can read own membership"
+on public.business_memberships
+for select
+to authenticated
+using (
+  public.current_operator_unlocked()
+  and (
+    user_id = auth.uid()
+    or public.current_user_business_role(business_id) = 'admin'
+  )
+);
+
+drop policy if exists "business members can read guest restrictions" on public.guest_restrictions;
+create policy "business members can read guest restrictions"
+on public.guest_restrictions
+for select
+to authenticated
+using (
+  public.current_operator_unlocked()
+  and public.current_user_business_role(business_id) is not null
+);
+
+drop policy if exists "business members can read restriction history" on public.guest_restriction_events;
+create policy "business members can read restriction history"
+on public.guest_restriction_events
+for select
+to authenticated
+using (
+  public.current_operator_unlocked()
+  and public.current_user_business_role(business_id) is not null
+);
+
+-- Keine Browser-Schreibpolicies: Restriktionen werden ausschliesslich ueber
+-- die atomare, service-role-only Management-RPC gepflegt.
+drop policy if exists "business members can insert guest restrictions" on public.guest_restrictions;
+drop policy if exists "business members can update guest restrictions" on public.guest_restrictions;
+drop policy if exists "business members can delete guest restrictions" on public.guest_restrictions;
+drop policy if exists "business members can insert restriction history" on public.guest_restriction_events;
+drop policy if exists "business members can update restriction history" on public.guest_restriction_events;
+drop policy if exists "business members can delete restriction history" on public.guest_restriction_events;
 
 drop policy if exists "operators and public can read templates" on public.card_templates;
 drop policy if exists "unlocked operators can read own templates" on public.card_templates;
@@ -4895,6 +5362,40 @@ grant select (
   created_at,
   updated_at
 ) on public.guest_profiles to authenticated;
+revoke select, insert, update, delete on public.business_memberships from anon, authenticated;
+grant select (
+  id,
+  business_id,
+  user_id,
+  role,
+  active,
+  created_at,
+  updated_at
+) on public.business_memberships to authenticated;
+revoke select, insert, update, delete on public.guest_restrictions from anon, authenticated;
+grant select (
+  id,
+  owner_id,
+  business_id,
+  guest_profile_id,
+  restriction_type,
+  status,
+  starts_at,
+  ends_at,
+  created_at,
+  updated_at,
+  lifted_at
+) on public.guest_restrictions to authenticated;
+revoke select, insert, update, delete on public.guest_restriction_events from anon, authenticated;
+grant select (
+  id,
+  restriction_id,
+  owner_id,
+  business_id,
+  guest_profile_id,
+  event_type,
+  performed_at
+) on public.guest_restriction_events to authenticated;
 revoke select, insert, update, delete on public.card_templates from authenticated;
 grant select (
   id,

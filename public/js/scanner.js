@@ -21,6 +21,11 @@ const state = {
   scanCanvas: null,
   scanCanvasContext: null,
   business: null,
+  guestRestrictions: { active: [], history: [], permissions: {} },
+  operatorRole: '',
+  restrictionAcknowledged: false,
+  pendingRestrictionAction: null,
+  restrictionConfirmationReady: false,
   pendingDemographicsAction: null,
   pendingDemographicsPayload: null
 };
@@ -41,6 +46,15 @@ const manualForm = byId('manualScanForm');
 const video = byId('scannerVideo');
 const cardPanel = byId('cardPanel');
 const scannerOnlyLogoutButton = byId('scannerOnlyLogoutButton');
+const restrictionWarningModal = byId('restrictionWarningModal');
+const restrictionWarningItems = byId('restrictionWarningItems');
+const restrictionWarningConfirm = byId('restrictionWarningConfirm');
+const restrictionEditorModal = byId('restrictionEditorModal');
+const restrictionEditorForm = byId('restrictionEditorForm');
+const restrictionEditorTitle = byId('restrictionEditorTitle');
+const restrictionEditorMessage = byId('restrictionEditorMessage');
+const restrictionEditorSubmit = byId('restrictionEditorSubmit');
+const restrictionEditorCancel = byId('restrictionEditorCancel');
 const accessStatusModal = byId('accessStatusModal');
 const accessStatusItems = byId('accessStatusItems');
 const accessStatusClose = byId('accessStatusClose');
@@ -70,6 +84,28 @@ async function loadBusinessHeader() {
     maybeSingle: true
   });
 
+  if (!state.business) {
+    const membership = await state.client.selectRows('business_memberships', {
+      select: 'business_id,role,active',
+      filters: [
+        { column: 'user_id', op: 'eq', value: state.session.user.id },
+        { column: 'active', op: 'eq', value: true }
+      ],
+      maybeSingle: true
+    });
+
+    if (membership?.business_id) {
+      state.operatorRole = membership.role || state.operatorRole;
+      state.business = await state.client.selectRows('businesses', {
+        select: businessScannerSelect,
+        filters: [
+          { column: 'id', op: 'eq', value: membership.business_id }
+        ],
+        maybeSingle: true
+      });
+    }
+  }
+
   renderBusinessHeader(state.business || {});
 }
 
@@ -94,6 +130,77 @@ function stopCamera() {
     video.pause();
     video.srcObject = null;
   }
+}
+
+function restrictionTypeLabel(type) {
+  return type === 'CASINO_BAN' ? 'Casinosperre' : 'Hausverbot';
+}
+
+function restrictionStateLabel(restriction = {}) {
+  if (restriction.status === 'lifted') return 'Aufgehoben';
+  if (restriction.ends_at && new Date(restriction.ends_at).getTime() <= Date.now()) return 'Abgelaufen';
+  if (restriction.starts_at && new Date(restriction.starts_at).getTime() > Date.now()) return 'Geplant';
+  return 'Aktiv';
+}
+
+function formatRestrictionDate(value) {
+  return value ? new Date(value).toLocaleString('de-CH') : 'unbefristet';
+}
+
+function restrictionStatusHtml() {
+  const restrictions = state.guestRestrictions || { active: [], history: [], permissions: {} };
+  const active = restrictions.active || [];
+  const history = restrictions.history || [];
+  const permissions = restrictions.permissions || {};
+  const activeHtml = active.length
+    ? active.map((restriction) => `
+      <article class="restriction-card">
+        <strong>${escapeHtml(restrictionTypeLabel(restriction.restriction_type))} aktiv</strong>
+        <p>Seit: ${escapeHtml(formatRestrictionDate(restriction.starts_at))}</p>
+        ${restriction.ends_at ? `<p>Bis: ${escapeHtml(formatRestrictionDate(restriction.ends_at))}</p>` : ''}
+        ${restriction.reason ? `<p><strong>Grund:</strong> ${escapeHtml(restriction.reason)}</p>` : ''}
+        ${restriction.internal_note ? `<p><strong>Interne Bemerkung:</strong> ${escapeHtml(restriction.internal_note)}</p>` : ''}
+        <div class="button-row wrap">
+          ${permissions.can_update ? `<button class="secondary" type="button" data-restriction-action="edit" data-restriction-id="${escapeHtml(restriction.id)}">Bearbeiten</button>` : ''}
+          ${permissions.can_lift ? `<button class="danger" type="button" data-restriction-action="lift" data-restriction-id="${escapeHtml(restriction.id)}">Aufheben</button>` : ''}
+        </div>
+      </article>
+    `).join('')
+    : '<p class="muted">Kein aktives Verbot.</p>';
+  const historyHtml = history.length
+    ? history.slice(0, 20).map((restriction) => `
+      <article class="restriction-history-row">
+        <div>
+          <strong>${escapeHtml(restrictionTypeLabel(restriction.restriction_type))}</strong>
+          <p class="muted">${escapeHtml(restrictionStateLabel(restriction))} · erstellt ${escapeHtml(formatRestrictionDate(restriction.created_at))}</p>
+          ${restriction.lifted_at ? `<p class="muted">Aufgehoben ${escapeHtml(formatRestrictionDate(restriction.lifted_at))}${restriction.lift_reason ? ` · ${escapeHtml(restriction.lift_reason)}` : ''}</p>` : ''}
+        </div>
+      </article>
+    `).join('')
+    : '<p class="muted">Noch keine Restriktionshistorie.</p>';
+
+  return `
+    <section class="guest-status-section ${active.length ? 'has-active-restriction' : ''}">
+      <div class="guest-status-heading">
+        <div>
+          <p class="eyebrow">Gaststatus</p>
+          <h3>${active.length ? 'Aktive Restriktion' : 'Kein aktives Verbot'}</h3>
+        </div>
+        <span class="pill">Rolle: ${escapeHtml(state.operatorRole || 'staff')}</span>
+      </div>
+      <div class="restriction-list">${activeHtml}</div>
+      ${permissions.can_create ? `
+        <div class="button-row wrap">
+          <button class="danger" type="button" data-restriction-action="create" data-restriction-type="HOUSE_BAN">Hausverbot erfassen</button>
+          <button class="danger" type="button" data-restriction-action="create" data-restriction-type="CASINO_BAN">Casinosperre erfassen</button>
+        </div>
+      ` : ''}
+      <details>
+        <summary>Restriktionshistorie (${history.length})</summary>
+        <div class="restriction-history">${historyHtml}</div>
+      </details>
+    </section>
+  `;
 }
 
 function renderCard() {
@@ -291,6 +398,7 @@ function renderCard() {
       </div>
       <span class="pill">${escapeHtml(cardTypeLabel(previewTemplate))}</span>
     </div>
+    ${restrictionStatusHtml()}
     <dl class="detail-grid">
       ${detailItems.join('')}
     </dl>
@@ -335,6 +443,132 @@ function showAccessStatusModal(card = state.currentCard) {
 function hideAccessStatusModal() {
   if (accessStatusModal) {
     accessStatusModal.hidden = true;
+  }
+}
+
+function showRestrictionWarning(restrictions = state.guestRestrictions) {
+  const active = restrictions?.active || [];
+
+  if (!restrictionWarningModal || !restrictionWarningItems || !active.length) {
+    return false;
+  }
+
+  restrictionWarningItems.innerHTML = active.map((restriction) => `
+    <article class="restriction-warning-card">
+      <strong>ACHTUNG: ${escapeHtml(restrictionTypeLabel(restriction.restriction_type))} aktiv</strong>
+      <p>Seit: ${escapeHtml(formatRestrictionDate(restriction.starts_at))}</p>
+      ${restriction.ends_at ? `<p>Bis: ${escapeHtml(formatRestrictionDate(restriction.ends_at))}</p>` : ''}
+      ${restriction.reason ? `<p><strong>Grund:</strong> ${escapeHtml(restriction.reason)}</p>` : ''}
+    </article>
+  `).join('');
+  restrictionWarningModal.hidden = false;
+
+  if (navigator.vibrate) {
+    navigator.vibrate([180, 80, 180, 80, 180]);
+  }
+
+  return true;
+}
+
+function hideRestrictionWarning() {
+  if (restrictionWarningModal) restrictionWarningModal.hidden = true;
+}
+
+function toDatetimeLocal(value = new Date().toISOString()) {
+  const date = new Date(value);
+  const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return localDate.toISOString().slice(0, 16);
+}
+
+function restrictionById(id) {
+  return (state.guestRestrictions?.history || []).find((restriction) => restriction.id === id)
+    || (state.guestRestrictions?.active || []).find((restriction) => restriction.id === id)
+    || null;
+}
+
+function hideRestrictionEditor() {
+  if (restrictionEditorModal) restrictionEditorModal.hidden = true;
+  state.restrictionConfirmationReady = false;
+}
+
+function openRestrictionEditor(mode, restriction = {}) {
+  if (!restrictionEditorModal || !restrictionEditorForm) return;
+
+  restrictionEditorForm.reset();
+  state.restrictionConfirmationReady = false;
+  byId('restrictionEditorMode').value = mode;
+  byId('restrictionEditorId').value = restriction.id || '';
+  byId('restrictionType').value = restriction.restriction_type || 'HOUSE_BAN';
+  byId('restrictionStartsAt').value = toDatetimeLocal(restriction.starts_at || new Date().toISOString());
+  byId('restrictionEndsAt').value = restriction.ends_at ? toDatetimeLocal(restriction.ends_at) : '';
+  byId('restrictionReason').value = restriction.reason || '';
+  byId('restrictionInternalNote').value = restriction.internal_note || '';
+  byId('restrictionLiftReason').value = '';
+
+  const lifting = mode === 'lift';
+  byId('restrictionType').disabled = mode !== 'create';
+  byId('restrictionPeriodFields').hidden = lifting;
+  byId('restrictionReasonField').hidden = lifting;
+  byId('restrictionInternalNoteField').hidden = lifting;
+  byId('restrictionLiftReasonField').hidden = !lifting;
+  byId('restrictionStartsAt').required = !lifting;
+  byId('restrictionReason').required = !lifting;
+  byId('restrictionLiftReason').required = lifting;
+  restrictionEditorTitle.textContent = lifting
+    ? `${restrictionTypeLabel(restriction.restriction_type)} aufheben`
+    : mode === 'edit'
+      ? `${restrictionTypeLabel(restriction.restriction_type)} bearbeiten`
+      : `${restrictionTypeLabel(byId('restrictionType').value)} erfassen`;
+  restrictionEditorSubmit.textContent = 'Weiter zur Bestätigung';
+  restrictionEditorMessage.hidden = true;
+  restrictionEditorMessage.textContent = '';
+  restrictionEditorModal.hidden = false;
+}
+
+function applyRestrictionResult(result) {
+  state.guestRestrictions = result.guest_restrictions || state.guestRestrictions;
+  state.operatorRole = result.operator_role || state.operatorRole;
+  state.restrictionAcknowledged = !(state.guestRestrictions.active || []).length;
+  renderCard();
+}
+
+async function submitRestrictionEditor(event) {
+  event.preventDefault();
+  const formData = new FormData(restrictionEditorForm);
+  const mode = String(formData.get('mode') || 'create');
+
+  if (!state.restrictionConfirmationReady) {
+    state.restrictionConfirmationReady = true;
+    showMessage(
+      restrictionEditorMessage,
+      mode === 'lift'
+        ? 'Möchtest du diese Restriktion wirklich aufheben? Die Historie bleibt erhalten.'
+        : `Möchtest du ${restrictionTypeLabel(String(formData.get('restriction_type') || 'HOUSE_BAN'))} wirklich speichern?`,
+      'warning'
+    );
+    restrictionEditorSubmit.textContent = mode === 'lift' ? 'Jetzt verbindlich aufheben' : 'Jetzt verbindlich speichern';
+    return;
+  }
+
+  const startsAtValue = String(formData.get('starts_at') || '');
+  const endsAtValue = String(formData.get('ends_at') || '');
+  const action = mode === 'edit' ? 'restriction-update' : mode === 'lift' ? 'restriction-lift' : 'restriction-create';
+  const result = await callScannerActionApi(action, {
+    restrictionId: formData.get('restriction_id') || null,
+    restrictionType: formData.get('restriction_type') || byId('restrictionType').value,
+    startsAt: startsAtValue ? new Date(startsAtValue).toISOString() : null,
+    endsAt: endsAtValue ? new Date(endsAtValue).toISOString() : null,
+    reason: formData.get('reason') || null,
+    internalNote: formData.get('internal_note') || null,
+    liftReason: formData.get('lift_reason') || null
+  });
+
+  applyRestrictionResult(result);
+  hideRestrictionEditor();
+  showMessage(scannerMessage, mode === 'lift' ? 'Restriktion wurde aufgehoben; die Historie bleibt erhalten.' : 'Gaststatus wurde gespeichert.', 'success');
+
+  if ((state.guestRestrictions.active || []).length) {
+    showRestrictionWarning();
   }
 }
 
@@ -443,9 +677,16 @@ async function loadCardByCode(rawCode) {
 
   state.currentCard = card;
   state.currentCardInstance = result.card_instance || null;
+  state.guestRestrictions = result.guest_restrictions || { active: [], history: [], permissions: {} };
+  state.operatorRole = result.operator_role || '';
+  state.restrictionAcknowledged = !(state.guestRestrictions.active || []).length;
+  state.pendingRestrictionAction = null;
   state.originalCard = structuredClone(card);
   renderCard();
-  showAccessStatusModal(card);
+
+  if (!showRestrictionWarning()) {
+    showAccessStatusModal(card);
+  }
   showMessage(scannerMessage, t('scanner.cardLoaded'), 'success');
 }
 
@@ -625,6 +866,8 @@ function hideDemographicsModal() {
 function applyScannerActionResult(result) {
   state.currentCard = result.card;
   state.currentCardInstance = result.card_instance || null;
+  state.guestRestrictions = result.guest_restrictions || state.guestRestrictions;
+  state.operatorRole = result.operator_role || state.operatorRole;
   state.originalCard = structuredClone(state.currentCard);
   renderCard();
 }
@@ -686,10 +929,24 @@ async function runScannerAction(action, payload = {}) {
   }
 
   showMessage(scannerMessage, 'Scanner-Aktion wird gespeichert ...');
-  const result = await callScannerActionApi(actionToSend, payload);
+  const requestPayload = {
+    ...payload,
+    restrictionAcknowledged: state.restrictionAcknowledged
+  };
+  const result = await callScannerActionApi(actionToSend, requestPayload);
+
+  if (result.requires_restriction_acknowledgement) {
+    state.guestRestrictions = result.guest_restrictions || state.guestRestrictions;
+    state.operatorRole = result.operator_role || state.operatorRole;
+    state.restrictionAcknowledged = false;
+    state.pendingRestrictionAction = { action, payload };
+    renderCard();
+    showRestrictionWarning();
+    return;
+  }
 
   if (result.requires_demographics) {
-    showDemographicsModal(result, actionToSend, payload);
+    showDemographicsModal(result, actionToSend, requestPayload);
     return;
   }
 
@@ -934,6 +1191,35 @@ async function initScanner() {
 
   accessStatusClose?.addEventListener('click', hideAccessStatusModal);
 
+  restrictionWarningConfirm?.addEventListener('click', () => {
+    hideRestrictionWarning();
+    state.restrictionAcknowledged = true;
+    const pending = state.pendingRestrictionAction;
+    state.pendingRestrictionAction = null;
+
+    if (pending) {
+      runScannerAction(pending.action, pending.payload).catch(showScannerActionError);
+    } else {
+      showAccessStatusModal();
+    }
+  });
+
+  restrictionEditorCancel?.addEventListener('click', hideRestrictionEditor);
+  restrictionEditorForm?.addEventListener('submit', (event) => {
+    submitRestrictionEditor(event).catch((error) => {
+      state.restrictionConfirmationReady = false;
+      restrictionEditorSubmit.textContent = 'Weiter zur Bestätigung';
+      showMessage(restrictionEditorMessage, error.error_reason || error.error_message || error.message || 'Gaststatus konnte nicht gespeichert werden.', 'error');
+    });
+  });
+  restrictionEditorForm?.addEventListener('input', () => {
+    if (state.restrictionConfirmationReady) {
+      state.restrictionConfirmationReady = false;
+      restrictionEditorSubmit.textContent = 'Weiter zur Bestätigung';
+      restrictionEditorMessage.hidden = true;
+    }
+  });
+
   scannerOnlyLogoutButton?.addEventListener('click', async () => {
     await state.client.signOut();
     window.location.replace(pagePath('index.html'));
@@ -952,6 +1238,22 @@ async function initScanner() {
   });
 
   cardPanel?.addEventListener('click', (event) => {
+    const restrictionButton = event.target.closest('[data-restriction-action]');
+
+    if (restrictionButton) {
+      const restrictionAction = restrictionButton.dataset.restrictionAction;
+      const restriction = restrictionById(restrictionButton.dataset.restrictionId);
+
+      if (restrictionAction === 'create') {
+        openRestrictionEditor('create', { restriction_type: restrictionButton.dataset.restrictionType });
+      } else if (restrictionAction === 'edit' && restriction) {
+        openRestrictionEditor('edit', restriction);
+      } else if (restrictionAction === 'lift' && restriction) {
+        openRestrictionEditor('lift', restriction);
+      }
+      return;
+    }
+
     const button = event.target.closest('[data-action]');
 
     if (!button) {
