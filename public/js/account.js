@@ -32,6 +32,7 @@ const businessAccountSelect = [
   'logo_url',
   'company_logo_path',
   'company_logo_updated_at',
+  'guest_scan_settings',
   'created_at',
   'updated_at'
 ].join(',');
@@ -128,6 +129,11 @@ function fillBusinessForm() {
   businessForm.website.value = state.business?.website || '';
   businessForm.logo_url.value = state.business?.logo_url || '';
   businessForm.company_logo_path.value = state.business?.company_logo_path || '';
+  const scanSettings = state.business?.guest_scan_settings || {};
+  businessForm.regular_info_auto_show.checked = scanSettings.regular_info_auto_show === true;
+  businessForm.notes_auto_show_warning.checked = scanSettings.notes_auto_show_warning !== false;
+  businessForm.notes_auto_show_important.checked = scanSettings.notes_auto_show_important !== false;
+  businessForm.notes_auto_show_normal.checked = scanSettings.notes_auto_show_normal === true;
   renderCompanyLogoPreview();
   renderBusinessHeader(state.business || {});
   renderMobileAccountSummary();
@@ -155,7 +161,13 @@ function businessPayloadFromForm() {
     phone: String(formData.get('phone') || '').trim(),
     website: String(formData.get('website') || '').trim(),
     logo_url: String(formData.get('logo_url') || state.business?.logo_url || '').trim(),
-    company_logo_path: String(formData.get('company_logo_path') || state.business?.company_logo_path || '').trim() || null
+    company_logo_path: String(formData.get('company_logo_path') || state.business?.company_logo_path || '').trim() || null,
+    guest_scan_settings: {
+      regular_info_auto_show: formData.get('regular_info_auto_show') === 'on',
+      notes_auto_show_warning: formData.get('notes_auto_show_warning') === 'on',
+      notes_auto_show_important: formData.get('notes_auto_show_important') === 'on',
+      notes_auto_show_normal: formData.get('notes_auto_show_normal') === 'on'
+    }
   };
 
   return payload;

@@ -113,6 +113,73 @@
         </form>
       </section>
 
+      <section id="guestNotificationModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="guestNotificationTitle" hidden>
+        <div class="modal-panel guest-notification-panel">
+          <p id="guestNotificationEyebrow" class="eyebrow">Interner Gästehinweis</p>
+          <h2 id="guestNotificationTitle">Gastinformation</h2>
+          <div id="guestNotificationContent" class="guest-notification-content"></div>
+          <div class="button-row wrap">
+            <button id="guestNotificationNext" class="primary" type="button">Verstanden</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="regularInfoModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="regularInfoTitle" hidden>
+        <form id="regularInfoForm" class="modal-panel guest-info-editor-panel">
+          <p class="eyebrow">Nur intern sichtbar</p>
+          <h2 id="regularInfoTitle">Stammgastinformationen</h2>
+          <label>Allgemeine Informationen
+            <textarea name="general_info" maxlength="5000"></textarea>
+          </label>
+          <div class="edit-grid">
+            <label>Lieblingsgetränk
+              <input name="favorite_drink" maxlength="500">
+            </label>
+            <label>Bevorzugter Bereich / Tisch
+              <input name="preferred_area" maxlength="500">
+            </label>
+          </div>
+          <label>Weitere Präferenzen
+            <textarea name="further_preferences" maxlength="5000"></textarea>
+          </label>
+          <label>Andere interne Informationen
+            <textarea name="other_internal_info" maxlength="5000"></textarea>
+          </label>
+          <div id="regularInfoMessage" class="message" hidden></div>
+          <div class="button-row wrap">
+            <button id="regularInfoSubmit" class="primary" type="submit">Speichern</button>
+            <button id="regularInfoCancel" class="secondary" type="button">Schliessen</button>
+          </div>
+        </form>
+      </section>
+
+      <section id="guestNoteModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="guestNoteTitle" hidden>
+        <form id="guestNoteForm" class="modal-panel guest-note-editor-panel">
+          <input name="mode" type="hidden" value="create">
+          <input name="note_id" type="hidden">
+          <p class="eyebrow">Chronologische Gastnotiz</p>
+          <h2 id="guestNoteTitle">Notiz hinzufügen</h2>
+          <label>Priorität
+            <select name="priority" required>
+              <option value="NORMAL">Normal</option>
+              <option value="IMPORTANT">Wichtig</option>
+              <option value="WARNING">Warnung</option>
+            </select>
+          </label>
+          <label>Notiz
+            <textarea name="note_text" maxlength="5000" required></textarea>
+          </label>
+          <label id="guestNoteDeleteReasonField" hidden>Löschgrund (optional)
+            <textarea name="delete_reason" maxlength="1000"></textarea>
+          </label>
+          <div id="guestNoteMessage" class="message" hidden></div>
+          <div class="button-row wrap">
+            <button id="guestNoteSubmit" class="primary" type="submit">Speichern</button>
+            <button id="guestNoteCancel" class="secondary" type="button">Abbrechen</button>
+          </div>
+        </form>
+      </section>
+
       <section id="accessStatusModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="accessStatusTitle" hidden>
         <div class="modal-panel access-status-panel">
           <p class="eyebrow">Eintrittshinweis</p>

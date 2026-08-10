@@ -92,6 +92,34 @@ alter table public.businesses
 add column if not exists company_logo_path text,
 add column if not exists company_logo_updated_at timestamptz;
 
+alter table public.businesses
+add column if not exists guest_scan_settings jsonb not null default '{
+  "regular_info_auto_show": false,
+  "notes_auto_show_warning": true,
+  "notes_auto_show_important": true,
+  "notes_auto_show_normal": false
+}'::jsonb;
+
+update public.businesses
+set guest_scan_settings = '{
+  "regular_info_auto_show": false,
+  "notes_auto_show_warning": true,
+  "notes_auto_show_important": true,
+  "notes_auto_show_normal": false
+}'::jsonb || coalesce(guest_scan_settings, '{}'::jsonb);
+
+alter table public.businesses
+drop constraint if exists businesses_guest_scan_settings_shape_check;
+
+alter table public.businesses
+add constraint businesses_guest_scan_settings_shape_check check (
+  jsonb_typeof(guest_scan_settings) = 'object'
+  and lower(coalesce(guest_scan_settings->>'regular_info_auto_show', 'false')) in ('true', 'false')
+  and lower(coalesce(guest_scan_settings->>'notes_auto_show_warning', 'true')) in ('true', 'false')
+  and lower(coalesce(guest_scan_settings->>'notes_auto_show_important', 'true')) in ('true', 'false')
+  and lower(coalesce(guest_scan_settings->>'notes_auto_show_normal', 'false')) in ('true', 'false')
+) not valid;
+
 create table if not exists public.card_templates (
   id uuid primary key default gen_random_uuid(),
   owner_id uuid not null references public.operator_profiles(id) on delete cascade,
@@ -369,6 +397,82 @@ create table if not exists public.guest_restriction_events (
       and jsonb_typeof(new_state) = 'object'
     )
 );
+
+-- Stammgastinformationen und chronologische Notizen sind absichtlich zwei
+-- getrennte interne Systeme. Beide sind mandantenbezogen und nie oeffentlich.
+create table if not exists public.guest_regular_information (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null references public.operator_profiles(id) on delete restrict,
+  business_id uuid not null references public.businesses(id) on delete restrict,
+  guest_profile_id uuid not null,
+  general_info text,
+  favorite_drink text,
+  preferred_area text,
+  further_preferences text,
+  other_internal_info text,
+  created_by uuid not null references public.operator_profiles(id) on delete restrict,
+  updated_by uuid not null references public.operator_profiles(id) on delete restrict,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint guest_regular_information_guest_key unique (guest_profile_id, business_id),
+  constraint guest_regular_information_guest_business_fkey
+    foreign key (guest_profile_id, business_id)
+    references public.guest_profiles(id, business_id) on delete restrict,
+  constraint guest_regular_information_lengths_check check (
+    coalesce(char_length(general_info), 0) <= 5000
+    and coalesce(char_length(favorite_drink), 0) <= 500
+    and coalesce(char_length(preferred_area), 0) <= 500
+    and coalesce(char_length(further_preferences), 0) <= 5000
+    and coalesce(char_length(other_internal_info), 0) <= 5000
+  )
+);
+
+create table if not exists public.guest_notes (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null references public.operator_profiles(id) on delete restrict,
+  business_id uuid not null references public.businesses(id) on delete restrict,
+  guest_profile_id uuid not null,
+  note_text text not null,
+  priority text not null default 'NORMAL' check (priority in ('NORMAL', 'IMPORTANT', 'WARNING')),
+  created_by uuid not null references public.operator_profiles(id) on delete restrict,
+  updated_by uuid not null references public.operator_profiles(id) on delete restrict,
+  deleted_by uuid references public.operator_profiles(id) on delete restrict,
+  deleted_at timestamptz,
+  delete_reason text,
+  created_at timestamptz not null default clock_timestamp(),
+  updated_at timestamptz not null default now(),
+  constraint guest_notes_guest_business_fkey
+    foreign key (guest_profile_id, business_id)
+    references public.guest_profiles(id, business_id) on delete restrict,
+  constraint guest_notes_text_length_check check (char_length(btrim(note_text)) between 1 and 5000),
+  constraint guest_notes_delete_state_check check (
+    (deleted_at is null and deleted_by is null)
+    or (deleted_at is not null and deleted_by is not null)
+  )
+);
+
+create table if not exists public.guest_note_events (
+  id uuid primary key default gen_random_uuid(),
+  guest_note_id uuid not null references public.guest_notes(id) on delete restrict,
+  owner_id uuid not null references public.operator_profiles(id) on delete restrict,
+  business_id uuid not null references public.businesses(id) on delete restrict,
+  guest_profile_id uuid not null,
+  event_type text not null check (event_type in ('CREATED', 'UPDATED', 'DELETED')),
+  previous_state jsonb,
+  new_state jsonb not null,
+  performed_by uuid not null references public.operator_profiles(id) on delete restrict,
+  performed_at timestamptz not null default now(),
+  constraint guest_note_events_guest_business_fkey
+    foreign key (guest_profile_id, business_id)
+    references public.guest_profiles(id, business_id) on delete restrict,
+  constraint guest_note_events_state_shape_check check (
+    (previous_state is null or jsonb_typeof(previous_state) = 'object')
+    and jsonb_typeof(new_state) = 'object'
+  )
+);
+
+alter table public.guest_notes
+alter column created_at set default clock_timestamp();
 
 create table if not exists public.customer_cards (
   id uuid primary key default gen_random_uuid(),
@@ -1631,6 +1735,9 @@ create index if not exists guest_profiles_last_seen_at_idx on public.guest_profi
 create index if not exists business_memberships_user_business_idx on public.business_memberships(user_id, business_id) where active;
 create index if not exists guest_restrictions_guest_active_idx on public.guest_restrictions(guest_profile_id, restriction_type, status, starts_at, ends_at);
 create index if not exists guest_restrictions_business_created_idx on public.guest_restrictions(business_id, created_at desc);
+create index if not exists guest_notes_guest_created_idx on public.guest_notes(guest_profile_id, created_at desc) where deleted_at is null;
+create index if not exists guest_notes_business_priority_idx on public.guest_notes(business_id, priority, created_at desc) where deleted_at is null;
+create index if not exists guest_note_events_note_idx on public.guest_note_events(guest_note_id, performed_at desc);
 create index if not exists guest_restriction_events_restriction_idx on public.guest_restriction_events(restriction_id, performed_at desc);
 create index if not exists guest_restriction_events_guest_idx on public.guest_restriction_events(guest_profile_id, performed_at desc);
 create index if not exists card_templates_owner_id_idx on public.card_templates(owner_id);
@@ -1785,6 +1892,16 @@ for each row execute function public.set_updated_at();
 drop trigger if exists set_guest_restrictions_updated_at on public.guest_restrictions;
 create trigger set_guest_restrictions_updated_at
 before update on public.guest_restrictions
+for each row execute function public.set_updated_at();
+
+drop trigger if exists set_guest_regular_information_updated_at on public.guest_regular_information;
+create trigger set_guest_regular_information_updated_at
+before update on public.guest_regular_information
+for each row execute function public.set_updated_at();
+
+drop trigger if exists set_guest_notes_updated_at on public.guest_notes;
+create trigger set_guest_notes_updated_at
+before update on public.guest_notes
 for each row execute function public.set_updated_at();
 
 drop trigger if exists set_card_templates_updated_at on public.card_templates;
@@ -2523,6 +2640,240 @@ $$;
 revoke all on function public.manage_guest_restriction(uuid, text, uuid, uuid, text, timestamptz, timestamptz, text, text, text) from public, anon, authenticated;
 grant execute on function public.manage_guest_restriction(uuid, text, uuid, uuid, text, timestamptz, timestamptz, text, text, text) to service_role;
 
+create or replace function public.get_guest_information_for_scan(p_customer_card_id uuid)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select jsonb_build_object(
+    'guest_profile_id', card.guest_profile_id,
+    'settings', business.guest_scan_settings,
+    'regular_information', (
+      select jsonb_build_object(
+        'id', info.id,
+        'general_info', info.general_info,
+        'favorite_drink', info.favorite_drink,
+        'preferred_area', info.preferred_area,
+        'further_preferences', info.further_preferences,
+        'other_internal_info', info.other_internal_info,
+        'created_by', info.created_by,
+        'created_by_name', creator.display_name,
+        'created_at', info.created_at,
+        'updated_by', info.updated_by,
+        'updated_by_name', updater.display_name,
+        'updated_at', info.updated_at
+      )
+      from public.guest_regular_information info
+      left join public.operator_profiles creator on creator.id = info.created_by
+      left join public.operator_profiles updater on updater.id = info.updated_by
+      where info.guest_profile_id = card.guest_profile_id
+        and info.business_id = card.business_id
+    ),
+    'notes', coalesce((
+      select jsonb_agg(
+        jsonb_build_object(
+          'id', note.id,
+          'note_text', note.note_text,
+          'priority', note.priority,
+          'created_by', note.created_by,
+          'created_by_name', creator.display_name,
+          'created_at', note.created_at,
+          'updated_by', note.updated_by,
+          'updated_by_name', updater.display_name,
+          'updated_at', note.updated_at
+        ) order by note.created_at desc
+      )
+      from public.guest_notes note
+      left join public.operator_profiles creator on creator.id = note.created_by
+      left join public.operator_profiles updater on updater.id = note.updated_by
+      where note.guest_profile_id = card.guest_profile_id
+        and note.business_id = card.business_id
+        and note.deleted_at is null
+    ), '[]'::jsonb)
+  )
+  from public.customer_cards card
+  join public.businesses business on business.id = card.business_id
+  where card.id = p_customer_card_id
+    and card.business_id is not null
+    and card.guest_profile_id is not null;
+$$;
+
+revoke all on function public.get_guest_information_for_scan(uuid) from public, anon, authenticated;
+grant execute on function public.get_guest_information_for_scan(uuid) to service_role;
+
+create or replace function public.manage_guest_regular_information(
+  p_customer_card_id uuid,
+  p_actor_id uuid,
+  p_general_info text default null,
+  p_favorite_drink text default null,
+  p_preferred_area text default null,
+  p_further_preferences text default null,
+  p_other_internal_info text default null
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  card_row record;
+  actor_role text;
+begin
+  select id, owner_id, business_id, guest_profile_id into card_row
+  from public.customer_cards where id = p_customer_card_id;
+
+  if not found or card_row.business_id is null or card_row.guest_profile_id is null then
+    raise exception 'GUEST_INFO_CARD_GUEST_REQUIRED: Karte besitzt kein mandantenfaehiges Gastprofil.';
+  end if;
+
+  actor_role := public.business_role_for_user(card_row.business_id, p_actor_id);
+  if actor_role is null or actor_role not in ('admin', 'manager') then
+    raise exception 'GUEST_INFO_WRITE_FORBIDDEN: Rolle darf Stammgastinformationen nicht bearbeiten.';
+  end if;
+
+  insert into public.guest_regular_information (
+    owner_id, business_id, guest_profile_id, general_info, favorite_drink,
+    preferred_area, further_preferences, other_internal_info, created_by, updated_by
+  ) values (
+    card_row.owner_id, card_row.business_id, card_row.guest_profile_id,
+    nullif(btrim(coalesce(p_general_info, '')), ''),
+    nullif(btrim(coalesce(p_favorite_drink, '')), ''),
+    nullif(btrim(coalesce(p_preferred_area, '')), ''),
+    nullif(btrim(coalesce(p_further_preferences, '')), ''),
+    nullif(btrim(coalesce(p_other_internal_info, '')), ''),
+    p_actor_id, p_actor_id
+  )
+  on conflict (guest_profile_id, business_id) do update set
+    general_info = excluded.general_info,
+    favorite_drink = excluded.favorite_drink,
+    preferred_area = excluded.preferred_area,
+    further_preferences = excluded.further_preferences,
+    other_internal_info = excluded.other_internal_info,
+    updated_by = excluded.updated_by;
+
+  return public.get_guest_information_for_scan(p_customer_card_id);
+end;
+$$;
+
+revoke all on function public.manage_guest_regular_information(uuid, uuid, text, text, text, text, text) from public, anon, authenticated;
+grant execute on function public.manage_guest_regular_information(uuid, uuid, text, text, text, text, text) to service_role;
+
+create or replace function public.manage_guest_note(
+  p_customer_card_id uuid,
+  p_action text,
+  p_actor_id uuid,
+  p_note_id uuid default null,
+  p_note_text text default null,
+  p_priority text default 'NORMAL',
+  p_delete_reason text default null
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  card_row record;
+  note_row public.guest_notes%rowtype;
+  actor_role text;
+  normalized_action text := lower(btrim(coalesce(p_action, '')));
+  normalized_priority text := upper(btrim(coalesce(p_priority, 'NORMAL')));
+  previous_state jsonb;
+  next_state jsonb;
+begin
+  select id, owner_id, business_id, guest_profile_id into card_row
+  from public.customer_cards where id = p_customer_card_id;
+
+  if not found or card_row.business_id is null or card_row.guest_profile_id is null then
+    raise exception 'GUEST_NOTE_CARD_GUEST_REQUIRED: Karte besitzt kein mandantenfaehiges Gastprofil.';
+  end if;
+
+  actor_role := public.business_role_for_user(card_row.business_id, p_actor_id);
+  if actor_role is null then
+    raise exception 'GUEST_NOTE_FORBIDDEN: Kein Zugriff auf dieses Business.';
+  end if;
+
+  if normalized_action = 'create' then
+    if actor_role not in ('admin', 'manager', 'security') then
+      raise exception 'GUEST_NOTE_WRITE_FORBIDDEN: Rolle darf keine Notiz erfassen.';
+    end if;
+    if nullif(btrim(coalesce(p_note_text, '')), '') is null then
+      raise exception 'GUEST_NOTE_TEXT_REQUIRED: Notiztext fehlt.';
+    end if;
+    if normalized_priority not in ('NORMAL', 'IMPORTANT', 'WARNING') then
+      raise exception 'GUEST_NOTE_PRIORITY_INVALID: Prioritaet ist ungueltig.';
+    end if;
+
+    insert into public.guest_notes (
+      owner_id, business_id, guest_profile_id, note_text, priority, created_by, updated_by
+    ) values (
+      card_row.owner_id, card_row.business_id, card_row.guest_profile_id,
+      btrim(p_note_text), normalized_priority, p_actor_id, p_actor_id
+    ) returning * into note_row;
+    next_state := to_jsonb(note_row);
+    insert into public.guest_note_events (
+      guest_note_id, owner_id, business_id, guest_profile_id, event_type,
+      previous_state, new_state, performed_by
+    ) values (
+      note_row.id, note_row.owner_id, note_row.business_id, note_row.guest_profile_id,
+      'CREATED', null, next_state, p_actor_id
+    );
+  elsif normalized_action in ('update', 'delete') then
+    if actor_role not in ('admin', 'manager') then
+      raise exception 'GUEST_NOTE_WRITE_FORBIDDEN: Rolle darf Notizen nicht bearbeiten oder loeschen.';
+    end if;
+
+    select * into note_row from public.guest_notes
+    where id = p_note_id
+      and owner_id = card_row.owner_id
+      and business_id = card_row.business_id
+      and guest_profile_id = card_row.guest_profile_id
+      and deleted_at is null
+    for update;
+    if not found then
+      raise exception 'GUEST_NOTE_NOT_FOUND: Notiz wurde nicht gefunden.';
+    end if;
+    previous_state := to_jsonb(note_row);
+
+    if normalized_action = 'update' then
+      if nullif(btrim(coalesce(p_note_text, '')), '') is null then
+        raise exception 'GUEST_NOTE_TEXT_REQUIRED: Notiztext fehlt.';
+      end if;
+      if normalized_priority not in ('NORMAL', 'IMPORTANT', 'WARNING') then
+        raise exception 'GUEST_NOTE_PRIORITY_INVALID: Prioritaet ist ungueltig.';
+      end if;
+      update public.guest_notes set
+        note_text = btrim(p_note_text), priority = normalized_priority, updated_by = p_actor_id
+      where id = note_row.id returning * into note_row;
+    else
+      update public.guest_notes set
+        deleted_at = now(), deleted_by = p_actor_id,
+        delete_reason = nullif(btrim(coalesce(p_delete_reason, '')), ''), updated_by = p_actor_id
+      where id = note_row.id returning * into note_row;
+    end if;
+
+    next_state := to_jsonb(note_row);
+    insert into public.guest_note_events (
+      guest_note_id, owner_id, business_id, guest_profile_id, event_type,
+      previous_state, new_state, performed_by
+    ) values (
+      note_row.id, note_row.owner_id, note_row.business_id, note_row.guest_profile_id,
+      case when normalized_action = 'update' then 'UPDATED' else 'DELETED' end,
+      previous_state, next_state, p_actor_id
+    );
+  else
+    raise exception 'GUEST_NOTE_ACTION_INVALID: Aktion ist ungueltig.';
+  end if;
+
+  return public.get_guest_information_for_scan(p_customer_card_id);
+end;
+$$;
+
+revoke all on function public.manage_guest_note(uuid, text, uuid, uuid, text, text, text) from public, anon, authenticated;
+grant execute on function public.manage_guest_note(uuid, text, uuid, uuid, text, text, text) to service_role;
+
 create or replace function public.prevent_guest_restriction_delete()
 returns trigger
 language plpgsql
@@ -2540,6 +2891,16 @@ for each row execute function public.prevent_guest_restriction_delete();
 drop trigger if exists prevent_guest_restriction_events_delete on public.guest_restriction_events;
 create trigger prevent_guest_restriction_events_delete
 before delete on public.guest_restriction_events
+for each row execute function public.prevent_guest_restriction_delete();
+
+drop trigger if exists prevent_guest_notes_delete on public.guest_notes;
+create trigger prevent_guest_notes_delete
+before delete on public.guest_notes
+for each row execute function public.prevent_guest_restriction_delete();
+
+drop trigger if exists prevent_guest_note_events_delete on public.guest_note_events;
+create trigger prevent_guest_note_events_delete
+before delete on public.guest_note_events
 for each row execute function public.prevent_guest_restriction_delete();
 
 create or replace function public.validate_card_template_business_consistency()
@@ -4918,6 +5279,9 @@ alter table public.guest_profiles enable row level security;
 alter table public.business_memberships enable row level security;
 alter table public.guest_restrictions enable row level security;
 alter table public.guest_restriction_events enable row level security;
+alter table public.guest_regular_information enable row level security;
+alter table public.guest_notes enable row level security;
+alter table public.guest_note_events enable row level security;
 alter table public.card_templates enable row level security;
 alter table public.customer_cards enable row level security;
 alter table public.card_instances enable row level security;
@@ -5034,6 +5398,32 @@ drop policy if exists "business members can delete guest restrictions" on public
 drop policy if exists "business members can insert restriction history" on public.guest_restriction_events;
 drop policy if exists "business members can update restriction history" on public.guest_restriction_events;
 drop policy if exists "business members can delete restriction history" on public.guest_restriction_events;
+
+drop policy if exists "business members can read regular guest information" on public.guest_regular_information;
+create policy "business members can read regular guest information"
+on public.guest_regular_information for select to authenticated
+using (public.current_operator_unlocked() and public.current_user_business_role(business_id) is not null);
+
+drop policy if exists "business members can read guest notes" on public.guest_notes;
+create policy "business members can read guest notes"
+on public.guest_notes for select to authenticated
+using (public.current_operator_unlocked() and public.current_user_business_role(business_id) is not null);
+
+drop policy if exists "business members can read guest note history" on public.guest_note_events;
+create policy "business members can read guest note history"
+on public.guest_note_events for select to authenticated
+using (public.current_operator_unlocked() and public.current_user_business_role(business_id) is not null);
+
+-- Interne Gastdaten werden nur ueber service-role-only RPCs geschrieben.
+drop policy if exists "business members can insert regular guest information" on public.guest_regular_information;
+drop policy if exists "business members can update regular guest information" on public.guest_regular_information;
+drop policy if exists "business members can delete regular guest information" on public.guest_regular_information;
+drop policy if exists "business members can insert guest notes" on public.guest_notes;
+drop policy if exists "business members can update guest notes" on public.guest_notes;
+drop policy if exists "business members can delete guest notes" on public.guest_notes;
+drop policy if exists "business members can insert guest note history" on public.guest_note_events;
+drop policy if exists "business members can update guest note history" on public.guest_note_events;
+drop policy if exists "business members can delete guest note history" on public.guest_note_events;
 
 drop policy if exists "operators and public can read templates" on public.card_templates;
 drop policy if exists "unlocked operators can read own templates" on public.card_templates;
@@ -5349,6 +5739,9 @@ grant update (
   company_logo_path,
   company_logo_updated_at
 ) on public.businesses to authenticated;
+grant select (guest_scan_settings) on public.businesses to authenticated;
+grant insert (guest_scan_settings) on public.businesses to authenticated;
+grant update (guest_scan_settings) on public.businesses to authenticated;
 revoke select, insert, update, delete on public.guest_profiles from anon, authenticated;
 grant select (
   id,
@@ -5373,6 +5766,9 @@ grant select (
   updated_at
 ) on public.business_memberships to authenticated;
 revoke select, insert, update, delete on public.guest_restrictions from anon, authenticated;
+revoke select, insert, update, delete on public.guest_regular_information from anon, authenticated;
+revoke select, insert, update, delete on public.guest_notes from anon, authenticated;
+revoke select, insert, update, delete on public.guest_note_events from anon, authenticated;
 grant select (
   id,
   owner_id,

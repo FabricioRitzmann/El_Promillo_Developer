@@ -22,10 +22,12 @@ const state = {
   scanCanvasContext: null,
   business: null,
   guestRestrictions: { active: [], history: [], permissions: {} },
+  guestInformation: { regular_information: null, notes: [], settings: {}, permissions: {} },
   operatorRole: '',
   restrictionAcknowledged: false,
   pendingRestrictionAction: null,
   restrictionConfirmationReady: false,
+  notificationQueue: [],
   pendingDemographicsAction: null,
   pendingDemographicsPayload: null
 };
@@ -55,6 +57,22 @@ const restrictionEditorTitle = byId('restrictionEditorTitle');
 const restrictionEditorMessage = byId('restrictionEditorMessage');
 const restrictionEditorSubmit = byId('restrictionEditorSubmit');
 const restrictionEditorCancel = byId('restrictionEditorCancel');
+const guestNotificationModal = byId('guestNotificationModal');
+const guestNotificationEyebrow = byId('guestNotificationEyebrow');
+const guestNotificationTitle = byId('guestNotificationTitle');
+const guestNotificationContent = byId('guestNotificationContent');
+const guestNotificationNext = byId('guestNotificationNext');
+const regularInfoModal = byId('regularInfoModal');
+const regularInfoForm = byId('regularInfoForm');
+const regularInfoMessage = byId('regularInfoMessage');
+const regularInfoCancel = byId('regularInfoCancel');
+const guestNoteModal = byId('guestNoteModal');
+const guestNoteForm = byId('guestNoteForm');
+const guestNoteTitle = byId('guestNoteTitle');
+const guestNoteMessage = byId('guestNoteMessage');
+const guestNoteSubmit = byId('guestNoteSubmit');
+const guestNoteCancel = byId('guestNoteCancel');
+const guestNoteDeleteReasonField = byId('guestNoteDeleteReasonField');
 const accessStatusModal = byId('accessStatusModal');
 const accessStatusItems = byId('accessStatusItems');
 const accessStatusClose = byId('accessStatusClose');
@@ -199,6 +217,63 @@ function restrictionStatusHtml() {
         <summary>Restriktionshistorie (${history.length})</summary>
         <div class="restriction-history">${historyHtml}</div>
       </details>
+    </section>
+  `;
+}
+
+function guestPriorityLabel(priority) {
+  return priority === 'WARNING' ? 'Warnung' : priority === 'IMPORTANT' ? 'Wichtig' : 'Normal';
+}
+
+function regularInformationHasContent(info = {}) {
+  return ['general_info', 'favorite_drink', 'preferred_area', 'further_preferences', 'other_internal_info']
+    .some((field) => String(info?.[field] || '').trim());
+}
+
+function regularInformationHtml(info = {}) {
+  const fields = [
+    ['Allgemein', info.general_info],
+    ['Lieblingsgetränk', info.favorite_drink],
+    ['Bereich / Tisch', info.preferred_area],
+    ['Weitere Präferenzen', info.further_preferences],
+    ['Andere interne Informationen', info.other_internal_info]
+  ].filter(([, value]) => String(value || '').trim());
+  return fields.length
+    ? `<dl class="detail-grid">${fields.map(([label, value]) => `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>`).join('')}</dl>`
+    : '<p class="muted">Noch keine Stammgastinformationen erfasst.</p>';
+}
+
+function guestInformationHtml() {
+  const info = state.guestInformation || {};
+  const permissions = info.permissions || {};
+  const notes = info.notes || [];
+  const notesHtml = notes.length ? notes.map((note) => `
+    <article class="guest-note-card guest-note-${escapeHtml(String(note.priority || 'NORMAL').toLowerCase())}">
+      <div class="guest-status-heading">
+        <strong>${escapeHtml(guestPriorityLabel(note.priority))}</strong>
+        <span class="muted">${escapeHtml(new Date(note.created_at).toLocaleString('de-CH'))}</span>
+      </div>
+      <p>${escapeHtml(note.note_text)}</p>
+      <p class="muted">Erstellt von ${escapeHtml(note.created_by_name || note.created_by || 'Unbekannt')}${note.updated_at !== note.created_at ? ` · aktualisiert von ${escapeHtml(note.updated_by_name || note.updated_by || 'Unbekannt')}` : ''}</p>
+      <div class="button-row wrap">
+        ${permissions.can_update_note ? `<button class="secondary" type="button" data-guest-note-action="edit" data-note-id="${escapeHtml(note.id)}">Bearbeiten</button>` : ''}
+        ${permissions.can_delete_note ? `<button class="danger-soft" type="button" data-guest-note-action="delete" data-note-id="${escapeHtml(note.id)}">Löschen</button>` : ''}
+      </div>
+    </article>
+  `).join('') : '<p class="muted">Noch keine Gastnotizen.</p>';
+
+  return `
+    <section class="guest-information-section">
+      <div class="guest-status-heading">
+        <div><p class="eyebrow">Nur intern</p><h3>Stammgastinformationen</h3></div>
+        <button class="secondary" type="button" data-guest-info-action="open">${permissions.can_edit_regular_information ? 'Anzeigen / bearbeiten' : 'Anzeigen'}</button>
+      </div>
+      ${regularInformationHtml(info.regular_information)}
+      <div class="guest-status-heading guest-notes-heading">
+        <h3>Gastnotizen (${notes.length})</h3>
+        ${permissions.can_create_note ? '<button class="secondary" type="button" data-guest-note-action="create">Notiz hinzufügen</button>' : ''}
+      </div>
+      <div class="guest-notes-list">${notesHtml}</div>
     </section>
   `;
 }
@@ -399,6 +474,7 @@ function renderCard() {
       <span class="pill">${escapeHtml(cardTypeLabel(previewTemplate))}</span>
     </div>
     ${restrictionStatusHtml()}
+    ${guestInformationHtml()}
     <dl class="detail-grid">
       ${detailItems.join('')}
     </dl>
@@ -474,6 +550,117 @@ function hideRestrictionWarning() {
   if (restrictionWarningModal) restrictionWarningModal.hidden = true;
 }
 
+function buildGuestNotificationQueue() {
+  const information = state.guestInformation || {};
+  const settings = information.settings || {};
+  const notes = information.notes || [];
+  const queue = [];
+  const addNotes = (priority, enabled) => {
+    const matching = notes.filter((note) => note.priority === priority);
+    if (enabled && matching.length) {
+      queue.push({
+        eyebrow: priority === 'WARNING' ? 'Interne Warnung' : 'Interne Gastnotiz',
+        title: `${guestPriorityLabel(priority)} (${matching.length})`,
+        html: matching.map((note) => `<article class="guest-note-card guest-note-${priority.toLowerCase()}"><p>${escapeHtml(note.note_text)}</p><span class="muted">${escapeHtml(new Date(note.created_at).toLocaleString('de-CH'))}</span></article>`).join('')
+      });
+    }
+  };
+
+  addNotes('WARNING', settings.notes_auto_show_warning !== false);
+  if (settings.regular_info_auto_show === true && regularInformationHasContent(information.regular_information)) {
+    queue.push({ eyebrow: 'Stammgastinformation', title: 'Präferenzen beachten', html: regularInformationHtml(information.regular_information) });
+  }
+  addNotes('IMPORTANT', settings.notes_auto_show_important !== false);
+  addNotes('NORMAL', settings.notes_auto_show_normal === true);
+  return queue;
+}
+
+function showNextGuestNotification() {
+  const next = state.notificationQueue.shift();
+  if (!next) {
+    if (guestNotificationModal) guestNotificationModal.hidden = true;
+    showAccessStatusModal();
+    return false;
+  }
+  guestNotificationEyebrow.textContent = next.eyebrow;
+  guestNotificationTitle.textContent = next.title;
+  guestNotificationContent.innerHTML = next.html;
+  guestNotificationNext.textContent = state.notificationQueue.length ? 'Nächster Hinweis' : 'Verstanden';
+  guestNotificationModal.hidden = false;
+  return true;
+}
+
+function startGuestNotificationSequence() {
+  state.notificationQueue = buildGuestNotificationQueue();
+  if (!state.notificationQueue.length) return false;
+  return showNextGuestNotification();
+}
+
+function openRegularInformation() {
+  const info = state.guestInformation?.regular_information || {};
+  ['general_info', 'favorite_drink', 'preferred_area', 'further_preferences', 'other_internal_info'].forEach((field) => {
+    regularInfoForm.elements[field].value = info[field] || '';
+  });
+  const editable = state.guestInformation?.permissions?.can_edit_regular_information === true;
+  regularInfoForm.querySelectorAll('input, textarea').forEach((element) => { element.disabled = !editable; });
+  regularInfoForm.querySelector('[type="submit"]').hidden = !editable;
+  regularInfoMessage.hidden = true;
+  regularInfoModal.hidden = false;
+}
+
+function noteById(noteId) {
+  return (state.guestInformation?.notes || []).find((note) => note.id === noteId);
+}
+
+function openGuestNoteEditor(mode, note = {}) {
+  guestNoteForm.reset();
+  guestNoteForm.elements.mode.value = mode;
+  guestNoteForm.elements.note_id.value = note.id || '';
+  guestNoteForm.elements.priority.value = note.priority || 'NORMAL';
+  guestNoteForm.elements.note_text.value = note.note_text || '';
+  const deleting = mode === 'delete';
+  guestNoteTitle.textContent = deleting ? 'Notiz löschen' : mode === 'edit' ? 'Notiz bearbeiten' : 'Notiz hinzufügen';
+  guestNoteSubmit.textContent = deleting ? 'Notiz soft löschen' : 'Speichern';
+  guestNoteSubmit.classList.toggle('danger', deleting);
+  guestNoteDeleteReasonField.hidden = !deleting;
+  guestNoteForm.elements.priority.disabled = deleting;
+  guestNoteForm.elements.note_text.disabled = deleting;
+  guestNoteMessage.hidden = true;
+  guestNoteModal.hidden = false;
+}
+
+async function saveRegularInformation(event) {
+  event.preventDefault();
+  const formData = new FormData(regularInfoForm);
+  const result = await callScannerActionApi('regular-info-save', {
+    generalInfo: formData.get('general_info'),
+    favoriteDrink: formData.get('favorite_drink'),
+    preferredArea: formData.get('preferred_area'),
+    furtherPreferences: formData.get('further_preferences'),
+    otherInternalInfo: formData.get('other_internal_info')
+  });
+  state.guestInformation = result.guest_information;
+  regularInfoModal.hidden = true;
+  renderCard();
+  showMessage(scannerMessage, 'Stammgastinformationen wurden gespeichert.', 'success');
+}
+
+async function saveGuestNote(event) {
+  event.preventDefault();
+  const formData = new FormData(guestNoteForm);
+  const mode = String(formData.get('mode') || 'create');
+  const result = await callScannerActionApi(`guest-note-${mode}`, {
+    noteId: formData.get('note_id') || null,
+    noteText: formData.get('note_text') || null,
+    priority: formData.get('priority') || 'NORMAL',
+    deleteReason: formData.get('delete_reason') || null
+  });
+  state.guestInformation = result.guest_information;
+  guestNoteModal.hidden = true;
+  renderCard();
+  showMessage(scannerMessage, mode === 'delete' ? 'Notiz wurde soft gelöscht; die Historie bleibt erhalten.' : 'Gastnotiz wurde gespeichert.', 'success');
+}
+
 function toDatetimeLocal(value = new Date().toISOString()) {
   const date = new Date(value);
   const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
@@ -527,6 +714,7 @@ function openRestrictionEditor(mode, restriction = {}) {
 
 function applyRestrictionResult(result) {
   state.guestRestrictions = result.guest_restrictions || state.guestRestrictions;
+  state.guestInformation = result.guest_information || state.guestInformation;
   state.operatorRole = result.operator_role || state.operatorRole;
   state.restrictionAcknowledged = !(state.guestRestrictions.active || []).length;
   renderCard();
@@ -678,15 +866,14 @@ async function loadCardByCode(rawCode) {
   state.currentCard = card;
   state.currentCardInstance = result.card_instance || null;
   state.guestRestrictions = result.guest_restrictions || { active: [], history: [], permissions: {} };
+  state.guestInformation = result.guest_information || { regular_information: null, notes: [], settings: {}, permissions: {} };
   state.operatorRole = result.operator_role || '';
   state.restrictionAcknowledged = !(state.guestRestrictions.active || []).length;
   state.pendingRestrictionAction = null;
   state.originalCard = structuredClone(card);
   renderCard();
 
-  if (!showRestrictionWarning()) {
-    showAccessStatusModal(card);
-  }
+  if (!showRestrictionWarning() && !startGuestNotificationSequence()) showAccessStatusModal(card);
   showMessage(scannerMessage, t('scanner.cardLoaded'), 'success');
 }
 
@@ -867,6 +1054,7 @@ function applyScannerActionResult(result) {
   state.currentCard = result.card;
   state.currentCardInstance = result.card_instance || null;
   state.guestRestrictions = result.guest_restrictions || state.guestRestrictions;
+  state.guestInformation = result.guest_information || state.guestInformation;
   state.operatorRole = result.operator_role || state.operatorRole;
   state.originalCard = structuredClone(state.currentCard);
   renderCard();
@@ -1200,8 +1388,18 @@ async function initScanner() {
     if (pending) {
       runScannerAction(pending.action, pending.payload).catch(showScannerActionError);
     } else {
-      showAccessStatusModal();
+      if (!startGuestNotificationSequence()) showAccessStatusModal();
     }
+  });
+
+  guestNotificationNext?.addEventListener('click', showNextGuestNotification);
+  regularInfoCancel?.addEventListener('click', () => { regularInfoModal.hidden = true; });
+  regularInfoForm?.addEventListener('submit', (event) => {
+    saveRegularInformation(event).catch((error) => showMessage(regularInfoMessage, error.error_message || error.message || 'Stammgastinformationen konnten nicht gespeichert werden.', 'error'));
+  });
+  guestNoteCancel?.addEventListener('click', () => { guestNoteModal.hidden = true; });
+  guestNoteForm?.addEventListener('submit', (event) => {
+    saveGuestNote(event).catch((error) => showMessage(guestNoteMessage, error.error_message || error.message || 'Gastnotiz konnte nicht gespeichert werden.', 'error'));
   });
 
   restrictionEditorCancel?.addEventListener('click', hideRestrictionEditor);
@@ -1238,6 +1436,19 @@ async function initScanner() {
   });
 
   cardPanel?.addEventListener('click', (event) => {
+    const guestInfoButton = event.target.closest('[data-guest-info-action]');
+    if (guestInfoButton) {
+      openRegularInformation();
+      return;
+    }
+
+    const guestNoteButton = event.target.closest('[data-guest-note-action]');
+    if (guestNoteButton) {
+      const mode = guestNoteButton.dataset.guestNoteAction;
+      openGuestNoteEditor(mode, noteById(guestNoteButton.dataset.noteId) || {});
+      return;
+    }
+
     const restrictionButton = event.target.closest('[data-restriction-action]');
 
     if (restrictionButton) {

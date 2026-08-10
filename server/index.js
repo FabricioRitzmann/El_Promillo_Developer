@@ -971,6 +971,64 @@ async function manageGuestRestriction(card, userId, role, body = {}) {
   return publicOperatorRestrictions(data, role);
 }
 
+function publicGuestInformation(payload, role) {
+  const canManage = ['admin', 'manager'].includes(role);
+  return {
+    regular_information: payload?.regular_information || null,
+    notes: Array.isArray(payload?.notes) ? payload.notes : [],
+    settings: {
+      regular_info_auto_show: payload?.settings?.regular_info_auto_show === true,
+      notes_auto_show_warning: payload?.settings?.notes_auto_show_warning !== false,
+      notes_auto_show_important: payload?.settings?.notes_auto_show_important !== false,
+      notes_auto_show_normal: payload?.settings?.notes_auto_show_normal === true
+    },
+    permissions: {
+      can_edit_regular_information: canManage,
+      can_create_note: ['admin', 'manager', 'security'].includes(role),
+      can_update_note: canManage,
+      can_delete_note: canManage
+    }
+  };
+}
+
+async function getGuestInformationForScan(card, role) {
+  if (!card.business_id || !card.guest_profile_id) return publicGuestInformation(null, role);
+  const { data, error } = await supabaseAdmin.rpc('get_guest_information_for_scan', { p_customer_card_id: card.id });
+  if (error) throw createStructuredError(500, 'GUEST_INFO_LOAD_FAILED', 'Gastinformationen konnten nicht geladen werden.', error.message);
+  return publicGuestInformation(data, role);
+}
+
+async function manageGuestInformation(card, userId, role, body = {}) {
+  let response;
+  if (String(body.action || '') === 'regular-info-save') {
+    response = await supabaseAdmin.rpc('manage_guest_regular_information', {
+      p_customer_card_id: card.id,
+      p_actor_id: userId,
+      p_general_info: body.generalInfo || null,
+      p_favorite_drink: body.favoriteDrink || null,
+      p_preferred_area: body.preferredArea || null,
+      p_further_preferences: body.furtherPreferences || null,
+      p_other_internal_info: body.otherInternalInfo || null
+    });
+  } else {
+    response = await supabaseAdmin.rpc('manage_guest_note', {
+      p_customer_card_id: card.id,
+      p_action: String(body.action || '').replace(/^guest-note-/, ''),
+      p_actor_id: userId,
+      p_note_id: body.noteId || null,
+      p_note_text: body.noteText || null,
+      p_priority: body.priority || 'NORMAL',
+      p_delete_reason: body.deleteReason || null
+    });
+  }
+  if (response.error) {
+    const message = String(response.error.message || '');
+    const forbidden = message.includes('FORBIDDEN');
+    throw createStructuredError(forbidden ? 403 : 400, forbidden ? 'GUEST_INFO_WRITE_FORBIDDEN' : 'GUEST_INFO_WRITE_FAILED', forbidden ? 'Keine Berechtigung für diese Änderung.' : 'Gastinformationen konnten nicht gespeichert werden.', message);
+  }
+  return publicGuestInformation(response.data, role);
+}
+
 function isMissingWalletEmblemColumn(error) {
   const message = String(error?.message || error?.details || '');
 
@@ -2441,6 +2499,7 @@ app.post('/api/scanner/actions', async (req, res) => {
     const now = new Date().toISOString();
     const cardInstanceBeforeScan = await loadLocalCardInstanceForScan(card);
     const restrictions = await getGuestRestrictionsForScan(card, operatorRole);
+    const guestInformation = await getGuestInformationForScan(card, operatorRole);
 
     if (action === 'inspect') {
       const guestProfile = await getGuestProfileForScan(card);
@@ -2451,6 +2510,7 @@ app.post('/api/scanner/actions', async (req, res) => {
         card: publicOperatorCard(card),
         guest_profile: guestProfile,
         guest_restrictions: restrictions,
+        guest_information: guestInformation,
         operator_role: operatorRole,
         card_instance: {
           id: cardInstanceBeforeScan.id,
@@ -2481,6 +2541,22 @@ app.post('/api/scanner/actions', async (req, res) => {
         card: publicOperatorCard(card),
         guest_profile: await getGuestProfileForScan(card),
         guest_restrictions: updatedRestrictions,
+        guest_information: guestInformation,
+        operator_role: operatorRole,
+        card_instance: cardInstanceBeforeScan
+      });
+      return;
+    }
+
+    if (['regular-info-save', 'guest-note-create', 'guest-note-update', 'guest-note-delete'].includes(action)) {
+      const updatedGuestInformation = await manageGuestInformation(card, user.id, operatorRole, req.body || {});
+      res.json({
+        ok: true,
+        action,
+        card: publicOperatorCard(card),
+        guest_profile: await getGuestProfileForScan(card),
+        guest_restrictions: restrictions,
+        guest_information: updatedGuestInformation,
         operator_role: operatorRole,
         card_instance: cardInstanceBeforeScan
       });
@@ -3029,6 +3105,7 @@ app.post('/api/scanner/actions', async (req, res) => {
       cloakroom_location_reminder: cloakroomLocationReminder,
       guest_profile: guestProfile,
       guest_restrictions: await getGuestRestrictionsForScan(updatedCard, operatorRole),
+      guest_information: await getGuestInformationForScan(updatedCard, operatorRole),
       operator_role: operatorRole,
       card: publicOperatorCard(updatedCard)
     });

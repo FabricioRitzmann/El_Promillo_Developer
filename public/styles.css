@@ -3384,3 +3384,52 @@ body:has(.modal-backdrop:not([hidden])) {
     grid-template-columns: 1fr;
   }
 }
+.guest-information-section {
+  margin: 1.25rem 0;
+  padding: 1rem;
+  border: 1px solid var(--border-color, #ded7ce);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.guest-notes-heading {
+  margin-top: 1.25rem;
+}
+
+.guest-notes-list,
+.guest-notification-content {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.guest-note-card {
+  padding: 0.85rem;
+  border-left: 4px solid #8d857c;
+  border-radius: 0.65rem;
+  background: rgba(0, 0, 0, 0.035);
+}
+
+.guest-note-card p {
+  margin: 0.35rem 0;
+}
+
+.guest-note-warning {
+  border-left-color: #b42318;
+  background: #fff1f0;
+}
+
+.guest-note-important {
+  border-left-color: #b7791f;
+  background: #fff8e6;
+}
+
+.guest-info-editor-panel,
+.guest-note-editor-panel,
+.guest-notification-panel {
+  max-width: 680px;
+}
+
+.guest-scan-settings {
+  display: grid;
+  gap: 0.75rem;
+}

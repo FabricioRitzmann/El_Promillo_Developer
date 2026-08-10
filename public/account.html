@@ -151,6 +151,27 @@
             <button id="saveBusinessLocationButton" class="primary" type="submit" data-i18n="account.locationSave">Standortangaben speichern</button>
           </div>
         </div>
+
+        <div class="account-location-block guest-scan-settings">
+          <h2>Automatische Scanner-Hinweise</h2>
+          <p class="muted">Legt fest, welche internen Gastinformationen nach einem Scan automatisch erscheinen. Aktive Restriktionen haben immer Vorrang.</p>
+          <label class="choice-card">
+            <input name="regular_info_auto_show" type="checkbox">
+            <span>Stammgastinformationen beim Scan automatisch anzeigen</span>
+          </label>
+          <label class="choice-card">
+            <input name="notes_auto_show_warning" type="checkbox" checked>
+            <span>Warnhinweise automatisch anzeigen</span>
+          </label>
+          <label class="choice-card">
+            <input name="notes_auto_show_important" type="checkbox" checked>
+            <span>Wichtige Notizen automatisch anzeigen</span>
+          </label>
+          <label class="choice-card">
+            <input name="notes_auto_show_normal" type="checkbox">
+            <span>Normale Notizen automatisch anzeigen</span>
+          </label>
+        </div>
       </form>
     </main>
 
