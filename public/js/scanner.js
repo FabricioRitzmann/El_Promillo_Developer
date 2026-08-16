@@ -300,17 +300,20 @@ function guestPriorityLabel(priority) {
 }
 
 function regularInformationHasContent(info = {}) {
+  const safeInfo = info && typeof info === 'object' && !Array.isArray(info) ? info : {};
+
   return ['general_info', 'favorite_drink', 'preferred_area', 'further_preferences', 'other_internal_info']
-    .some((field) => String(info?.[field] || '').trim());
+    .some((field) => String(safeInfo[field] || '').trim());
 }
 
 function regularInformationHtml(info = {}) {
+  const safeInfo = info && typeof info === 'object' && !Array.isArray(info) ? info : {};
   const fields = [
-    ['Allgemein', info.general_info],
-    ['Lieblingsgetränk', info.favorite_drink],
-    ['Bereich / Tisch', info.preferred_area],
-    ['Weitere Präferenzen', info.further_preferences],
-    ['Andere interne Informationen', info.other_internal_info]
+    ['Allgemein', safeInfo.general_info],
+    ['Lieblingsgetränk', safeInfo.favorite_drink],
+    ['Bereich / Tisch', safeInfo.preferred_area],
+    ['Weitere Präferenzen', safeInfo.further_preferences],
+    ['Andere interne Informationen', safeInfo.other_internal_info]
   ].filter(([, value]) => String(value || '').trim());
   return fields.length
     ? `<dl class="detail-grid">${fields.map(([label, value]) => `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>`).join('')}</dl>`
