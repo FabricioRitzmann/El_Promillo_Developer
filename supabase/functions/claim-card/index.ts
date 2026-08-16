@@ -150,6 +150,26 @@ function safeHttpsUrl(value: unknown) {
   }
 }
 
+function hasCrmRegistrationValue(value: unknown): boolean {
+  if (Array.isArray(value)) return value.some(hasCrmRegistrationValue);
+  if (typeof value === 'boolean') return value === true;
+  if (value === null || value === undefined) return false;
+  if (typeof value === 'object') return Object.values(value as Row).some(hasCrmRegistrationValue);
+  return stringValue(value) !== '';
+}
+
+function hasCrmRegistrationInput(registration: unknown) {
+  if (!registration || typeof registration !== 'object' || Array.isArray(registration)) return false;
+  const payload = registration as Row;
+  const standard = payload.standard && typeof payload.standard === 'object' ? payload.standard : {};
+  const socials = Array.isArray(payload.social_links) ? payload.social_links : [];
+  const customValues = payload.custom_values && typeof payload.custom_values === 'object' ? payload.custom_values : {};
+
+  return hasCrmRegistrationValue(standard)
+    || socials.some((entry: Row) => hasCrmRegistrationValue(entry?.url))
+    || hasCrmRegistrationValue(customValues);
+}
+
 function crmRegistrationConfig(template: Row) {
   const business = templateBusiness(template) || {};
   const settings = template.settings && typeof template.settings === 'object' ? template.settings : {};
@@ -164,7 +184,7 @@ function crmRegistrationConfig(template: Row) {
 
 async function createPersonalizedGuestProfile(supabaseAdmin: any, template: Row, body: Row) {
   const registration = body.crmRegistration || body.crm_registration;
-  if (!registration || typeof registration !== 'object' || Array.isArray(registration)) return null;
+  if (!hasCrmRegistrationInput(registration)) return null;
   const config = crmRegistrationConfig(template);
   if (!config.enabled) {
     throw createStructuredError(403, 'CRM_REGISTRATION_NOT_ALLOWED', 'Personalisierung ist für diese Karte nicht freigegeben.', 'Öffentliche CRM-Daten dürfen nur für ein aktiviertes Template erfasst werden.');

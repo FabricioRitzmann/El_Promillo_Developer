@@ -260,8 +260,27 @@ function safePublicCrmUrl(value) {
   }
 }
 
+function hasCrmRegistrationValue(value) {
+  if (Array.isArray(value)) return value.some(hasCrmRegistrationValue);
+  if (typeof value === 'boolean') return value === true;
+  if (value == null) return false;
+  if (typeof value === 'object') return Object.values(value).some(hasCrmRegistrationValue);
+  return String(value).trim() !== '';
+}
+
+function hasCrmRegistrationInput(registration) {
+  if (!registration || typeof registration !== 'object' || Array.isArray(registration)) return false;
+  const standard = registration.standard && typeof registration.standard === 'object' ? registration.standard : {};
+  const socials = Array.isArray(registration.social_links) ? registration.social_links : [];
+  const customValues = registration.custom_values && typeof registration.custom_values === 'object' ? registration.custom_values : {};
+
+  return hasCrmRegistrationValue(standard)
+    || socials.some((entry) => hasCrmRegistrationValue(entry?.url))
+    || hasCrmRegistrationValue(customValues);
+}
+
 async function createLocalPersonalizedGuestProfile(template, registration) {
-  if (!registration || typeof registration !== 'object' || Array.isArray(registration)) return null;
+  if (!hasCrmRegistrationInput(registration)) return null;
   const business = Array.isArray(template.businesses) ? template.businesses[0] : template.businesses;
   const settings = template.settings && typeof template.settings === 'object' ? template.settings : {};
   const fields = Array.isArray(settings.crmRegistrationFields) ? settings.crmRegistrationFields.filter((field) => field?.enabled === true).slice(0, 50) : [];

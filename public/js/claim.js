@@ -96,8 +96,16 @@ function renderClaimCrmForm() {
   claimCrmFields.innerHTML = enabled ? fields.map(crmFieldInput).join('') : '';
 }
 
+function hasCrmValue(value) {
+  if (Array.isArray(value)) return value.some(hasCrmValue);
+  if (typeof value === 'boolean') return value === true;
+  if (value == null) return false;
+  if (typeof value === 'object') return Object.values(value).some(hasCrmValue);
+  return String(value).trim() !== '';
+}
+
 function crmRegistrationPayload() {
-  if (claimCrmForm?.hidden) return {};
+  if (claimCrmForm?.hidden) return null;
   if (!claimCrmForm.reportValidity()) throw new Error('Bitte fülle alle Pflichtfelder korrekt aus.');
   const data = new FormData(claimCrmForm);
   const fields = Array.isArray(template?.crm_registration_fields) ? template.crm_registration_fields : [];
@@ -113,6 +121,9 @@ function crmRegistrationPayload() {
   }
   if (fields.some((field) => field.key === 'address')) {
     for (const key of ['street', 'house_number', 'postal_code', 'city', 'country']) standard[key] = String(data.get(`crm_${key}`) || '').trim();
+  }
+  if (!hasCrmValue(standard) && !socialLinks.some((entry) => hasCrmValue(entry.url)) && !hasCrmValue(customValues)) {
+    return null;
   }
   return { standard, social_links: socialLinks, custom_values: customValues };
 }
@@ -485,7 +496,7 @@ async function createGoogleWalletSaveLink(result) {
 }
 
 
-async function claimCardViaEdge(walletPlatform, walletObjectId, crmRegistration = {}) {
+async function claimCardViaEdge(walletPlatform, walletObjectId, crmRegistration = null) {
   const supabaseUrl = publicConfig?.supabase?.url?.replace(/\/$/, '');
   const anonKey = publicConfig?.supabase?.anonKey;
 
@@ -496,6 +507,15 @@ async function claimCardViaEdge(walletPlatform, walletObjectId, crmRegistration 
   let response;
 
   try {
+    const payload = {
+      templateId: template.id,
+      claimToken: currentClaimToken || undefined,
+      walletPlatform,
+      walletObjectId,
+      claimSource: currentClaimSource,
+      ...(crmRegistration ? { crmRegistration } : {})
+    };
+
     response = await fetch(`${supabaseUrl}/functions/v1/claim-card`, {
       method: 'POST',
       headers: {
@@ -503,14 +523,7 @@ async function claimCardViaEdge(walletPlatform, walletObjectId, crmRegistration 
         apikey: anonKey,
         Authorization: `Bearer ${anonKey}`
       },
-      body: JSON.stringify({
-        templateId: template.id,
-        claimToken: currentClaimToken || undefined,
-        walletPlatform,
-        walletObjectId,
-        claimSource: currentClaimSource,
-        crmRegistration
-      })
+      body: JSON.stringify(payload)
     });
   } catch (error) {
     error.fallbackToLocal = true;
@@ -535,20 +548,22 @@ async function claimCardViaEdge(walletPlatform, walletObjectId, crmRegistration 
   };
 }
 
-async function claimCardViaLocalApi(walletPlatform, walletObjectId, crmRegistration = {}) {
+async function claimCardViaLocalApi(walletPlatform, walletObjectId, crmRegistration = null) {
+  const payload = {
+    templateId: template.id,
+    claimToken: currentClaimToken || undefined,
+    walletPlatform,
+    walletObjectId,
+    claimSource: currentClaimSource,
+    ...(crmRegistration ? { crmRegistration } : {})
+  };
+
   const response = await fetch(apiUrl('/api/cards/claim'), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({
-      templateId: template.id,
-      claimToken: currentClaimToken || undefined,
-      walletPlatform,
-      walletObjectId,
-      claimSource: currentClaimSource,
-      crmRegistration
-    })
+    body: JSON.stringify(payload)
   });
 
   const result = await response.json();
