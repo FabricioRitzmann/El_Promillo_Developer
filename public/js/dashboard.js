@@ -381,9 +381,6 @@ function renderTemplates() {
         <td>${escapeHtml(templateFeatureSummary(template))}</td>
         <td>${escapeHtml(template.reward_text || '-')}</td>
         <td>${template.is_active ? 'Aktiv' : 'Inaktiv'}</td>
-        <td>
-          <img class="table-qr" src="${qrUrl}" alt="QR-Code für ${escapeHtml(template.card_name)}">
-        </td>
         <td class="actions-cell">
           <select
             class="action-select"
@@ -420,7 +417,6 @@ function renderTemplates() {
             <th>Funktion</th>
             <th>Belohnung</th>
             <th>Status</th>
-            <th>QR</th>
             <th>Aktionen</th>
           </tr>
         </thead>
