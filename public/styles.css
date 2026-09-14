@@ -479,6 +479,30 @@ textarea {
   text-underline-offset: 0.28rem;
 }
 
+.site-legal-links {
+  width: min(980px, 100%);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.55rem 1rem;
+  margin: clamp(1.1rem, 3vw, 1.7rem) auto 0;
+  padding: 0 1rem;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.site-legal-links a {
+  color: currentColor;
+  text-decoration: none;
+}
+
+.site-legal-links a:hover,
+.site-legal-links a:focus-visible {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 0.24rem;
+}
+
 .dashboard-about-section {
   margin: clamp(2rem, 5vw, 3.5rem) auto 0;
   padding-bottom: clamp(0.5rem, 2vw, 1.25rem);
